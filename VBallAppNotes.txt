@@ -25,12 +25,8 @@ Zoom scrub should not highlight.
 
 git add .
 
-git commit -m "feat(editable-cell): add keyboard navigation and auto-resizing
-- Implement Tab / Shift+Tab and Enter / Shift+Enter navigation between cells
-- Support Alt+Enter for newline insertion without saving
-- Handle Escape to cancel edits without committing changes
-- Auto-resize textarea height based on content using ghost element
-- Preserve and display multiline content with proper styling
-- Improve focus and editing transitions with ref forwarding"
+git commit -m "refactor(DBStats): compact admin control columns and add refresh button
+- Added "Add 10 Rows to Bottom" and "Refresh DB" buttons in Admin Mode
+- Moved stats fetching logic into shared `loadStatsForSelectedVideo` function to remove duplication"
 
 git push

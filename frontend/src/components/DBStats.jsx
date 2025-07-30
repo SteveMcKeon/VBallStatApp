@@ -49,6 +49,7 @@ const IconWithTooltip = ({ children, tooltip }) => {
 const DBStats = ({
   isAdmin,
   stats,
+  refreshStats,
   setStats,
   filteredStats,
   visibleColumns,
@@ -216,7 +217,7 @@ const DBStats = ({
                   } : undefined}
                 >
                 {isAdmin && (
-                  <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center">
+                  <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center w-8 px-1">
                     <button
                       className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
                       onClick={async (e) => {
@@ -379,9 +380,9 @@ const DBStats = ({
                     );
                   })}
                   {isAdmin && (
-                    <td className="text-center">
+                    <td className="text-center w-8 px-1">
                       <button
-                        className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
+                        className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
                         onClick={async (e) => {
                           e.stopPropagation();
                           try {
@@ -430,6 +431,48 @@ const DBStats = ({
           )}
         </tbody>
       </table>
+      {isAdmin && (
+        <div className="flex justify-between items-center mt-4 px-4">
+          <button
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow"
+            onClick={async () => {
+              const lastRow = stats[stats.length - 1];
+              const newRows = Array.from({ length: 10 }, (_, i) => ({
+                game_id: lastRow?.game_id,
+                rally_id: lastRow?.rally_id,
+                posession_seq: lastRow?.posession_seq || 0,
+                import_seq: (lastRow?.import_seq || 0) + 0.01 + i * 0.01,
+                our_score: lastRow?.our_score,
+                opp_score: lastRow?.opp_score,
+                set: lastRow?.set,
+              }));
+
+              try {
+                const res = await authorizedFetch('/api/save-stats', {
+                  body: { rows: newRows },
+                });
+                const result = await res.json();
+                if (result.success && result.insertedRows?.length) {
+                  setStats([...stats, ...result.insertedRows]);
+                } else {
+                  alert('Failed to add rows.');
+                }
+              } catch (err) {
+                console.error('Add 10 rows failed', err);
+                alert('Add 10 rows failed');
+              }
+            }}
+          >
+            ➕ Add 10 Rows to Bottom
+          </button>
+          <button
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow"
+            onClick={refreshStats}
+          >
+            🔄 Refresh DB
+          </button>
+        </div>
+      )}      
     </>
   );
 };

@@ -176,11 +176,51 @@ const MainPage = () => {
   };
   const lastScrollY = useRef(0);
   const suppressScrollDetection = useRef(false);
+
+  const loadStatsForSelectedVideo = async (videoUrl) => {
+    if (!videoUrl) {
+      setStats([]);
+      return;
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from('games')
+      .select('id')
+      .eq('video_url', videoUrl)
+      .single();
+
+    if (existingError || !existing?.id) {
+      console.error('Error checking for game:', existingError);
+      setStats([]);
+      return;
+    }
+
+    setGameId(existing.id);
+
+    const { data: statData, error: statError } = await supabase
+      .from('stats')
+      .select('*')
+      .eq('game_id', existing.id)
+      .order('import_seq', { ascending: true });
+
+    if (statError || !statData) {
+      console.error('Failed to fetch stats:', statError);
+      setStats([]);
+    } else {
+      setStats(statData);
+    }
+  };
+  
+  useEffect(() => {
+    loadStatsForSelectedVideo(selectedVideo);
+  }, [selectedVideo]);
+  
   useEffect(() => {
     if (selectedGameId) {
       localStorage.setItem('selectedGameId', selectedGameId);
     }
   }, [selectedGameId]);
+  
   const fetchTeamNames = async () => {
     const { data, error } = await supabase
       .from('games')
@@ -195,6 +235,7 @@ const MainPage = () => {
 
     return [...new Set(data.map(row => row.team_name))];
   };  
+  
   useEffect(() => {
     setIsAppLoading(true);
     const savedTeam = getLocal('teamName');
@@ -231,9 +272,11 @@ const MainPage = () => {
 
     fetchAndRestore();
   }, []);
+  
   useEffect(() => {
     setLocal('visibleColumnsMainPage', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
+  
   const handleHeaderClick = (columnKey) => {
     setSortConfig((prev) => {
       if (prev.key === columnKey) {
@@ -243,9 +286,11 @@ const MainPage = () => {
       return { key: columnKey, direction: 'asc' };
     });
   };  
+  
   useEffect(() => {
     setLocal('layoutMode', layoutMode);
   }, [layoutMode]);
+  
   useEffect(() => {
     fetch('/api/videos')
       .then(async res => {
@@ -260,38 +305,9 @@ const MainPage = () => {
         console.error('Failed to load videos:', err.message);
       });
   }, []);
-  useEffect(() => {
-    if (!selectedVideo) {
-      setStats([]); 
-      return;
-    }
-    setStats([]);
-    (async () => {
-      const { data: existing, error: existingError } = await supabase
-        .from('games')
-        .select('id')
-        .eq('video_url', selectedVideo)
-        .single();
-      if (existingError || !existing?.id) {
-        console.error('Error checking for game:', existingError);
-        setStats([]);
-        return;
-      }
-      setGameId(existing.id);
-      const { data: statData, error: statError } = await supabase
-        .from('stats')
-        .select('*')
-        .eq('game_id', existing.id)
-        .order('import_seq', { ascending: true });
-
-      if (statError || !statData) {
-        console.error('Failed to fetch stats:', statError);
-        setStats([]);
-      } else {
-        setStats(statData);
-      }
-    })();
-  }, [selectedVideo]);
+  
+  const refreshStats = () => loadStatsForSelectedVideo(selectedVideo);
+  
   const uniqueValues = (key) =>
     [...new Set(stats.map((s) => s[key]).filter((v) => v !== undefined && v !== null))];
   const filteredStats = stats
@@ -608,6 +624,7 @@ const MainPage = () => {
             <DBStats
               isAdmin={isAdmin}
               stats={stats}
+              refreshStats={refreshStats}
               setStats={setStats}
               filteredStats={filteredStats}
               visibleColumns={visibleColumns}
