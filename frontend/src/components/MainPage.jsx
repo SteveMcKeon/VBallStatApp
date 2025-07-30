@@ -326,26 +326,43 @@ const MainPage = () => {
         };
         const evaluateNumber = (cond) => {
           const rawValue = s[key];
+          if (cond.operator === 'blank') return rawValue == null || rawValue === '';
+          if (cond.operator === 'not_blank') return rawValue != null && rawValue !== '';
+          if (rawValue == null || rawValue === '') return false;
           const numericValue = Number(rawValue);
-          const rawConditionValue = cond.value;
-          if (rawConditionValue === '' || rawConditionValue == null) return false;
-          const conditionValue = Number(rawConditionValue);
-
+          if (isNaN(numericValue)) return false;
           switch (cond.operator) {
-            case 'equals': return numericValue === conditionValue;
-            case 'not_equals': return numericValue !== conditionValue;
-            case 'lt': return numericValue < conditionValue;
-            case 'lte': return numericValue <= conditionValue;
-            case 'gt': return numericValue > conditionValue;
-            case 'gte': return numericValue >= conditionValue;
+            case 'equals': {
+              const conditionValue = Number(cond.value);
+              return !isNaN(conditionValue) && numericValue === conditionValue;
+            }
+            case 'not_equals': {
+              const conditionValue = Number(cond.value);
+              return !isNaN(conditionValue) && numericValue !== conditionValue;
+            }
+            case 'lt': {
+              const conditionValue = Number(cond.value);
+              return !isNaN(conditionValue) && numericValue < conditionValue;
+            }
+            case 'lte': {
+              const conditionValue = Number(cond.value);
+              return !isNaN(conditionValue) && numericValue <= conditionValue;
+            }
+            case 'gt': {
+              const conditionValue = Number(cond.value);
+              return !isNaN(conditionValue) && numericValue > conditionValue;
+            }
+            case 'gte': {
+              const conditionValue = Number(cond.value);
+              return !isNaN(conditionValue) && numericValue >= conditionValue;
+            }
             case 'between': {
               const min = Number(cond.value?.min);
               const max = Number(cond.value?.max);
-              return numericValue >= min && numericValue <= max;
+              return !isNaN(min) && !isNaN(max) && numericValue >= min && numericValue <= max;
             }
-            case 'blank': return rawValue == null;
-            case 'not_blank': return rawValue != null;
-            default: return false;
+            default:
+              return false;
           }
         };
         const isNumberType = ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(colType);

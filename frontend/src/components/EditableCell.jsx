@@ -6,7 +6,9 @@ const EditableCell = ({ value, type, statId, field, idx, stats, setStats }) => {
   const [tempValue, setTempValue] = useState(value ?? ' ');
   const inputRef = useRef(null);
   const { authorizedFetch } = EditMode();
-
+  useEffect(() => {
+    setTempValue(value ?? ' ');
+  }, [value]);
   const handleBlur = async () => {
     if (!editing) return;
 
