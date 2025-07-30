@@ -1,0 +1,35 @@
+#New Features
+add "export highlights" (for player / action type) functionality, ffmpeg
+Add functionailty for users to add stats so I don't have to do it all myself (this will require automating the rally/seq/touch/score, perhaps even timestamp numbering).
+	-add "insert rows" here/at end, copy/paste row, tab/enter switching to right/down editable cells.
+Add video player settings option to change settings such as "jump forward/backward" timings, delay after end of rally before skipping to next rally during autoplay
+	-Possible fix required. If time is increased too much it messes with all my timing stuff on autplay/rally seek...
+Add video upload functionaility
+	-Automate encoding pipeline.
+Add tooltip intro for new users to introduce features.
+Add "stat editor" user role
+Add resize video option (drag) in side-by-side mode.
+Make certian cells drop selectable only good values (points won, etc.) on admin insert
+Show timestamp on video seekbar as you scrub
+After I scrub, seek doesn't work right? it's going frame by frame. Add frame seek with "<" and ">" (in reality "," and ".")
+	Shift + -> and <- for seek to set.
+	Shift + n for next video (by date).
+Re add Header animation to disappear on scroll, and to work for mobile(add to app.jsx)
+Resize table columns button?
+Add green/yellow/red icons for status of videos on video selector.
+Add contact / bug report / suggestions email?
+OAuth -> register team, invite other players / accounts to team.
+Make it so, when autoplay or highlights is on, seeking with left/right seeks into the timings of the rally/highlights
+
+#Fixes
+REFACTOR
+Clicking into a second editablecell immediately exits.
+Zoom scrub should not highlight.
+make select a game not selectable after you select so keys dont mess with it.
+ensure editing works when stats are filtered
+sometimes selecting a new game doesn't allow the rallytimes to work correctly?
+
+
+git add .
+git commit -m "message here"
+git push
