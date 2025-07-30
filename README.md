@@ -30,17 +30,6 @@ VBallStatApp_dev/
 └── VBallAppNotes.txt      # Development notes
 ```
 
-## Supabase Usage
-
-Make sure Supabase is running (locally or remote), and your schema is defined in the `supabase/` folder.
-
-The `combineSets.js` script helps aggregate multiple game sets into one entry with adjusted timestamps.
-
-Run:
-```bash
-node combineSets.js
-```
-
 ## Sensitive Files (excluded via .gitignore)
 
 - `.env` — Supabase keys
@@ -55,4 +44,4 @@ This repository is publicly available for personal archival and demonstration pu
 
 ## Author
 
-Created and maintained by Steve McKeon
+Created and maintained by Stephen McKeon
