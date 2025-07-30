@@ -4,11 +4,14 @@ VBallStatApp is a volleyball match statistics tracking and analysis application.
 
 ## Features
 
-- Match Stats Aggregation: Combines stats from multiple sets into a single game timeline.
-- Video Sync Support: Associates stats with video timestamps for easy review.
-- Supabase Integration: Uses Supabase for database storage and querying.
-- Vite + Tailwind + React: Fast frontend stack with live development and flexible UI styling.
-- Docker Support: Ships with a docker-compose.yml and Dockerfile for containerized dev environments.
+- **Video-Linked Statistics** – Connects in-game stats to specific video timestamps for precise playback and review.
+- **Custom Video Player** – Includes rally-based navigation, zoom/pan, overlays, score tracking, and auto-skip to highlights.
+- **Dynamic Filtering & Sorting** – Filter and sort plays by player, action type, result, and more — instantly reflected in the video feed.
+- **Editable Stats Table** – Admins can edit stats inline with automatic recalculations for scores and possessions.
+- **Team & Game Management** – Supports multiple teams and games, with persistent local settings and easy switching.
+- **Statistical Summaries** – Provides aggregated stats, assist tracking, and outcome analysis by player, action, and result.
+- **Column Customization** – Toggle visibility for stat fields and sub-metrics to focus on what matters most.
+- **Secure Editing** – Token-based login for secure stat editing and saving.
 
 ## Project Structure
 
