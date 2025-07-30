@@ -69,7 +69,9 @@ const DBStats = ({
 }) => {
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
-
+  const [editingCell, setEditingCell] = React.useState(null);
+  const cellRefs = useRef({});
+  
   const isFiltered = Object.values(textColumnFilters).some((filter) => {
     const conditions = filter?.conditions ?? [];
     return conditions.some(({ operator, value }) =>
@@ -308,9 +310,10 @@ const DBStats = ({
                         : '';
 
                     return (
-                      <td key={field} className={`border border-black hover:bg-gray-100 ${highlightClass}`}>
+                      <td key={field} className={`border border-black hover:bg-gray-100 ${highlightClass} whitespace-pre-wrap`}>
                         {isAdmin ? (
                           <EditableCell
+                            ref={(el) => { cellRefs.current[`${idx}-${field}`] = el; }}
                             value={s[field]}
                             type={visibleColumns[field].type}
                             statId={s.id}
@@ -318,6 +321,56 @@ const DBStats = ({
                             idx={idx}
                             stats={stats}
                             setStats={setStats}
+                            setEditingCell={({ idx, field, direction }) => {
+                              const keys = Object.keys(visibleColumns).filter(
+                                k => visibleColumns[k]?.visible && k !== 'timestamp' && k !== 'score'
+                              );
+                              const colIndex = keys.indexOf(field);
+                              let newIdx = idx;
+                              let newField = field;
+
+                              if (direction === 'next') {
+                                if (colIndex < keys.length - 1) {
+                                  newField = keys[colIndex + 1];
+                                } else if (idx < filteredStats.length - 1) {
+                                  newIdx = idx + 1;
+                                  newField = keys[0];
+                                } else {
+                                  return;
+                                }
+                              } else if (direction === 'prev') {
+                                if (colIndex > 0) {
+                                  newField = keys[colIndex - 1];
+                                } else if (idx > 0) {
+                                  newIdx = idx - 1;
+                                  newField = keys[keys.length - 1];
+                                } else {
+                                  return; 
+                                }
+                              } else if (direction === 'down') {
+                                if (idx < filteredStats.length - 1) {
+                                  newIdx = idx + 1;
+                                } else {
+                                  return;
+                                }
+                              } else if (direction === 'up') {
+                                if (idx > 0) {
+                                  newIdx = idx - 1;
+                                } else {
+                                  return;
+                                }
+                              }
+                              requestAnimationFrame(() => {
+                                const cellRef = cellRefs.current[`${newIdx}-${newField}`];
+                                if (!cellRef) return;
+
+                                cellRef.clickToEdit?.();
+
+                                requestAnimationFrame(() => {
+                                  cellRef.focusInput?.();
+                                });
+                              });
+                            }}
                           />
                         ) : (
                           s[field] ?? ''

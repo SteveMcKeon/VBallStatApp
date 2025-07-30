@@ -1,19 +1,53 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } from 'react';
 import EditMode from './EditMode';
 
-const EditableCell = ({ value, type, statId, field, idx, stats, setStats }) => {
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, setEditingCell }, ref) => {
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value ?? ' ');
   const inputRef = useRef(null);
+  const wrapperRef = useRef(null); 
   const { authorizedFetch } = EditMode();
+  const [cellHeight, setCellHeight] = useState(null);
+  const [cellWidth, setCellWidth] = useState(null);  
+  const displayRef = useRef(null);
+  const ghostRef = useRef(null);
+  
+  useEffect(() => {
+    if (editing && inputRef.current && ghostRef.current) {
+      inputRef.current.style.height = ghostRef.current.offsetHeight + 'px';
+    }
+  }, [tempValue, editing]);
+    
   useEffect(() => {
     setTempValue(value ?? ' ');
   }, [value]);
+  
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      const el = inputRef.current;
+      el.select();
+    }
+  }, [editing]);
+
+  useImperativeHandle(ref, () => ({
+    focusInput: () => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    },
+    clickToEdit: () => {
+      wrapperRef.current?.click();
+    },
+    element: inputRef.current || wrapperRef.current
+  }));
+  
   const handleBlur = async () => {
     if (!editing) return;
 
     let parsed;
-    const isBlank = tempValue.trim?.() === '';
+    const isBlank =
+      ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(type)
+        ? tempValue.trim?.() === ''
+        : tempValue === '';
 
     if (['int2', 'int4', 'int8'].includes(type)) {
       parsed = isBlank ? null : parseInt(tempValue);
@@ -91,38 +125,125 @@ const EditableCell = ({ value, type, statId, field, idx, stats, setStats }) => {
     setEditing(false);
   };
 
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.select();
-    }
-  }, [editing]);
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setTempValue(value ?? ''); 
+      setEditing(false);         
+      return;
+    } else if (e.key === 'Enter') {
+      if (e.altKey) {
+        e.preventDefault();
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        const newValue =
+          tempValue.substring(0, start) + '\n' + tempValue.substring(end);
+        setTempValue(newValue);
 
-  return editing ? (
-    <input
-      ref={inputRef}
-      autoFocus
-      size="1"
-      className="w-full text-center bg-yellow-200"
-      value={tempValue}
-      onChange={(e) => setTempValue(e.target.value)}
-      onBlur={handleBlur}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') handleBlur();
-        if (e.key === 'Escape') {
-          setEditing(false);
-          setTempValue(value ?? '');
+        requestAnimationFrame(() => {
+          inputRef.current.selectionStart = inputRef.current.selectionEnd = start + 1;
+        });
+        return;
+      }
+
+      e.preventDefault();
+      handleBlur().then(() => {
+        if (setEditingCell) {
+          setEditingCell({
+            idx,
+            field,
+            direction: e.shiftKey ? 'up' : 'down'
+          });
         }
-      }}
-    />
-  ) : (
-    <div onClick={() => setEditing(true)} className="cursor-pointer hover:bg-gray-100">
-      {(value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) ? (
-        <span className="text-gray-400 italic">–</span>
-      ) : (
-        value
-      )}
+      });
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleBlur().then(() => {
+        if (setEditingCell) {
+          setEditingCell({
+            idx,
+            field,
+            direction: e.shiftKey ? 'prev' : 'next'
+          });
+        }
+      });
+    }
+  };
+
+  return (
+    editing ? (
+      <div ref={wrapperRef} className="relative w-full h-full">
+        <textarea
+          ref={inputRef}
+          autoFocus
+          rows={1}
+          className="resize-none text-center bg-yellow-200"
+          style={{
+            height: cellHeight ? `${cellHeight}px` : '100%',
+            width: cellWidth ? `${cellWidth}px` : '100%',
+            display: 'block',
+            verticalAlign: 'top',
+            fontSize: 'inherit',
+            fontFamily: 'inherit',
+            paddingTop: '0',
+            paddingBottom: '0',
+            paddingLeft: '0',
+            paddingRight: '0',
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            right: '0',
+            bottom: '0',
+            margin: '0',
+            border: 'none',
+            outline: 'none',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+          }}   
+          value={tempValue}
+          onChange={(e) => {
+            setTempValue(e.target.value);
+          }}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+        />
+        <div
+          ref={ghostRef}
+          aria-hidden
+          className="invisible whitespace-pre-wrap break-words w-full"
+          style={{
+            fontSize: 'inherit',
+            fontFamily: 'inherit',
+            lineHeight: 'inherit',
+            padding: 0,
+            margin: 0,
+          }}
+        >     
+        {(tempValue || ' ') + '\n'}      
+      </div>
     </div>
+    ) : (
+      <div
+        ref={wrapperRef}
+        onClick={() => {
+          if (displayRef.current) {
+            const { offsetHeight, offsetWidth } = displayRef.current;
+            setCellHeight(offsetHeight);
+            setCellWidth(offsetWidth);
+          }
+          setEditing(true);
+        }}
+        className="cursor-pointer hover:bg-gray-100"
+      >
+        {(value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) ? (
+          <span className="text-gray-400 italic">–</span>
+        ) : (
+          value
+        )}
+      </div>
+    )
   );
-};
+
+});
 
 export default EditableCell;

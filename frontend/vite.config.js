@@ -24,7 +24,7 @@ export default defineConfig({
         secure: false,
       }
     } 
-  }, 
+  },  
   publicDir: false,
   resolve: {
     alias: {

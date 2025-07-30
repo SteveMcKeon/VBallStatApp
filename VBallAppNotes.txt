@@ -25,7 +25,12 @@ Zoom scrub should not highlight.
 
 git add .
 
-git commit -m "Fix: restore video time only if same video is selected" \
--m "fix: reduce size of "Add row below" button by adjusting SVG and layout"
+git commit -m "feat(editable-cell): add keyboard navigation and auto-resizing
+- Implement Tab / Shift+Tab and Enter / Shift+Enter navigation between cells
+- Support Alt+Enter for newline insertion without saving
+- Handle Escape to cancel edits without committing changes
+- Auto-resize textarea height based on content using ghost element
+- Preserve and display multiline content with proper styling
+- Improve focus and editing transitions with ref forwarding"
 
 git push
