@@ -1,0 +1,5 @@
+*.env
+cert/
+*.exe
+node_modules/
+videos/
