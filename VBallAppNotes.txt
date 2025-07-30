@@ -25,9 +25,7 @@ Make it so, when autoplay or highlights is on, seeking with left/right seeks int
 REFACTOR
 Clicking into a second editablecell immediately exits.
 Zoom scrub should not highlight.
-make select a game not selectable after you select so keys dont mess with it.
 sometimes selecting a new game doesn't allow the rallytimes to work correctly?
-When selecting a cell to edit, it's auto filling the filtered somehow, but only the first time I try to edit. if I escape and then reenter, it works.
 
 git add .
 git commit -m "message here"

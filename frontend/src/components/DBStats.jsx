@@ -1,6 +1,50 @@
 import React, { useRef } from 'react';
 import SortableFilterHeader from './SortableFilterHeader';
 import EditableCell from './EditableCell';
+import TooltipPortal from '../utils/tooltipPortal';
+
+const IconWithTooltip = ({ children, tooltip }) => {
+  const [hovered, setHovered] = React.useState(false);
+  const ref = React.useRef(null);
+  const [coords, setCoords] = React.useState({ top: 0, left: 0 });
+
+  React.useEffect(() => {
+    if (hovered && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setCoords({
+        top: rect.top - 36,
+        left: rect.left + rect.width / 2,
+      });
+    }
+  }, [hovered]);
+
+  return (
+    <>
+      <div
+        ref={ref}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="inline-block"
+      >
+        {children}
+      </div>
+      {hovered && tooltip && (
+        <TooltipPortal>
+          <div
+            className="fixed z-[9999] bg-black text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap"
+            style={{
+              top: coords.top,
+              left: coords.left,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            {tooltip}
+          </div>
+        </TooltipPortal>
+      )}
+    </>
+  );
+};
 
 const DBStats = ({
   isAdmin,
@@ -169,8 +213,61 @@ const DBStats = ({
                     }
                   } : undefined}
                 >
-                  {isAdmin && <td ref={insertButtonParentRef}></td>}
-
+                {isAdmin && (
+                  <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center">
+                    <button
+                      className="p-1 rounded-full hover:scale-110 transition-transform"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const newRow = {
+                          game_id: s.game_id,
+                          rally_id: s.rally_id,
+                          posession_seq: (s.posession_seq || 0),
+                          import_seq: (s.import_seq || 0) + 0.01,
+                          our_score: s.our_score,
+                          opp_score: s.opp_score,
+                          set: s.set,
+                        };
+                        try {
+                          const res = await authorizedFetch('/api/save-stats', {
+                            body: { rows: [newRow] },
+                          });
+                          const result = await res.json();
+                          if (result.success && result.insertedRows?.length) {
+                            const inserted = result.insertedRows[0];
+                            const index = stats.findIndex(row => row.id === s.id);
+                            const updated = [...stats];
+                            updated.splice(index + 1, 0, inserted);
+                            setStats(updated);
+                          } else {
+                            alert('Failed to insert row.');
+                          }
+                        } catch (err) {
+                          console.error('Insert failed', err);
+                          alert('Insert failed');
+                        }
+                      }}
+                    >
+                      <IconWithTooltip tooltip="Add row below">
+                        <svg
+                          viewBox="-2 -2 24.00 24.00"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          className="w-6 h-6"
+                        >
+                          <rect x="-2" y="-2" width="24.00" height="24.00" rx="12" fill="#ccdfe5"></rect>
+                          <path
+                            stroke="#88d8a0"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M4.343 4.343l11.314 11.314m0 0h-9.9m9.9 0v-9.9"
+                          />
+                        </svg>
+                      </IconWithTooltip>
+                    </button>
+                  </td>
+                )}
                   {visibleColumns.timestamp?.visible && (
                     <td
                       className="border border-black cursor-pointer hover:bg-gray-100"
@@ -228,6 +325,46 @@ const DBStats = ({
                       </td>
                     );
                   })}
+                  {isAdmin && (
+                    <td className="text-center">
+                      <button
+                        className="p-1 rounded-full hover:scale-110 transition-transform"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const res = await authorizedFetch(`/api/delete-stat/${s.id}`, {
+                              method: 'DELETE',
+                            });
+                            const result = await res.json();
+                            if (result.success) {
+                              const updated = stats.filter(row => row.id !== s.id);
+                              setStats(updated);
+                            } else {
+                              alert('Delete failed: ' + result.message);
+                            }
+                          } catch (err) {
+                            console.error('Delete failed', err);
+                            alert('Delete failed');
+                          }
+                        }}
+                      >
+                        <IconWithTooltip tooltip="Delete row">
+                          <svg
+                            viewBox="-102.4 -102.4 1228.80 1228.80"
+                            className="w-6 h-6"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                          >
+                            <rect x="-102.4" y="-102.4" width="1228.80" height="1228.80" rx="614.4" fill="#ccdfe5" />
+                            <path d="M667.8 362.1H304V830c0 28.2 23 51 51.3 51h312.4c28.4 0 51.4-22.8 51.4-51V362.2h-51.3z" fill="#d24646"></path>
+                            <path d="M750.3 295.2c0-8.9-7.6-16.1-17-16.1H289.9c-9.4 0-17 7.2-17 16.1v50.9c0 8.9 7.6 16.1 17 16.1h443.4c9.4 0 17-7.2 17-16.1v-50.9z" fill="#d24646"></path>
+                            <path d="M733.3 258.3H626.6V196c0-11.5-9.3-20.8-20.8-20.8H419.1c-11.5 0-20.8 9.3-20.8 20.8v62.3H289.9c-20.8 0-37.7 16.5-37.7 36.8V346c0 18.1 13.5 33.1 31.1 36.2V830c0 39.6 32.3 71.8 72.1 71.8h312.4c39.8 0 72.1-32.2 72.1-71.8V382.2c17.7-3.1 31.1-18.1 31.1-36.2v-50.9c0.1-20.2-16.9-36.8-37.7-36.8z m-293.5-41.5h145.3v41.5H439.8v-41.5z m-146.2 83.1H729.5v41.5H293.6v-41.5z m404.8 530.2c0 16.7-13.7 30.3-30.6 30.3H355.4c-16.9 0-30.6-13.6-30.6-30.3V382.9h373.6v447.2z" fill="#211F1E"></path>
+                            <path d="M511.6 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.4 9.3 20.7 20.8 20.7zM407.8 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0.1 11.4 9.4 20.7 20.8 20.7zM615.4 799.6c11.5 0 20.8-9.3 20.8-20.8V467.4c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.5 9.3 20.8 20.8 20.8z" fill="#211F1E"></path>
+                          </svg>
+                        </IconWithTooltip>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })

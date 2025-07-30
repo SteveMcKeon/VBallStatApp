@@ -2,7 +2,7 @@
 
 rsync -av --exclude 'Dockerfile' \
            --exclude 'docker-compose*yml' \
-           --exclude 'backup/' \
+           --exclude '.git/' \
            --exclude 'VBallAppNotes.txt' \
            --exclude 'push_to_prod.sh' \
            --exclude 'videos/' \

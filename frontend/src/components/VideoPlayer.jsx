@@ -862,6 +862,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     >
     <video
       ref={videoRef}
+      tabIndex={-1}
       className="w-full transition-transform origin-center"
       style={{ transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px) rotate(${rotation}deg)` }}
       controls={false}
