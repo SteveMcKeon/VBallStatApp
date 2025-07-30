@@ -216,7 +216,7 @@ const DBStats = ({
                 {isAdmin && (
                   <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center">
                     <button
-                      className="p-1 rounded-full hover:scale-110 transition-transform"
+                      className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
                       onClick={async (e) => {
                         e.stopPropagation();
                         const newRow = {
@@ -253,7 +253,7 @@ const DBStats = ({
                           viewBox="-2 -2 24.00 24.00"
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
-                          className="w-6 h-6"
+                          className="w-5 h-5"
                         >
                           <rect x="-2" y="-2" width="24.00" height="24.00" rx="12" fill="#ccdfe5"></rect>
                           <path
@@ -328,7 +328,7 @@ const DBStats = ({
                   {isAdmin && (
                     <td className="text-center">
                       <button
-                        className="p-1 rounded-full hover:scale-110 transition-transform"
+                        className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
                         onClick={async (e) => {
                           e.stopPropagation();
                           try {
@@ -363,7 +363,7 @@ const DBStats = ({
                           </svg>
                         </IconWithTooltip>
                       </button>
-                    </td>
+                  </td>
                   )}
                 </tr>
               );

@@ -542,6 +542,7 @@ const MainPage = () => {
                 setSelectedGameId(selectedOption.value);
                 const selectedGame = teamGames.find(g => g.id === selectedOption.value);
                 setSelectedVideo(selectedGame?.video_url || '');
+                localStorage.removeItem('videoTime');
                 setTimeout(() => {
                   videoRef.current?.focus();
                 }, 300);                

@@ -16,17 +16,16 @@ After I scrub, seek doesn't work right? it's going frame by frame. Add frame see
 	Shift + n for next video (by date).
 Re add Header animation to disappear on scroll, and to work for mobile(add to app.jsx)
 Resize table columns button?
-Add green/yellow/red icons for status of videos on video selector.
 Add contact / bug report / suggestions email?
 OAuth -> register team, invite other players / accounts to team.
-Make it so, when autoplay or highlights is on, seeking with left/right seeks into the timings of the rally/highlights
 
 #Fixes
 REFACTOR
-Clicking into a second editablecell immediately exits.
 Zoom scrub should not highlight.
-sometimes selecting a new game doesn't allow the rallytimes to work correctly?
 
 git add .
-git commit -m "message here"
+
+git commit -m "Fix: restore video time only if same video is selected" \
+-m "fix: reduce size of "Add row below" button by adjusting SVG and layout"
+
 git push
