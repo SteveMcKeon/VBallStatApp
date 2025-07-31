@@ -167,17 +167,17 @@ const SortableFilterHeader = ({
   }, [showFilterMenu]);
   
   return (
-<th className="relative px-2 py-1 text-sm font-medium text-gray-800 border border-black bg-gray-200">
+  <th className="relative px-2 py-1 text-sm font-medium text-gray-800 border border-black bg-gray-200 min-w-[100px]">
   <div className="relative text-center w-full">
     <button
       onClick={toggleSort}
       className="w-full truncate"
       title={label}
     >
-      {label}
-    <span className="ml-1 text-xs inline-block w-[1ch] text-center">
+    <span className="absolute left-1 text-xs text-center pointer-events-none select-none">
       {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '\u00A0'}
     </span>
+    {label}
     </button>
 
     {isFilterable && isFilterableType(columnType) && (
@@ -187,9 +187,9 @@ const SortableFilterHeader = ({
           window.dispatchEvent(new Event('closeAllFilters'));
           setShowFilterMenu(shouldOpen);
         }}
-        className={`absolute right-0 top-0 p-1 rounded transition-colors
-          ${isFilterActive() ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700'
-                             : 'text-gray-500 hover:text-black hover:bg-gray-300'}`}
+  className={`absolute right-[-5px] top-1/2 -translate-y-1/2 p-1 rounded transition-colors
+    ${isFilterActive() ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700'
+                       : 'text-gray-500 hover:text-black hover:bg-gray-300'}`}
         title="Filter"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">

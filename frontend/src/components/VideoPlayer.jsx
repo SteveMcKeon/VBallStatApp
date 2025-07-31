@@ -564,8 +564,10 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
 
     // ---- KEYBOARD LISTENER ----
     const handleKeyDown = async (e) => {
-    const activeTag = document.activeElement?.tagName.toLowerCase();
-    if (["input", "textarea", "select"].includes(activeTag)) return; 
+    const activeElement = document.activeElement;
+    const isEditingTableCell =
+      activeElement?.closest?.('.editable-cell-wrapper') !== null;
+    if (isEditingTableCell) return;
     if (isCustomPlayback && (e.key === "s" || e.key === "S")) {
       e.preventDefault();
       setIsCustomPlayback(false);    

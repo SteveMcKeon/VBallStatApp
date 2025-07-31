@@ -661,6 +661,7 @@ const MainPage = () => {
               layoutMode={layoutMode}
               jumpToTime={jumpToTime}
               videoRef={videoRef}
+              videoPlayerRef={videoPlayerRef}
               mainContentRef={mainContentRef}
               containerRef={containerRef}
               formatTimestamp={formatTimestamp}

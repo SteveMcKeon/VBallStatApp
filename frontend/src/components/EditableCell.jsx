@@ -32,7 +32,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       options = ACTION_TYPE_OPTIONS;
     }
 
-    const trimmedInput = tempValue.trim().toLowerCase();
+    const trimmedInput = (tempValue ?? '').toString().trim().toLowerCase();
 
     const filtered = trimmedInput.length > 0
       ? options.filter(opt => opt.toLowerCase().startsWith(trimmedInput))
@@ -207,7 +207,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     if (!e.shiftKey && !e.altKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
       const { selectionStart, selectionEnd } = e.target;
       const cursorPos = selectionStart;
-      const text = tempValue;      
+      const text = (tempValue ?? '').toString();    
       const isMultiline = text.includes('\n');
       const lines = text.split('\n');
       const lineIndex = text.slice(0, cursorPos).split('\n').length - 1;
@@ -246,7 +246,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
 
   return (
     editing ? (
-      <div ref={wrapperRef} className="relative w-full h-full">
+      <div ref={wrapperRef} className="relative w-full h-full editable-cell-wrapper">
         <textarea
           ref={inputRef}
           autoFocus

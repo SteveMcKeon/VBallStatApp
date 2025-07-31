@@ -64,6 +64,7 @@ const DBStats = ({
   layoutMode,
   jumpToTime,
   videoRef,
+  videoPlayerRef,
   mainContentRef,
   containerRef,
   formatTimestamp,
@@ -90,7 +91,7 @@ const DBStats = ({
       .map(s => s.timestamp)
       .sort((a, b) => a - b);
 
-    if (timestamps.length === 0 || !videoRef.current) return;
+    if (timestamps.length === 0 || !videoPlayerRef.current) return;
 
     const sequences = [];
     let lastEnd = -Infinity;
@@ -107,7 +108,7 @@ const DBStats = ({
       lastEnd = end;
     }
 
-    await videoRef.current.playCustomSequences(sequences);
+    await videoPlayerRef.current.playCustomSequences(sequences);
   };
 
   const renderHeader = () => (
