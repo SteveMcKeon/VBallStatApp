@@ -543,7 +543,7 @@ const MainPage = () => {
       </div>
     );
   }
-
+  const selectedGame = teamGames.find(g => g.id === selectedGameId);
   return (
     <div className="flex flex-col h-[100svh] overflow-hidden">
       <div
@@ -645,6 +645,8 @@ const MainPage = () => {
           <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
             <DBStats
               isAdmin={isAdmin}
+              hastimestamps={selectedGame?.hastimestamps}
+              isscored={selectedGame?.isscored}              
               stats={stats}
               refreshStats={refreshStats}
               setStats={setStats}

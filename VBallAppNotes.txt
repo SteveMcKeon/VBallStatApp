@@ -23,16 +23,6 @@ Zoom scrub should not highlight.
 
 git add .
 
-git commit -m "feat: improve player autocomplete, sorting, and UI consistency
-- Add 'players' column to games table and populate via SQL from stats
-- Update players list for a specific game by title
-- Implement Excel-style autocomplete dropdown for player name, action type, and results entry
-  - Default first suggestion to highlighted
-  - Support keyboard navigation (ArrowUp/Down)
-  - Tab/Enter/Blur applies selected suggestion
-- Fix visual alignment of column headers and filter button
-- Improve editable cell behavior and keyboard navigation
-  - ArrowLeft/Right move to adjacent cell only at text boundaries with no selection
-  - ArrowUp/Down move between rows when on top/bottom line"
+git commit -m "feat: Added "Update Game Settings" panel for `hastimestamps` and `isscored` fields"
 
 git push

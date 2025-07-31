@@ -168,6 +168,44 @@ app.post('/api/update-stat', async (req, res) => {
   res.json({ success: true });
 });
 
+app.patch('/api/update-game/:id', async (req, res) => {
+  const { id } = req.params;
+  const { updates } = req.body;
+
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
+  if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'admin') throw new Error();
+  } catch {
+    return res.status(403).json({ success: false, message: 'Invalid token' });
+  }
+
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ success: false, message: 'Invalid updates object' });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('games')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Supabase update-game error:', error);
+      return res.status(500).json({ success: false, message: 'Update failed' });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update game error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
 app.delete('/api/delete-stat/:id', async (req, res) => {
   const { id } = req.params; 
   const authHeader = req.headers.authorization;

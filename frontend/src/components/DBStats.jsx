@@ -1,4 +1,4 @@
-import React, { useRef, useMemo  } from 'react';
+import React, { useRef, useMemo, useEffect  } from 'react';
 import SortableFilterHeader from './SortableFilterHeader';
 import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
@@ -48,6 +48,8 @@ const IconWithTooltip = ({ children, tooltip }) => {
 
 const DBStats = ({
   isAdmin,
+  hastimestamps,
+  isscored,  
   stats,
   refreshStats,
   setStats,
@@ -74,7 +76,6 @@ const DBStats = ({
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
   const [editingCell, setEditingCell] = React.useState(null);
   const cellRefs = useRef({});
-  
   const isFiltered = Object.values(textColumnFilters).some((filter) => {
     const conditions = filter?.conditions ?? [];
     return conditions.some(({ operator, value }) =>
@@ -84,6 +85,20 @@ const DBStats = ({
         : value?.toString().trim())
     );
   });
+  
+  const [gameSettings, setGameSettings] = React.useState({
+    hastimestamps: null,
+    isscored: null
+  });
+
+  useEffect(() => {
+    if (typeof hastimestamps === 'boolean' || typeof isscored === 'boolean') {
+      setGameSettings({
+        hastimestamps,
+        isscored
+      });
+    }
+  }, [hastimestamps, isscored]);
 
   const handlePlayFiltered = async () => {
     const timestamps = filteredStats
@@ -160,6 +175,25 @@ const DBStats = ({
       })}
     </tr>
   );
+
+  const toggleGameField = async (field, value) => {
+    if (!gameId) return;
+    try {
+      const res = await authorizedFetch(`/api/update-game/${gameId}`, {
+        method: 'PATCH',
+        body: { updates: { [field]: value } }
+      });
+      const result = await res.json();
+      if (result.success) {
+        refreshStats();
+      } else {
+        alert(`Failed to update ${field}: ${result.message}`);
+      }
+    } catch (err) {
+      console.error(`Failed to update ${field}`, err);
+      alert(`Error updating ${field}`);
+    }
+  };
 
   return (
     <>
@@ -435,9 +469,9 @@ const DBStats = ({
         </tbody>
       </table>
       {isAdmin && (
-        <div className="flex justify-between items-center mt-4 px-4">
+        <div className="flex justify-between items-start mt-6 px-6 gap-6">
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
             onClick={async () => {
               const lastRow = stats[stats.length - 1];
               const newRows = Array.from({ length: 10 }, (_, i) => ({
@@ -468,8 +502,45 @@ const DBStats = ({
           >
             ➕ Add 10 Rows to Bottom
           </button>
+          <div className="mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md w-fit">
+            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">
+              🛠 Update Game Settings
+            </h3>
+            <div className="flex flex-col space-y-3">
+              <div className="flex justify-between items-center w-full">
+                <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
+                <select
+                  className="border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={gameSettings.hastimestamps ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value === 'true';
+                    setGameSettings(prev => ({ ...prev, hastimestamps: value }));
+                    toggleGameField('hastimestamps', value);
+                  }}
+                >
+                  <option value="true">True</option>
+                  <option value="false">False</option>
+                </select>
+              </div>
+              <div className="flex justify-between items-center w-full">
+                <label className="text-sm font-medium text-gray-700">Is Scored:</label>
+                <select
+                  className="border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={gameSettings.isscored ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value === 'true';
+                    setGameSettings(prev => ({ ...prev, isscored: value }));
+                    toggleGameField('isscored', value);
+                  }}
+                >
+                  <option value="true">True</option>
+                  <option value="false">False</option>
+                </select>
+              </div>
+            </div>
+          </div>
           <button
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow"
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1"
             onClick={refreshStats}
           >
             🔄 Refresh DB
