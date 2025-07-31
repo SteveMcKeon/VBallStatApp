@@ -1,9 +1,7 @@
 #New Features
 add "export highlights" (for player / action type) functionality, ffmpeg
 Add functionailty for users to add stats so I don't have to do it all myself (this will require automating the rally/seq/touch/score, perhaps even timestamp numbering).
-	-add "insert rows" here/at end, copy/paste row, tab/enter switching to right/down editable cells.
 Add video player settings option to change settings such as "jump forward/backward" timings, delay after end of rally before skipping to next rally during autoplay
-	-Possible fix required. If time is increased too much it messes with all my timing stuff on autplay/rally seek...
 Add video upload functionaility
 	-Automate encoding pipeline.
 Add tooltip intro for new users to introduce features.
@@ -25,8 +23,16 @@ Zoom scrub should not highlight.
 
 git add .
 
-git commit -m "refactor(DBStats): compact admin control columns and add refresh button
-- Added "Add 10 Rows to Bottom" and "Refresh DB" buttons in Admin Mode
-- Moved stats fetching logic into shared `loadStatsForSelectedVideo` function to remove duplication"
+git commit -m "feat: improve player autocomplete, sorting, and UI consistency
+- Add 'players' column to games table and populate via SQL from stats
+- Update players list for a specific game by title
+- Implement Excel-style autocomplete dropdown for player name, action type, and results entry
+  - Default first suggestion to highlighted
+  - Support keyboard navigation (ArrowUp/Down)
+  - Tab/Enter/Blur applies selected suggestion
+- Fix visual alignment of column headers and filter button
+- Improve editable cell behavior and keyboard navigation
+  - ArrowLeft/Right move to adjacent cell only at text boundaries with no selection
+  - ArrowUp/Down move between rows when on top/bottom line"
 
 git push

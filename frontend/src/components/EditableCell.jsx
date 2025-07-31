@@ -1,9 +1,17 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } from 'react';
 import EditMode from './EditMode';
 
-const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, setEditingCell }, ref) => {
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell }, ref) => {
+  const RESULT_OPTIONS = ['In Play', 'Won Point', 'Lost Point'];
+  const ACTION_TYPE_OPTIONS = [
+    'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free', 'Taylor Dump'
+  ];  
+  const [interactionMode, setInteractionMode] = useState('keyboard'); // 'keyboard' | 'mouse'
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [tempValue, setTempValue] = useState(value ?? ' ');
+  const [tempValue, setTempValue] = useState(value ?? '');
   const inputRef = useRef(null);
   const wrapperRef = useRef(null); 
   const { authorizedFetch } = EditMode();
@@ -13,13 +21,31 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   const ghostRef = useRef(null);
   
   useEffect(() => {
-    if (editing && inputRef.current && ghostRef.current) {
-      inputRef.current.style.height = ghostRef.current.offsetHeight + 'px';
+    if (!editing) return;
+
+    let options = [];
+    if (field === 'player') {
+      options = gamePlayers;
+    } else if (field === 'result') {
+      options = RESULT_OPTIONS;
+    } else if (field === 'action_type') {
+      options = ACTION_TYPE_OPTIONS;
     }
-  }, [tempValue, editing]);
-    
+
+    const trimmedInput = tempValue.trim().toLowerCase();
+
+    const filtered = trimmedInput.length > 0
+      ? options.filter(opt => opt.toLowerCase().startsWith(trimmedInput))
+      : [];
+
+    setSuggestions(filtered.sort());
+    setInteractionMode('keyboard');
+    setSelectedSuggestionIndex(0);
+    setShowSuggestions(filtered.length > 0);
+  }, [editing, field, gamePlayers, tempValue]);
+
   useEffect(() => {
-    setTempValue(value ?? ' ');
+    setTempValue(value ?? '');
   }, [value]);
   
   useEffect(() => {
@@ -48,7 +74,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(type)
         ? tempValue.trim?.() === ''
         : tempValue === '';
-
     if (['int2', 'int4', 'int8'].includes(type)) {
       parsed = isBlank ? null : parseInt(tempValue);
     } else if (['float4', 'float8', 'numeric'].includes(type)) {
@@ -56,24 +81,24 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     } else {
       parsed = isBlank ? null : tempValue;
     }
-
+    if ((field === 'player' || field === 'result' || field === 'action_type') && suggestions.length === 1) {
+      parsed = suggestions[0];
+      setTempValue(suggestions[0]);
+    }
     const isValid =
       (['int2', 'int4', 'int8'].includes(type) && (parsed === null || (!isNaN(parsed) && Number.isInteger(parsed)))) ||
       (['float4', 'float8', 'numeric'].includes(type) && (parsed === null || !isNaN(parsed))) ||
       (type === 'text' && (typeof parsed === 'string' || parsed === null));
-
     if (!isValid) {
       alert(`Invalid value for type ${type}`);
       setTempValue(value ?? '');
       setEditing(false);
       return;
     }
-
     if (value !== null && parsed === value) {
       setEditing(false);
       return;
     }
-
     try {
       const res = await authorizedFetch('/api/update-stat', {
         body: { statId, updates: { [field]: parsed } },
@@ -109,6 +134,8 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           }
 
           setStats(newStats);
+          setTimeout(() => setEditing(false), 0);
+          return;          
         } else {
           alert('Stat not found by id.');
           setTempValue(value ?? '');
@@ -126,47 +153,94 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
+    const key = e.key;
+    if (key === 'Escape') {
       e.preventDefault();
-      setTempValue(value ?? ''); 
-      setEditing(false);         
+      setTempValue(value ?? '');
+      setEditing(false);
       return;
-    } else if (e.key === 'Enter') {
-      if (e.altKey) {
-        e.preventDefault();
-        const start = e.target.selectionStart;
-        const end = e.target.selectionEnd;
-        const newValue =
-          tempValue.substring(0, start) + '\n' + tempValue.substring(end);
-        setTempValue(newValue);
+    }
+    const suggestionNavKeys = ['ArrowUp', 'ArrowDown', 'Enter', 'Tab'];
+    const isNavigatingSuggestions = ['player', 'result', 'action_type'].includes(field) && showSuggestions && suggestionNavKeys.includes(key);
+    if (isNavigatingSuggestions) {
+      e.preventDefault();
+      if (key === 'ArrowDown') {
+        setInteractionMode('keyboard');
+        setSelectedSuggestionIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+        return;
+      }
+      if (key === 'ArrowUp') {
+        setInteractionMode('keyboard');
+        setSelectedSuggestionIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if ((key === 'Enter' || key === 'Tab') && suggestions.length > 0) {
+        setTempValue(suggestions[selectedSuggestionIndex]);
+        setShowSuggestions(false);
 
-        requestAnimationFrame(() => {
-          inputRef.current.selectionStart = inputRef.current.selectionEnd = start + 1;
+        handleBlur().then(() => {
+          if (setEditingCell) {
+            setEditingCell({
+              idx,
+              field,
+              direction: key === 'Tab'
+                ? (e.shiftKey ? 'prev' : 'next')
+                : (e.shiftKey ? 'up' : 'down'),
+            });
+          }
         });
         return;
       }
+    }
+    if (key === 'Enter' && e.altKey) {
+      e.preventDefault();
+      const start = e.target.selectionStart;
+      const end = e.target.selectionEnd;
+      const newValue = tempValue.substring(0, start) + '\n' + tempValue.substring(end);
+      setTempValue(newValue);
 
+      requestAnimationFrame(() => {
+        inputRef.current.selectionStart = inputRef.current.selectionEnd = start + 1;
+      });
+      return;
+    }
+    if (!e.shiftKey && !e.altKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+      const { selectionStart, selectionEnd } = e.target;
+      const cursorPos = selectionStart;
+      const text = tempValue;      
+      const isMultiline = text.includes('\n');
+      const lines = text.split('\n');
+      const lineIndex = text.slice(0, cursorPos).split('\n').length - 1;
+      const lineOffset = cursorPos - text.split('\n').slice(0, lineIndex).join('\n').length - (lineIndex > 0 ? 1 : 0);
+      const isCollapsed = selectionStart === selectionEnd;
+      const isAtStart = isCollapsed && cursorPos === 0;
+      const isAtEnd = isCollapsed && cursorPos === text.length;
+      const direction =
+        (key === 'ArrowLeft' && isAtStart) ? 'prev' :
+        (key === 'ArrowRight' && isAtEnd) ? 'next' :
+        (key === 'ArrowUp' && lineIndex === 0) ? 'up' :
+        (key === 'ArrowDown' && lineIndex === lines.length - 1) ? 'down' :
+        null;
+      if (direction && setEditingCell) {
+        e.preventDefault();
+        handleBlur().then(() => {
+          setEditingCell({ idx, field, direction });
+        });
+        return;
+      }
+    }    
+    if (key === 'Enter' || key === 'Tab') {
       e.preventDefault();
+
+      const direction = key === 'Tab'
+        ? (e.shiftKey ? 'prev' : 'next')
+        : (e.shiftKey ? 'up' : 'down');
       handleBlur().then(() => {
         if (setEditingCell) {
-          setEditingCell({
-            idx,
-            field,
-            direction: e.shiftKey ? 'up' : 'down'
-          });
+          setEditingCell({ idx, field, direction });
         }
       });
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      handleBlur().then(() => {
-        if (setEditingCell) {
-          setEditingCell({
-            idx,
-            field,
-            direction: e.shiftKey ? 'prev' : 'next'
-          });
-        }
-      });
+      return;
     }
   };
 
@@ -207,6 +281,47 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
         />
+        {showSuggestions && (
+          <ul
+            className="absolute left-0 right-0 bg-white border border-gray-300 shadow z-10 max-h-40 overflow-y-auto text-sm"
+            style={{ top: '100%' }}
+            onMouseMove={(e) => {
+              const listItems = Array.from(e.currentTarget.children);
+              const hoverIndex = listItems.findIndex((li) =>
+                li.contains(document.elementFromPoint(e.clientX, e.clientY))
+              );
+              if (hoverIndex !== -1) {
+                setSelectedSuggestionIndex(hoverIndex);
+                setInteractionMode('mouse');
+              }
+            }}
+          >
+          {suggestions.map((sug, i) => (
+            <li
+              key={i}
+              className={`px-2 py-1 cursor-pointer ${
+                i === selectedSuggestionIndex
+                  ? 'bg-blue-100 text-black'
+                  : interactionMode === 'mouse'
+                    ? 'hover:bg-blue-100'
+                    : ''
+              }`}
+              onMouseEnter={() => {
+                if (interactionMode === 'mouse') {
+                  setSelectedSuggestionIndex(i);
+                }
+              }}
+              onMouseDown={() => {
+                setTempValue(sug);
+                setShowSuggestions(false);
+                setTimeout(() => inputRef.current?.focus(), 0);
+              }}
+            >
+              {sug}
+            </li>
+          ))}
+          </ul>
+        )}      
         <div
           ref={ghostRef}
           aria-hidden

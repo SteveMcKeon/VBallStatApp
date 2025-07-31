@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo  } from 'react';
 import SortableFilterHeader from './SortableFilterHeader';
 import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
@@ -52,6 +52,7 @@ const DBStats = ({
   refreshStats,
   setStats,
   filteredStats,
+  gamePlayers,
   visibleColumns,
   sortConfig,
   setSortConfig,
@@ -322,6 +323,7 @@ const DBStats = ({
                             idx={idx}
                             stats={stats}
                             setStats={setStats}
+                            gamePlayers={gamePlayers}
                             setEditingCell={({ idx, field, direction }) => {
                               const keys = Object.keys(visibleColumns).filter(
                                 k => visibleColumns[k]?.visible && k !== 'timestamp' && k !== 'score'

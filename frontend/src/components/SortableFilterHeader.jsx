@@ -167,46 +167,52 @@ const SortableFilterHeader = ({
   }, [showFilterMenu]);
   
   return (
-    <th className="relative align-top px-2 py-1 text-center text-sm font-medium text-gray-800 border border-black bg-gray-200">
-      <div className="flex justify-between items-start gap-1">
-        <button onClick={toggleSort} className="cursor-pointer flex-1 text-center ">
-          {label}
-          {isSorted && (
-            <span className="ml-1 text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-          )}
-        </button>
-        {isFilterable && isFilterableType(columnType) && (
-          <button
-            onClick={() => {
-              const shouldOpen = !showFilterMenu;
-              window.dispatchEvent(new Event('closeAllFilters'));
-              setShowFilterMenu(shouldOpen);
-            }}
-            className={`relative p-1 rounded transition-colors
-              ${isFilterActive() ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700': 'text-gray-500 hover:text-black hover:bg-gray-300'}`}
-            title="Filter"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M3 4h18M6 10h12M10 16h4"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-            {isFilterActive() && (
-              <span className="absolute top-[2px] right-[2px] w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            )}
-          </button>
-        )}
-      </div>
+<th className="relative px-2 py-1 text-sm font-medium text-gray-800 border border-black bg-gray-200">
+  <div className="relative text-center w-full">
+    <button
+      onClick={toggleSort}
+      className="w-full truncate"
+      title={label}
+    >
+      {label}
+    <span className="ml-1 text-xs inline-block w-[1ch] text-center">
+      {isSorted ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '\u00A0'}
+    </span>
+    </button>
 
-      {showFilterMenu && isFilterableType(columnType) && (
-        <div
-          ref={wrapperRef}
-          className="absolute z-10 mt-2 bg-white border border-gray-300 shadow-md p-2 rounded w-56 right-0 space-y-2 max-h-96 overflow-y-auto"
-          style={menuStyles}
-        >
+    {isFilterable && isFilterableType(columnType) && (
+      <button
+        onClick={() => {
+          const shouldOpen = !showFilterMenu;
+          window.dispatchEvent(new Event('closeAllFilters'));
+          setShowFilterMenu(shouldOpen);
+        }}
+        className={`absolute right-0 top-0 p-1 rounded transition-colors
+          ${isFilterActive() ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700'
+                             : 'text-gray-500 hover:text-black hover:bg-gray-300'}`}
+        title="Filter"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M3 4h18M6 10h12M10 16h4"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+        {isFilterActive() && (
+          <span className="absolute top-[2px] right-[2px] w-1.5 h-1.5 bg-blue-500 rounded-full" />
+        )}
+      </button>
+    )}
+  </div>
+
+  {showFilterMenu && isFilterableType(columnType) && (
+    <div
+      ref={wrapperRef}
+      className="absolute z-10 mt-2 bg-white border border-gray-300 shadow-md p-2 rounded w-56 right-0 space-y-2 max-h-96 overflow-y-auto"
+      style={menuStyles}
+    >
           {effectiveFilter.conditions.map((condition, idx) => {
             const OPERATORS = columnType === 'text' ? TEXT_OPERATORS : NUMERIC_OPERATORS;
             return (

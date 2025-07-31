@@ -18,10 +18,12 @@ const MainPage = () => {
   const navigate = useNavigate();
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
+  const [gamePlayers, setGamePlayers] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
   const [teamName, setTeamName] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
+  
   const handleTeamChange = async (e) => {
     const selected = e.target.value;
     setTeamName(selected);
@@ -40,6 +42,7 @@ const MainPage = () => {
       setTeamGames(data);
     }
   };    
+  
   useEffect(() => {
     const savedTeam = getLocal('teamName');
     const fetchTeams = async () => {
@@ -57,9 +60,11 @@ const MainPage = () => {
       };
     fetchTeams();
   }, []);
+  
   const [teamGames, setTeamGames] = useState([]);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [textColumnFilters, setTextColumnFilters] = useState({});
+  
   const handleTextColumnFilterChange = (column, value) => {
     const colType = visibleColumns[column]?.type;
     if (typeof value === 'string') {
@@ -77,8 +82,10 @@ const MainPage = () => {
       }));
     }
   };
+  
   const [containerHeight, setContainerHeight] = useState(0); 
   const insertButtonParentRef = useRef(null);
+  
   useEffect(() => {
     const updateHeight = () => {
       if (insertButtonParentRef.current) {
@@ -89,6 +96,7 @@ const MainPage = () => {
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
   }, []); 
+  
   const savedVisibleColumns = getLocal('visibleColumnsMainPage');
   const savedLayout = getLocal('layoutMode');  
   const videoRef = useRef(null);
@@ -99,6 +107,7 @@ const MainPage = () => {
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
   const { isAdmin, handleEditModeLogin, authorizedFetch, logout } = EditMode();
+  
   const isFiltered =
     Object.values(textColumnFilters).some((filter) => {
       const conditions = filter?.conditions ?? [];
@@ -109,12 +118,15 @@ const MainPage = () => {
           : value?.toString().trim())
       );
     });
+    
   const [showOverlay, setShowOverlay] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const { registerToggle } = useSidebar();  
+  
   useEffect(() => {
     registerToggle(() => setShowSidebar((prev) => !prev));
   }, [registerToggle]);  
+  
   const [layoutMode, setLayoutMode] = useState(() => {
     try {
       return savedLayout
@@ -124,7 +136,9 @@ const MainPage = () => {
       return 'stacked';
     }
   });
+  
   const [sortConfig, setSortConfig] = useState({ key: 'import_seq', direction: 'asc' });
+  
   const defaultColumnConfig = {
     timestamp: { visible: false, type: 'float8' },
     set: { visible: false, type: 'int2' },
@@ -182,21 +196,29 @@ const MainPage = () => {
       setStats([]);
       return;
     }
-
     const { data: existing, error: existingError } = await supabase
       .from('games')
       .select('id')
       .eq('video_url', videoUrl)
       .single();
-
     if (existingError || !existing?.id) {
       console.error('Error checking for game:', existingError);
       setStats([]);
       return;
     }
-
     setGameId(existing.id);
+    const { data: gameMeta, error: gameError } = await supabase
+      .from('games')
+      .select('players')
+      .eq('id', existing.id)
+      .single();
 
+    if (gameError) {
+      console.error('Error fetching game players:', gameError);
+      setGamePlayers([]);
+    } else {
+      setGamePlayers(gameMeta?.players || []);
+    }
     const { data: statData, error: statError } = await supabase
       .from('stats')
       .select('*')
@@ -626,7 +648,8 @@ const MainPage = () => {
               stats={stats}
               refreshStats={refreshStats}
               setStats={setStats}
-              filteredStats={filteredStats}
+              filteredStats={sortedStats}
+              gamePlayers={gamePlayers}
               visibleColumns={visibleColumns}
               sortConfig={sortConfig}
               setSortConfig={setSortConfig}
