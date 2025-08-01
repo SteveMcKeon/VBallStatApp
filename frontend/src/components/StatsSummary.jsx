@@ -354,370 +354,374 @@ const StatsSummary = () => {
   const totalSuccess2 = grandTotals.qty ? ((grandTotals.won / grandTotals.qty) * 100).toFixed(1) + '%' : '';
   const totalFail2 = grandTotals.qty ? ((grandTotals.lost / grandTotals.qty) * 100).toFixed(1) + '%' : '';
   
-return (
-  <div className="flex flex-col h-[100svh] overflow-hidden">
-      <div
-        className="flex flex-1 overflow-auto transition-all duration-300"
-        style={{ paddingTop: "3.5rem" }}
-      >
-        {/* Sidebar */}
+  return (
+    <div className="flex flex-col h-[100svh] overflow-hidden">
         <div
-          className={`transition-all duration-300 overflow-hidden bg-gray-200 border-r h-full flex-shrink-0 ${
-            showSidebar ? 'w-64' : 'w-0'
-          }`}
+          className="flex flex-1 overflow-auto transition-all duration-300"
+          style={{ paddingTop: "3.5rem" }}
         >
-        <div className="h-full flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
-            {/* Team Selector */}
-            <div>
-              <label className="font-semibold block mb-1">Select Your Team:</label>
-              <StyledSelect
-                options={availableTeams.map(team => ({
-                  label: team,
-                  value: team,
-                  color: 'blue',
-                }))}
-                value={teamName}
-                onChange={(selected) => {
-                  const selectedValue = selected?.value || '';
-                  setTeamName(selectedValue);
-                  setLocal('teamName', selectedValue);
-                  setSelectedGame('all');
-                }}
-                placeholder="Select a team"
-                showStatus={false}
-              />
-            </div>            
-            {/* Game Filter */}
-            <div>
-              <label className="font-semibold block mb-1">Select Game:</label>
-              <StyledSelect
-                options={[
-                  { value: 'all', label: 'All Games' },
-                  { value: 'scored', label: 'All Scored Games' },
-                  ...[...games]
-                    .sort((a, b) => new Date(b.date) - new Date(a.date))
-                    .map((game) => ({
-                      value: game.id,
-                      label: game.title,
-                      color: game.isscored ? 'green' : 'red', // red dot for unscored
-                      tooltip: game.isscored ? 'Scored' : 'Not yet scored',
-                    })),
-                ]}
-                value={selectedGame}
-                onChange={(selected) => setSelectedGame(selected?.value || 'all')}
-                placeholder="Select a game"
-                showStatus={true}
-                showTooltip={true}
-              />
-            </div>
-
-            {/* Set Filter */}
-            {selectedGame && (
+          {/* Sidebar */}
+          <div
+            className={`transition-all duration-300 overflow-hidden bg-gray-200 border-r h-full flex-shrink-0 ${
+              showSidebar ? 'w-64' : 'w-0'
+            }`}
+          >
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
+              {/* Team Selector */}
               <div>
-                <label className="font-semibold block mb-1 mt-2">Select Set:</label>
+                <label className="font-semibold block mb-1">Select Your Team:</label>
                 <StyledSelect
-                  options={[
-                    { value: 'all', label: 'All Sets' },
-                    { value: '1', label: 'Set 1' },
-                    { value: '2', label: 'Set 2' },
-                    { value: '3', label: 'Set 3' },
-                  ]}
-                  value={selectedSet}
-                  onChange={(selected) => setSelectedSet(selected?.value || 'all')}
-                  placeholder="Select Set"
+                  options={availableTeams.map(team => ({
+                    label: team,
+                    value: team,
+                    color: 'blue',
+                  }))}
+                  value={teamName}
+                  onChange={(selected) => {
+                    const selectedValue = selected?.value || '';
+                    setTeamName(selectedValue);
+                    setLocal('teamName', selectedValue);
+                    setSelectedGame('all');
+                  }}
+                  placeholder="Select a team"
                   showStatus={false}
                 />
+              </div>            
+              {/* Game Filter */}
+              <div>
+                <label className="font-semibold block mb-1">Select Game:</label>
+                <StyledSelect
+                  options={[
+                    { value: 'all', label: 'All Games' },
+                    { value: 'scored', label: 'All Scored Games' },
+                    ...[...games]
+                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                      .map((game) => ({
+                        value: game.id,
+                        label: game.title,
+                        color: game.isscored ? 'green' : 'red', // red dot for unscored
+                        tooltip: game.isscored ? 'Scored' : 'Not yet scored',
+                      })),
+                  ]}
+                  value={selectedGame}
+                  onChange={(selected) => setSelectedGame(selected?.value || 'all')}
+                  placeholder="Select a game"
+                  showStatus={true}
+                  showTooltip={true}
+                />
               </div>
-            )}
-          <div>
-            <label className="font-semibold block mb-1">Visible Columns:</label>
-              <ColumnSelector
-                columns={allColumns}
-                visibleColumns={visibleColumns}
-                toggleColumn={toggleColumn}
-              />
-          </div>    
-          <div>
-            <label className="font-semibold block mb-1">Visible SubColumns:</label>
-              <ColumnSelector
-                columns={allSubColumns}
-                visibleColumns={visibleSubColumns}
-                toggleColumn={toggleSubColumn}
-              />
-          </div>             
-            <div className="mt-auto p-4 space-y-4">
-              <button
-                onClick={NavToHome}
-                className={`w-full px-3 py-2 rounded text-white ${'bg-blue-400 hover:bg-blue-800'}`}
-              >
-                Return to Home
-              </button>
+
+              {/* Set Filter */}
+              {selectedGame && (
+                <div>
+                  <label className="font-semibold block mb-1 mt-2">Select Set:</label>
+                  <StyledSelect
+                    options={[
+                      { value: 'all', label: 'All Sets' },
+                      { value: '1', label: 'Set 1' },
+                      { value: '2', label: 'Set 2' },
+                      { value: '3', label: 'Set 3' },
+                    ]}
+                    value={selectedSet}
+                    onChange={(selected) => setSelectedSet(selected?.value || 'all')}
+                    placeholder="Select Set"
+                    showStatus={false}
+                  />
+                </div>
+              )}
+            <div>
+              <label className="font-semibold block mb-1">Visible Columns:</label>
+                <ColumnSelector
+                  columns={allColumns}
+                  visibleColumns={visibleColumns}
+                  toggleColumn={toggleColumn}
+                />
+            </div>    
+            <div>
+              <label className="font-semibold block mb-1">Visible SubColumns:</label>
+                <ColumnSelector
+                  columns={allSubColumns}
+                  visibleColumns={visibleSubColumns}
+                  toggleColumn={toggleSubColumn}
+                />
+            </div>             
+              <div className="mt-auto p-4 space-y-4">
+                <button
+                  onClick={NavToHome}
+                  className={`w-full px-3 py-2 rounded text-white ${'bg-blue-400 hover:bg-blue-800'}`}
+                >
+                  Return to Home
+                </button>
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    localStorage.clear();
+                    navigate('/login');
+                  }}
+                  className="w-full px-3 py-2 rounded text-white bg-red-500 hover:bg-red-700"
+                >
+                  Logout
+                </button>                   
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-    {/* Main Content */}
-    <div className="flex-1 overflow-y-auto p-4">
-      {/* Original Table Content */}
-      <div>
-        {/* Stats Table */}
-        <table className="text-center table-auto">
-          <thead>
-            <tr>
-              <th></th>
-              {actions.filter(action => visibleColumns[action]?.visible).map(action => {
-                const subColSpan = allSubColumns.filter(
-                  sub =>
-                    visibleSubColumns[sub.key]?.visible &&
-                    (!sub.actionOnly || sub.actionOnly === action)
-                ).length;
-                if (subColSpan === 0) return null;
-                return (
-                  <th key={action} colSpan={subColSpan} className="p-1 font-semibold border border-black bg-gray-200">
-                    {action}
-                  </th>
-                );
-              })}
-              <th colSpan="4" className="bg-gray-200 border-l-2 border-t-2 border-r-2 p-1 font-semibold">Total</th>
-            </tr>
-            <tr>
-              <th></th>
-              {actions
-                .filter(action => visibleColumns[action]?.visible)
-                .flatMap(action =>
-                  allSubColumns
-                    .filter(
-                      sub =>
-                        visibleSubColumns[sub.key]?.visible &&
-                        (!sub.actionOnly || sub.actionOnly === action)
-                    )
-                    .map(sub => (
-                      <th
-                        key={`${action}-${sub.key}`}
-                        className="border bg-gray-100 p-1 text-xs"
-                        title={sub.title}
-                      >
-                        {sub.label}
-                      </th>
-                    ))
-                )}
-              {allSubColumns
-                .filter(
-                  sub => visibleSubColumns[sub.key] && !sub.actionOnly
-                )
-                .map((sub, i, arr) => (
-                  <th
-                    key={`total-${sub.key}`}
-                    className={`border bg-gray-100 p-1 text-xs ${
-                      i === 0 ? 'border-l-2' : ''
-                    } ${i === arr.length - 1 ? 'border-r-2' : ''}`}
-                    title={sub.title}
-                  >
-                    {sub.label}
-                  </th>
-                ))}
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player, index) => {
-              const isLastRow = index === players.length - 1;
-              const totals = Object.values(grouped[player] || {}).flatMap(obj => obj.qualities);
-              const totalQty = totals.length;
-              const totalAvg = totalQty ? (totals.reduce((a, b) => a + b, 0) / totalQty).toFixed(2) : '-';
-              const totalWon = Object.values(grouped[player] || {}).reduce((acc, obj) => acc + (obj.won || 0), 0);
-              const totalLost = Object.values(grouped[player] || {}).reduce((acc, obj) => acc + (obj.lost || 0), 0);
-              const rawTotalSuccess = totalQty ? ((totalWon / totalQty) * 100).toFixed(1) : null;
-              const rawTotalFail = totalQty ? ((totalLost / totalQty) * 100).toFixed(1) : null;
-              const totalSuccess = rawTotalSuccess && rawTotalSuccess !== '0.0' ? `${rawTotalSuccess}%` : '-';
-              const totalFail = rawTotalFail && rawTotalFail !== '0.0' ? `${rawTotalFail}%` : '-';
-
-              return (
-                <tr key={player}>
-                  <td className="border p-1 bg-gray-200 font-semibold">{player}</td>
-                    {actions.filter(action => visibleColumns[action]?.visible).map(action => {
-                      const actionStats = grouped[player]?.[action];
-                      const qty = actionStats?.qualities.length ?? 0;
-                      const avg = qty ? (actionStats.qualities.reduce((a, b) => a + b, 0) / qty).toFixed(2) : '-';
-                      const rawSuccess = qty ? ((actionStats.won / qty) * 100).toFixed(1) : null;
-                      const rawFail = qty ? ((actionStats.lost / qty) * 100).toFixed(1) : null;
-                      const success = rawSuccess && rawSuccess !== '0.0' ? `${rawSuccess}%` : '-';
-                      const fail = rawFail && rawFail !== '0.0' ? `${rawFail}%` : '-';
-
-                      return (
-                        <React.Fragment key={action}>
-                          {allSubColumns
-                            .filter(
-                              sub =>
-                                visibleSubColumns[sub.key]?.visible &&
-                                (!sub.actionOnly || sub.actionOnly === action)
-                            )
-                            .map(sub => {
-                              let value = '-';
-                              if (sub.key === 'Qty') value = qty || '-';
-                              else if (sub.key === 'Avg') value = avg;
-                              else if (sub.key === 'Success') value = success;
-                              else if (sub.key === 'Fail') value = fail;
-                              else if (sub.key === 'Assists') {
-                                value = assistData?.[player] || 0;
-                              }
-
-                              const colorClass =
-                                sub.key === 'Success' && value !== '-' ? 'text-green-600' :
-                                sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
-                                sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
-                                '';
-
-                              return (
-                                <td key={`${action}-${sub.key}`} className={`border border-black p-1 ${colorClass}`}>
-                                  {value}
-                                </td>
-                              );
-                            })}
-                        </React.Fragment>
-                      );
-                    })}
-                  <td className={`border border-l-2 p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalQty}</td>
-                  <td className={`border p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalAvg}</td>
-                  <td className={`border p-1 border-black text-green-600 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalSuccess}</td>
-                  <td className={`border border-black text-red-600 border-r-2 p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalFail}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-2 font-semibold">
-              <td className="border bg-gray-200 p-1 text-center">Total</td>
-              {actions.filter(action => visibleColumns[action]?.visible).map(action => {
-                const totals = actionTotals[action];
-                return (
-                  <React.Fragment key={action}>
-                    {allSubColumns
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {/* Original Table Content */}
+        <div>
+          {/* Stats Table */}
+          <table className="text-center table-auto">
+            <thead>
+              <tr>
+                <th></th>
+                {actions.filter(action => visibleColumns[action]?.visible).map(action => {
+                  const subColSpan = allSubColumns.filter(
+                    sub =>
+                      visibleSubColumns[sub.key]?.visible &&
+                      (!sub.actionOnly || sub.actionOnly === action)
+                  ).length;
+                  if (subColSpan === 0) return null;
+                  return (
+                    <th key={action} colSpan={subColSpan} className="p-1 font-semibold border border-black bg-gray-200">
+                      {action}
+                    </th>
+                  );
+                })}
+                <th colSpan="4" className="bg-gray-200 border-l-2 border-t-2 border-r-2 p-1 font-semibold">Total</th>
+              </tr>
+              <tr>
+                <th></th>
+                {actions
+                  .filter(action => visibleColumns[action]?.visible)
+                  .flatMap(action =>
+                    allSubColumns
                       .filter(
                         sub =>
                           visibleSubColumns[sub.key]?.visible &&
                           (!sub.actionOnly || sub.actionOnly === action)
                       )
-                      .map(sub => {
-                        let value = '-';
-                        if (sub.key === 'Qty') value = totals.qty || '-';
-                        else if (sub.key === 'Avg') value = totals.avg;
-                        else if (sub.key === 'Success') value = totals.success;
-                        else if (sub.key === 'Fail') value = totals.fail;
-                        else if (sub.key === 'Assists') value = Object.values(assistData).reduce((a, b) => a + b, 0);
+                      .map(sub => (
+                        <th
+                          key={`${action}-${sub.key}`}
+                          className="border bg-gray-100 p-1 text-xs"
+                          title={sub.title}
+                        >
+                          {sub.label}
+                        </th>
+                      ))
+                  )}
+                {allSubColumns
+                  .filter(
+                    sub => visibleSubColumns[sub.key] && !sub.actionOnly
+                  )
+                  .map((sub, i, arr) => (
+                    <th
+                      key={`total-${sub.key}`}
+                      className={`border bg-gray-100 p-1 text-xs ${
+                        i === 0 ? 'border-l-2' : ''
+                      } ${i === arr.length - 1 ? 'border-r-2' : ''}`}
+                      title={sub.title}
+                    >
+                      {sub.label}
+                    </th>
+                  ))}
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((player, index) => {
+                const isLastRow = index === players.length - 1;
+                const totals = Object.values(grouped[player] || {}).flatMap(obj => obj.qualities);
+                const totalQty = totals.length;
+                const totalAvg = totalQty ? (totals.reduce((a, b) => a + b, 0) / totalQty).toFixed(2) : '-';
+                const totalWon = Object.values(grouped[player] || {}).reduce((acc, obj) => acc + (obj.won || 0), 0);
+                const totalLost = Object.values(grouped[player] || {}).reduce((acc, obj) => acc + (obj.lost || 0), 0);
+                const rawTotalSuccess = totalQty ? ((totalWon / totalQty) * 100).toFixed(1) : null;
+                const rawTotalFail = totalQty ? ((totalLost / totalQty) * 100).toFixed(1) : null;
+                const totalSuccess = rawTotalSuccess && rawTotalSuccess !== '0.0' ? `${rawTotalSuccess}%` : '-';
+                const totalFail = rawTotalFail && rawTotalFail !== '0.0' ? `${rawTotalFail}%` : '-';
 
-                        const colorClass =
-                          sub.key === 'Success' && value !== '-' ? 'text-green-600' :
-                          sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
-                          sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
-                          '';
+                return (
+                  <tr key={player}>
+                    <td className="border p-1 bg-gray-200 font-semibold">{player}</td>
+                      {actions.filter(action => visibleColumns[action]?.visible).map(action => {
+                        const actionStats = grouped[player]?.[action];
+                        const qty = actionStats?.qualities.length ?? 0;
+                        const avg = qty ? (actionStats.qualities.reduce((a, b) => a + b, 0) / qty).toFixed(2) : '-';
+                        const rawSuccess = qty ? ((actionStats.won / qty) * 100).toFixed(1) : null;
+                        const rawFail = qty ? ((actionStats.lost / qty) * 100).toFixed(1) : null;
+                        const success = rawSuccess && rawSuccess !== '0.0' ? `${rawSuccess}%` : '-';
+                        const fail = rawFail && rawFail !== '0.0' ? `${rawFail}%` : '-';
 
                         return (
-                          <td
-                            key={`${action}-${sub.key}`}
-                            className={`border border-black p-1 ${colorClass}`}
-                          >
-                            {value}
-                          </td>
+                          <React.Fragment key={action}>
+                            {allSubColumns
+                              .filter(
+                                sub =>
+                                  visibleSubColumns[sub.key]?.visible &&
+                                  (!sub.actionOnly || sub.actionOnly === action)
+                              )
+                              .map(sub => {
+                                let value = '-';
+                                if (sub.key === 'Qty') value = qty || '-';
+                                else if (sub.key === 'Avg') value = avg;
+                                else if (sub.key === 'Success') value = success;
+                                else if (sub.key === 'Fail') value = fail;
+                                else if (sub.key === 'Assists') {
+                                  value = assistData?.[player] || 0;
+                                }
+
+                                const colorClass =
+                                  sub.key === 'Success' && value !== '-' ? 'text-green-600' :
+                                  sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
+                                  sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
+                                  '';
+
+                                return (
+                                  <td key={`${action}-${sub.key}`} className={`border border-black p-1 ${colorClass}`}>
+                                    {value}
+                                  </td>
+                                );
+                              })}
+                          </React.Fragment>
                         );
                       })}
-                  </React.Fragment>
+                    <td className={`border border-l-2 p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalQty}</td>
+                    <td className={`border p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalAvg}</td>
+                    <td className={`border p-1 border-black text-green-600 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalSuccess}</td>
+                    <td className={`border border-black text-red-600 border-r-2 p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalFail}</td>
+                  </tr>
                 );
               })}
-              <td className="border border-l-2 p-1">{grandTotals.qty}</td>
-              <td className="border p-1">{totalAvg2}</td>
-              <td className="border border-black p-1 text-green-600">{totalSuccess2}</td>
-              <td className="border border-black border-r-2 p-1 text-red-600">{totalFail2}</td>
-            </tr>
-          </tfoot>
-        </table>
-        {/* Setting Statistics Table */}
-        {settingStats.length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-lg font-bold mb-2">Setting Statistics - Who Got Set?</h3>
+            </tbody>
+            <tfoot>
+              <tr className="border-2 font-semibold">
+                <td className="border bg-gray-200 p-1 text-center">Total</td>
+                {actions.filter(action => visibleColumns[action]?.visible).map(action => {
+                  const totals = actionTotals[action];
+                  return (
+                    <React.Fragment key={action}>
+                      {allSubColumns
+                        .filter(
+                          sub =>
+                            visibleSubColumns[sub.key]?.visible &&
+                            (!sub.actionOnly || sub.actionOnly === action)
+                        )
+                        .map(sub => {
+                          let value = '-';
+                          if (sub.key === 'Qty') value = totals.qty || '-';
+                          else if (sub.key === 'Avg') value = totals.avg;
+                          else if (sub.key === 'Success') value = totals.success;
+                          else if (sub.key === 'Fail') value = totals.fail;
+                          else if (sub.key === 'Assists') value = Object.values(assistData).reduce((a, b) => a + b, 0);
 
-            {/* Setter Filter */}
-            <div className="mb-4">
-              <label className="font-semibold block mb-1">Filter by Setter:</label>
-              <select
-                value={selectedSetter}
-                onChange={(e) => setSelectedSetter(e.target.value)}
-                className="border p-2 max-w-xs bg-gray-100"
-              >
-                <option value="all">All Setters</option>
-                {[...new Set(settingStats.map(s => s.player))]
-                  .sort((a, b) => a.localeCompare(b))
-                  .map((setter) => (
-                    <option key={setter} value={setter}>
-                      {setter}
-                    </option>
-                  ))}
-              </select>
+                          const colorClass =
+                            sub.key === 'Success' && value !== '-' ? 'text-green-600' :
+                            sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
+                            sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
+                            '';
+
+                          return (
+                            <td
+                              key={`${action}-${sub.key}`}
+                              className={`border border-black p-1 ${colorClass}`}
+                            >
+                              {value}
+                            </td>
+                          );
+                        })}
+                    </React.Fragment>
+                  );
+                })}
+                <td className="border border-l-2 p-1">{grandTotals.qty}</td>
+                <td className="border p-1">{totalAvg2}</td>
+                <td className="border border-black p-1 text-green-600">{totalSuccess2}</td>
+                <td className="border border-black border-r-2 p-1 text-red-600">{totalFail2}</td>
+              </tr>
+            </tfoot>
+          </table>
+          {/* Setting Statistics Table */}
+          {settingStats.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-bold mb-2">Setting Statistics - Who Got Set?</h3>
+
+              {/* Setter Filter */}
+              <div className="mb-4">
+                <label className="font-semibold block mb-1">Filter by Setter:</label>
+                <select
+                  value={selectedSetter}
+                  onChange={(e) => setSelectedSetter(e.target.value)}
+                  className="border p-2 max-w-xs bg-gray-100"
+                >
+                  <option value="all">All Setters</option>
+                  {[...new Set(settingStats.map(s => s.player))]
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((setter) => (
+                      <option key={setter} value={setter}>
+                        {setter}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="flex  flex-wrap gap-8">
+                <div>
+                  <h4 className="font-semibold mb-1">By Position</h4>
+                  <table className="text-center table-auto border-collapse mb-4">
+                    <thead>
+                      <tr>
+                        <th className="p-1 font-semibold border border-black bg-gray-200">Position</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-200">Qty</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-200">%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {['Power', 'Middle', 'Opposite', 'Backrow'].map(pos => {
+                        const percentages = calculatePercentages(countOccurrences(filteredSettingStats, 'set_to_position'), filteredSettingStats.length)
+                        const row = percentages.find(p => p.key === pos);
+                        return row ? (
+                          <tr key={row.key}>
+                            <td className="border border-black p-1">{row.key}</td>
+                            <td className="border border-black p-1">{row.count}</td>
+                            <td className="border border-black p-1">{row.percent}</td>
+                          </tr>
+                        ) : null;
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-1">By Player</h4>
+                  <table className="text-center table-auto border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="p-1 font-semibold border border-black bg-gray-200">Player</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-200">Qty</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-200">%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calculatePercentages(countOccurrences(filteredSettingStats, 'set_to_player'), filteredSettingStats.length)
+                        .sort((a, b) => a.key.localeCompare(b.key))
+                        .map(row => (
+                          <tr key={row.key}>
+                            <td className="border border-black p-1">{row.key}</td>
+                            <td className="border border-black p-1">{row.count}</td>
+                            <td className="border border-black p-1">{row.percent}</td>
+                          </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-
-<div className="flex  flex-wrap gap-8">
-  {/* By Position Table */}
-  <div>
-    <h4 className="font-semibold mb-1">By Position</h4>
-    <table className="text-center table-auto border-collapse mb-4">
-      <thead>
-        <tr>
-          <th className="p-1 font-semibold border border-black bg-gray-200">Position</th>
-          <th className="p-1 font-semibold border border-black bg-gray-200">Qty</th>
-          <th className="p-1 font-semibold border border-black bg-gray-200">%</th>
-        </tr>
-      </thead>
-      <tbody>
-        {['Power', 'Middle', 'Opposite', 'Backrow'].map(pos => {
-          const percentages = calculatePercentages(countOccurrences(filteredSettingStats, 'set_to_position'), filteredSettingStats.length)
-          const row = percentages.find(p => p.key === pos);
-          return row ? (
-            <tr key={row.key}>
-              <td className="border border-black p-1">{row.key}</td>
-              <td className="border border-black p-1">{row.count}</td>
-              <td className="border border-black p-1">{row.percent}</td>
-            </tr>
-          ) : null;
-        })}
-      </tbody>
-    </table>
-  </div>
-
-  {/* By Player Table */}
-  <div>
-    <h4 className="font-semibold mb-1">By Player</h4>
-    <table className="text-center table-auto border-collapse">
-      <thead>
-        <tr>
-          <th className="p-1 font-semibold border border-black bg-gray-200">Player</th>
-          <th className="p-1 font-semibold border border-black bg-gray-200">Qty</th>
-          <th className="p-1 font-semibold border border-black bg-gray-200">%</th>
-        </tr>
-      </thead>
-      <tbody>
-        {calculatePercentages(countOccurrences(filteredSettingStats, 'set_to_player'), filteredSettingStats.length)
-          .sort((a, b) => a.key.localeCompare(b.key))
-          .map(row => (
-            <tr key={row.key}>
-              <td className="border border-black p-1">{row.key}</td>
-              <td className="border border-black p-1">{row.count}</td>
-              <td className="border border-black p-1">{row.percent}</td>
-            </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-            
-          </div>
-        )}       
+          )}       
+        </div>
+      </div>
       </div>
     </div>
-    </div>
-  </div>
-);
+  );
 };
 
 export default StatsSummary;

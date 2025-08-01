@@ -59,7 +59,9 @@ const LoginPage = () => {
         <p className="text-sm text-center mt-4 text-gray-500">
           Don’t have an account? <span className="text-blue-600 cursor-pointer">Sign up</span>
         </p>
-
+        <p className="text-sm text-center mt-4 text-gray-500">
+          <a href="/reset-password" className="text-blue-600 hover:underline">Forgot your password?</a>
+        </p>
         <div className="flex items-center my-6">
           <hr className="flex-grow border-gray-300" />
           <span className="mx-2 text-sm text-gray-400">OR</span>

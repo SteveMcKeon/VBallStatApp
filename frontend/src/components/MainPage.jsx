@@ -35,7 +35,6 @@ const MainPage = () => {
       .select('id, title, date, video_url, hastimestamps, isscored')
       .eq('team_name', selected)
       .order('date', { ascending: false });
-    
     if (error) {
       console.error("Error fetching games:", error);
     } else {
@@ -114,7 +113,11 @@ const MainPage = () => {
   const [videoList, setVideoList] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
-  const { isAdmin, handleEditModeLogin, authorizedFetch, logout } = EditMode();
+  const { isAdmin, editMode, toggleEditMode, authorizedFetch, logout } = EditMode();
+
+  const handleEditModeToggle = () => {
+    toggleEditMode();
+  };
   
   const isFiltered =
     Object.values(textColumnFilters).some((filter) => {
@@ -630,12 +633,12 @@ const MainPage = () => {
           </div>
           <div className="mt-auto p-4 space-y-4">
             <button
-              onClick={handleEditModeLogin}
+              onClick={handleEditModeToggle}
               className={`w-full px-3 py-2 rounded text-white ${
-                isAdmin ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-800'
+                editMode === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
               }`}
             >
-              {isAdmin ? 'Disable Admin Mode' : 'Enable Admin Mode'}
+              {editMode === 'admin' ? 'Exit Edit Mode' : 'Enter Edit Mode'}
             </button>
             <button
               onClick={NavToStats}
