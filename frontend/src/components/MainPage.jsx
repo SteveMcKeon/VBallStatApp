@@ -42,6 +42,14 @@ const MainPage = () => {
       setTeamGames(data);
     }
   };    
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/login');
+      }
+    });
+  }, [navigate]);
   
   useEffect(() => {
     const savedTeam = getLocal('teamName');
@@ -538,6 +546,7 @@ const MainPage = () => {
             setSelectedGameId(selectedOption.value);
             const selectedGame = teamGames.find(g => g.id === selectedOption.value);
             setSelectedVideo(selectedGame?.video_url || '');
+            localStorage.removeItem('videoTime');
           }}
         />
       </div>
@@ -635,6 +644,16 @@ const MainPage = () => {
             >
               Statistic Matrix
             </button>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                localStorage.clear();
+                navigate('/login');
+              }}
+              className="w-full px-3 py-2 rounded text-white bg-red-500 hover:bg-red-700"
+            >
+              Logout
+            </button>            
           </div>          
         </div>
       </div>

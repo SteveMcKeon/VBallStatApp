@@ -17,6 +17,13 @@ const StatsSummary = () => {
     registerToggle(() => setShowSidebar((prev) => !prev));
   }, [registerToggle]);
   const navigate = useNavigate();
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/login');
+      }
+    });
+  }, [navigate]);    
   const [actions, setActions] = useState([]);  
   const [stats, setStats] = useState([]);
   const [games, setGames] = useState([]);

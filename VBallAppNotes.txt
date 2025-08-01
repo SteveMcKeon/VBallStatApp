@@ -7,7 +7,6 @@ Add video upload functionaility
 Add tooltip intro for new users to introduce features.
 Add "stat editor" user role
 Add resize video option (drag) in side-by-side mode.
-Make certian cells drop selectable only good values (points won, etc.) on admin insert
 Show timestamp on video seekbar as you scrub
 After I scrub, seek doesn't work right? it's going frame by frame. Add frame seek with "<" and ">" (in reality "," and ".")
 	Shift + -> and <- for seek to set.
@@ -20,9 +19,16 @@ OAuth -> register team, invite other players / accounts to team.
 #Fixes
 REFACTOR
 Zoom scrub should not highlight.
+check admintoken and remove admin access if its stale when I load the page.
 
 git add .
 
-git commit -m "feat: Added "Update Game Settings" panel for `hastimestamps` and `isscored` fields"
+git commit -m "feat(auth): add login page with email/password and Google OAuth via Supabase
+- Implemented a new LoginPage with OAuth support
+- Integrated Supabase email/password login
+- Enabled Google OAuth login via Supabase
+- Auto-redirects to login page if session is missing
+- Refactored layout into AppRoutes and Header components
+- Added 404 NotFound route and suppress header on unknown/login routes"
 
 git push
