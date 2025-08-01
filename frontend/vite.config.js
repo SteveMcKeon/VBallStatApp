@@ -29,7 +29,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      react: path.resolve('./node_modules/react'),
     },     
   },
-}); 
-    
+});
+   

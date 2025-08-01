@@ -47,7 +47,7 @@ const IconWithTooltip = ({ children, tooltip }) => {
 };
 
 const DBStats = ({
-  isAdmin,
+  canEdit,
   hastimestamps,
   isscored,  
   stats,
@@ -128,7 +128,7 @@ const DBStats = ({
 
   const renderHeader = () => (
     <tr>
-      {isAdmin && <th></th>}
+      {canEdit && <th></th>}
       {Object.entries(visibleColumns).map(([key, config]) => {
         if (!config.visible) return null;
 
@@ -227,8 +227,8 @@ const DBStats = ({
               return (
                 <tr
                   key={idx}
-                  className={`cursor-pointer ${!isAdmin ? 'hover:bg-gray-100' : ''}`}
-                  onClick={!isAdmin ? () => {
+                  className={`cursor-pointer ${!canEdit ? 'hover:bg-gray-100' : ''}`}
+                  onClick={!canEdit ? () => {
                     const validTimestamps = stats
                       .slice(0, idx)
                       .map((r) => r.timestamp)
@@ -252,7 +252,7 @@ const DBStats = ({
                     }
                   } : undefined}
                 >
-                {isAdmin && (
+                {canEdit && (
                   <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center w-8 px-1">
                     <button
                       className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
@@ -311,7 +311,7 @@ const DBStats = ({
                     <td
                       className="border border-black cursor-pointer hover:bg-gray-100"
                       onClick={async () => {
-                        if (!isAdmin) return;
+                        if (!canEdit) return;
 
                         const currentTimestamp = videoRef.current?.currentTime ?? 0;
 
@@ -348,7 +348,7 @@ const DBStats = ({
 
                     return (
                       <td key={field} className={`border border-black hover:bg-gray-100 ${highlightClass} whitespace-pre-wrap`}>
-                        {isAdmin ? (
+                        {canEdit ? (
                           <EditableCell
                             ref={(el) => { cellRefs.current[`${idx}-${field}`] = el; }}
                             value={s[field]}
@@ -416,7 +416,7 @@ const DBStats = ({
                       </td>
                     );
                   })}
-                  {isAdmin && (
+                  {canEdit && (
                     <td className="text-center w-8 px-1">
                       <button
                         className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
@@ -461,14 +461,14 @@ const DBStats = ({
             })
           ) : (
             <tr>
-              <td colSpan={Object.values(visibleColumns).filter(c => c.visible).length + (isAdmin ? 1 : 0)} className="py-20 text-gray-500 italic text-center border-t">
+              <td colSpan={Object.values(visibleColumns).filter(c => c.visible).length + (canEdit ? 1 : 0)} className="py-20 text-gray-500 italic text-center border-t">
                 No matching data.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-      {isAdmin && (
+      {canEdit && (
         <div className="flex justify-between items-start mt-6 px-6 gap-6">
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"

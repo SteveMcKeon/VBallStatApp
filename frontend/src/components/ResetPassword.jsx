@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import supabase from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 const FloatingLabelInput = ({ label, type = 'text', id, name, value, onChange }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -28,6 +29,7 @@ const FloatingLabelInput = ({ label, type = 'text', id, name, value, onChange })
 };
 
 const ResetPassword = () => {
+  const navigate = useNavigate();
   const [mode, setMode] = useState('send');
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -37,7 +39,7 @@ const ResetPassword = () => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
       setMode('reset');
-      supabase.auth.getSessionFromUrl().catch(() => {
+      supabase.auth.exchangeCodeForSession().catch(() => {
         setMessage('Invalid or expired reset link.');
       });
     }
@@ -110,6 +112,9 @@ const ResetPassword = () => {
           </>
         )}
         {message && <p className="text-center text-sm mt-4 text-gray-500">{message}</p>}
+        <p className="text-center text-sm mt-4 text-blue-600 cursor-pointer hover:underline" onClick={() => navigate('/login')}>
+          Back to Login
+        </p>        
       </div>
     </div>
   );

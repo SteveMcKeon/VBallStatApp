@@ -5,7 +5,6 @@ Add video player settings option to change settings such as "jump forward/backwa
 Add video upload functionaility
 	-Automate encoding pipeline.
 Add tooltip intro for new users to introduce features.
-Add "stat editor" user role
 Add resize video option (drag) in side-by-side mode.
 Show timestamp on video seekbar as you scrub
 After I scrub, seek doesn't work right? it's going frame by frame. Add frame seek with "<" and ">" (in reality "," and ".")
@@ -14,7 +13,11 @@ After I scrub, seek doesn't work right? it's going frame by frame. Add frame see
 Re add Header animation to disappear on scroll, and to work for mobile(add to app.jsx)
 Resize table columns button?
 Add contact / bug report / suggestions email?
-OAuth -> register team, invite other players / accounts to team.
+Register team, invite other users to team.
+Make isscored/timestamps setting automatic update the circle colours
+add ability to register account with email
+Add "stat editor" user role
+Add comments instead of notes.
 
 #Fixes
 REFACTOR
@@ -23,12 +26,11 @@ check admintoken and remove admin access if its stale when I load the page.
 
 git add .
 
-git commit -m "feat(auth): add login page with email/password and Google OAuth via Supabase
-- Implemented a new LoginPage with OAuth support
-- Integrated Supabase email/password login
-- Enabled Google OAuth login via Supabase
-- Auto-redirects to login page if session is missing
-- Refactored layout into AppRoutes and Header components
-- Added 404 NotFound route and suppress header on unknown/login routes"
+git commit -m "feat(auth): migrate to Supabase OAuth/JWT, UI overhaul for login/reset, role-based stat editing
+- Migrated backend authentication to Supabase OAuth and JWT tokens.
+- Updated Login page UI to reflect new auth flow.
+- Added Password Reset page and integrated Supabase password recovery.
+- Editing stats now checks user role from Supabase metadata instead of password gating.
+- Still pending: implement email/password registration flow."
 
 git push

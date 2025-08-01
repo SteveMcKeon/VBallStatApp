@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import supabase from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 const FloatingLabelInput = ({ label, type = 'text', id, name }) => {
   const [value, setValue] = useState('');
@@ -19,7 +20,7 @@ const FloatingLabelInput = ({ label, type = 'text', id, name }) => {
       />
       <label
         htmlFor={id}
-        className={`absolute left-4 px-1 transition-all bg-white pointer-events-none duration-300 ease-in-out
+        className={`absolute left-4 px-1 transition-all pointer-events-none duration-300 ease-in-out
           ${shouldFloat ? 'top-1 text-xs text-blue-500' : 'top-3.5 text-base text-gray-400'}`}
       >
         {label}
@@ -29,6 +30,8 @@ const FloatingLabelInput = ({ label, type = 'text', id, name }) => {
 };
 
 const LoginPage = () => {
+  const navigate = useNavigate();
+  
   const handleLogin = async (provider) => {
     await supabase.auth.signInWithOAuth({ provider });
   };
@@ -37,13 +40,18 @@ const LoginPage = () => {
     e.preventDefault();
     const email = e.target.email.value;
     const password = e.target.password.value;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      alert(error.message);
+    } else {
+      navigate('/');
+    }
   };
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        <img src="../../public/android-chrome-512x512.png" alt="Logo" className="w-20 h-20 mx-auto mb-6 animate-bounce" />
         <h2 className="text-2xl font-semibold text-center mb-6">Welcome back</h2>
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <FloatingLabelInput label="Email address" id="email" name="email" type="email" />

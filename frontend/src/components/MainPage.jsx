@@ -23,7 +23,18 @@ const MainPage = () => {
   const getLocal = (key) => localStorage.getItem(key);
   const [teamName, setTeamName] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
-  
+  const [userRole, setUserRole] = useState(null);
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Failed to get user', error);
+        return;
+      }
+      setUserRole(user?.user_metadata?.role);
+    };
+    fetchUserRole();
+  }, []);  
   const handleTeamChange = async (e) => {
     const selected = e.target.value;
     setTeamName(selected);
@@ -113,7 +124,7 @@ const MainPage = () => {
   const [videoList, setVideoList] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
-  const { isAdmin, editMode, toggleEditMode, authorizedFetch, logout } = EditMode();
+  const { canEdit, editMode, toggleEditMode, authorizedFetch, logout } = EditMode();
 
   const handleEditModeToggle = () => {
     toggleEditMode();
@@ -458,7 +469,7 @@ const MainPage = () => {
     }
     return (
       <td key={field} className={highlightClass}>
-        {isAdmin ? (
+        {canEdit ? (
           <EditableCell
             value={s[field]} 
             type={visibleColumns[field].type}
@@ -632,14 +643,16 @@ const MainPage = () => {
             />
           </div>
           <div className="mt-auto p-4 space-y-4">
-            <button
-              onClick={handleEditModeToggle}
-              className={`w-full px-3 py-2 rounded text-white ${
-                editMode === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {editMode === 'admin' ? 'Exit Edit Mode' : 'Enter Edit Mode'}
-            </button>
+            {userRole  && (
+              <button
+                onClick={handleEditModeToggle}
+                className={`w-full px-3 py-2 rounded text-white ${
+                  editMode ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {editMode  ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+              </button>
+            )}
             <button
               onClick={NavToStats}
               className={`w-full px-3 py-2 rounded text-white ${'bg-blue-400 hover:bg-blue-800'
@@ -653,7 +666,7 @@ const MainPage = () => {
                 localStorage.clear();
                 navigate('/login');
               }}
-              className="w-full px-3 py-2 rounded text-white bg-red-500 hover:bg-red-700"
+              className="w-full px-3 py-2 rounded text-white bg-red-600 hover:bg-red-700 !important"
             >
               Logout
             </button>            
@@ -666,7 +679,7 @@ const MainPage = () => {
         <div className={`flex gap-4 ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
           <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
             <DBStats
-              isAdmin={isAdmin}
+              canEdit={canEdit}
               hastimestamps={selectedGame?.hastimestamps}
               isscored={selectedGame?.isscored}              
               stats={stats}

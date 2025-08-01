@@ -3,23 +3,25 @@ import supabase from '../supabaseClient';
 
 const EditMode = () => {
   const [editMode, setEditMode] = useState(null);
-  const isAdmin = editMode === 'admin';
+  const [userRole, setUserRole] = useState(null);
+  const canEdit = editMode != null;
   const toggleEditMode = () => {
-    setEditMode((prev) => (prev === 'admin' ? null : 'admin'));
+    if (editMode) {
+      setEditMode(null);
+    } else if (userRole) {
+      setEditMode(userRole);
+    }
   };
-
   useEffect(() => {
-    const checkUserRole = async () => {
+    const fetchUserRole = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session) return;
 
       const role = session.user.user_metadata?.role;
-      if (role === 'admin') {
-        setEditMode('admin');
-      }
+      setUserRole(role || null);
     };
 
-    checkUserRole();
+    fetchUserRole();
   }, []);
 
   const authorizedFetch = async (url, options = {}) => {
@@ -28,7 +30,7 @@ const EditMode = () => {
 
     const token = session.access_token;
 
-    const method = options.method || 'POST';
+    const method = options.method || 'POST';  
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
@@ -51,7 +53,7 @@ const EditMode = () => {
   };
 
   return {
-    isAdmin,
+    canEdit,
     editMode,
     authorizedFetch,
     toggleEditMode, 

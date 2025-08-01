@@ -277,6 +277,9 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           value={tempValue}
           onChange={(e) => {
             setTempValue(e.target.value);
+            const newStats = [...stats];
+            newStats[idx] = { ...newStats[idx], [field]: e.target.value };
+            setStats(newStats);            
           }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
