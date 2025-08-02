@@ -20,6 +20,20 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   const displayRef = useRef(null);
   const ghostRef = useRef(null);
   
+  const isValidValue = () => {
+    if (value == null || value === '') return true;
+    
+    if (field === 'player') {
+      return gamePlayers.includes(value);
+    }
+    
+    if (field === 'action_type') {
+      return ACTION_TYPE_OPTIONS.includes(value);
+    }
+    
+    return true; 
+  };
+  const highlightClass = !editing && !isValidValue() ? 'bg-yellow-200 hover:bg-yellow-300' : 'hover:bg-gray-100';
   useEffect(() => {
     if (!editing) return;
 
@@ -252,7 +266,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           ref={inputRef}
           autoFocus
           rows={1}
-          className="resize-none text-center bg-yellow-200"
+          className="resize-none text-center bg-green-200"
           style={{
             height: cellHeight ? `${cellHeight}px` : '100%',
             width: cellWidth ? `${cellWidth}px` : '100%',
@@ -349,7 +363,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           }
           setEditing(true);
         }}
-        className="cursor-pointer hover:bg-gray-100 w-full h-full flex items-center justify-center"
+        className={`cursor-pointer w-full h-full flex items-center justify-center ${highlightClass}`}
       >
         {(value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) ? (
           <span className="text-gray-400 italic">–</span>

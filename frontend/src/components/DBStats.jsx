@@ -48,6 +48,7 @@ const IconWithTooltip = ({ children, tooltip }) => {
 
 const DBStats = ({
   canEdit,
+  editMode,
   hastimestamps,
   isscored,  
   stats,
@@ -128,7 +129,7 @@ const DBStats = ({
 
   const renderHeader = () => (
     <tr>
-      {canEdit && <th></th>}
+      {editMode === 'admin' && <th></th>}
       {Object.entries(visibleColumns).map(([key, config]) => {
         if (!config.visible) return null;
 
@@ -252,7 +253,7 @@ const DBStats = ({
                     }
                   } : undefined}
                 >
-                {canEdit && (
+                {editMode === 'admin' && (
                   <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center w-8 px-1">
                     <button
                       className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
@@ -309,9 +310,11 @@ const DBStats = ({
                 )}
                   {visibleColumns.timestamp?.visible && (
                     <td
-                      className="border border-black cursor-pointer hover:bg-gray-100"
+                      className={`border border-black ${
+                        editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
+                      }`}
                       onClick={async () => {
-                        if (!canEdit) return;
+                        if (editMode !== 'admin') return;
 
                         const currentTimestamp = videoRef.current?.currentTime ?? 0;
 
@@ -345,10 +348,20 @@ const DBStats = ({
                         : field === 'opp_score' && prevRow && s[field] > prevRow[field]
                         ? 'bg-red-100 text-red-800'
                         : '';
-
+                        
+                    const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
+                    const shouldRenderEditableCell =
+                      editMode === 'admin' ||
+                      (editMode === 'editor' && editableFieldsInEditorMode.includes(field));
+                      
                     return (
-                      <td key={field} className={`border border-black hover:bg-gray-100 ${highlightClass} whitespace-pre-wrap`}>
-                        {canEdit ? (
+                      <td
+                        key={field}
+                        className={`border border-black ${highlightClass} whitespace-pre-wrap ${
+                          shouldRenderEditableCell ? '' : 'cursor-default'
+                        }`}
+                      >
+                        {shouldRenderEditableCell ? (
                           <EditableCell
                             ref={(el) => { cellRefs.current[`${idx}-${field}`] = el; }}
                             value={s[field]}
@@ -416,7 +429,7 @@ const DBStats = ({
                       </td>
                     );
                   })}
-                  {canEdit && (
+                  {editMode === 'admin' && (
                     <td className="text-center w-8 px-1">
                       <button
                         className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
@@ -468,40 +481,42 @@ const DBStats = ({
           )}
         </tbody>
       </table>
-      {canEdit && (
+      {['admin', 'editor'].includes(editMode) && (
         <div className="flex justify-between items-start mt-6 px-6 gap-6">
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
-            onClick={async () => {
-              const lastRow = stats[stats.length - 1];
-              const newRows = Array.from({ length: 10 }, (_, i) => ({
-                game_id: lastRow?.game_id,
-                rally_id: lastRow?.rally_id,
-                posession_seq: lastRow?.posession_seq || 0,
-                import_seq: (lastRow?.import_seq || 0) + 0.01 + i * 0.01,
-                our_score: lastRow?.our_score,
-                opp_score: lastRow?.opp_score,
-                set: lastRow?.set,
-              }));
+          {editMode === 'admin' && (
+            <button
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
+              onClick={async () => {
+                const lastRow = stats[stats.length - 1];
+                const newRows = Array.from({ length: 10 }, (_, i) => ({
+                  game_id: lastRow?.game_id,
+                  rally_id: lastRow?.rally_id,
+                  posession_seq: lastRow?.posession_seq || 0,
+                  import_seq: (lastRow?.import_seq || 0) + 0.01 + i * 0.01,
+                  our_score: lastRow?.our_score,
+                  opp_score: lastRow?.opp_score,
+                  set: lastRow?.set,
+                }));
 
-              try {
-                const res = await authorizedFetch('/api/save-stats', {
-                  body: { rows: newRows },
-                });
-                const result = await res.json();
-                if (result.success && result.insertedRows?.length) {
-                  setStats([...stats, ...result.insertedRows]);
-                } else {
-                  alert('Failed to add rows.');
+                try {
+                  const res = await authorizedFetch('/api/save-stats', {
+                    body: { rows: newRows },
+                  });
+                  const result = await res.json();
+                  if (result.success && result.insertedRows?.length) {
+                    setStats([...stats, ...result.insertedRows]);
+                  } else {
+                    alert('Failed to add rows.');
+                  }
+                } catch (err) {
+                  console.error('Add 10 rows failed', err);
+                  alert('Add 10 rows failed');
                 }
-              } catch (err) {
-                console.error('Add 10 rows failed', err);
-                alert('Add 10 rows failed');
-              }
-            }}
-          >
-            ➕ Add 10 Rows to Bottom
-          </button>
+              }}
+            >
+              ➕ Add 10 Rows to Bottom
+            </button>
+          )}
           <div className="mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md w-fit">
             <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">
               🛠 Update Game Settings
@@ -510,7 +525,9 @@ const DBStats = ({
               <div className="flex justify-between items-center w-full">
                 <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
                 <select
-                  className="border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={editMode !== 'admin'}
+                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500
+                    ${editMode !== 'admin' ? 'opacity-50' : ''}`}
                   value={gameSettings.hastimestamps ?? ''}
                   onChange={(e) => {
                     const value = e.target.value === 'true';
@@ -525,7 +542,9 @@ const DBStats = ({
               <div className="flex justify-between items-center w-full">
                 <label className="text-sm font-medium text-gray-700">Is Scored:</label>
                 <select
-                  className="border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={!(editMode === 'admin' || editMode === 'editor')}
+                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500
+                    ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
                   value={gameSettings.isscored ?? ''}
                   onChange={(e) => {
                     const value = e.target.value === 'true';

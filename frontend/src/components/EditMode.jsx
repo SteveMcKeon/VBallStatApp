@@ -4,7 +4,6 @@ import supabase from '../supabaseClient';
 const EditMode = () => {
   const [editMode, setEditMode] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  const canEdit = editMode != null;
   const toggleEditMode = () => {
     if (editMode) {
       setEditMode(null);
@@ -53,7 +52,6 @@ const EditMode = () => {
   };
 
   return {
-    canEdit,
     editMode,
     authorizedFetch,
     toggleEditMode, 

@@ -124,7 +124,7 @@ const MainPage = () => {
   const [videoList, setVideoList] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
-  const { canEdit, editMode, toggleEditMode, authorizedFetch, logout } = EditMode();
+  const { editMode, toggleEditMode, authorizedFetch, logout } = EditMode();
 
   const handleEditModeToggle = () => {
     toggleEditMode();
@@ -469,7 +469,7 @@ const MainPage = () => {
     }
     return (
       <td key={field} className={highlightClass}>
-        {canEdit ? (
+        {editMode ? (
           <EditableCell
             value={s[field]} 
             type={visibleColumns[field].type}
@@ -679,7 +679,8 @@ const MainPage = () => {
         <div className={`flex gap-4 ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
           <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
             <DBStats
-              canEdit={canEdit}
+              canEdit={editMode === 'admin' || editMode === 'editor'}
+              editMode={editMode}
               hastimestamps={selectedGame?.hastimestamps}
               isscored={selectedGame?.isscored}              
               stats={stats}
