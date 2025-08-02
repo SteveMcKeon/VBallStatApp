@@ -196,6 +196,62 @@ const DBStats = ({
     }
   };
 
+  const navigateToEditableCell = ({ idx, field, direction }) => {
+    const keys = Object.keys(visibleColumns).filter(
+      (k) => visibleColumns[k]?.visible && k !== 'timestamp' && k !== 'score'
+    );
+
+    const isEditable = (fieldName) => {
+      if (editMode === 'admin') return true;
+      const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
+      return editableFieldsInEditorMode.includes(fieldName);
+    };
+
+    let newIdx = idx;
+    let colIndex = keys.indexOf(field);
+
+    const MAX_ROWS = filteredStats.length;
+    const MAX_COLS = keys.length;
+
+    while (true) {
+      if (direction === 'next') {
+        colIndex++;
+        if (colIndex >= MAX_COLS) {
+          colIndex = 0;
+          newIdx++;
+        }
+      } else if (direction === 'prev') {
+        colIndex--;
+        if (colIndex < 0) {
+          colIndex = MAX_COLS - 1;
+          newIdx--;
+        }
+      } else if (direction === 'down') {
+        newIdx++;
+      } else if (direction === 'up') {
+        newIdx--;
+      }
+
+      if (newIdx < 0 || newIdx >= MAX_ROWS) {
+        break;
+      }
+
+      const nextField = keys[colIndex];
+      if (isEditable(nextField)) {
+        requestAnimationFrame(() => {
+          const cellRef = cellRefs.current[`${newIdx}-${nextField}`];
+          if (cellRef) {
+            cellRef.clickToEdit?.();
+            requestAnimationFrame(() => cellRef.focusInput?.());
+          } else {
+            setEditingCell({ idx: newIdx, field: nextField });
+          }
+        });
+        return;
+      }
+    }
+  };
+
   return (
     <>
       {isFiltered && filteredStats.length > 0 && (
@@ -372,56 +428,7 @@ const DBStats = ({
                             stats={stats}
                             setStats={setStats}
                             gamePlayers={gamePlayers}
-                            setEditingCell={({ idx, field, direction }) => {
-                              const keys = Object.keys(visibleColumns).filter(
-                                k => visibleColumns[k]?.visible && k !== 'timestamp' && k !== 'score'
-                              );
-                              const colIndex = keys.indexOf(field);
-                              let newIdx = idx;
-                              let newField = field;
-
-                              if (direction === 'next') {
-                                if (colIndex < keys.length - 1) {
-                                  newField = keys[colIndex + 1];
-                                } else if (idx < filteredStats.length - 1) {
-                                  newIdx = idx + 1;
-                                  newField = keys[0];
-                                } else {
-                                  return;
-                                }
-                              } else if (direction === 'prev') {
-                                if (colIndex > 0) {
-                                  newField = keys[colIndex - 1];
-                                } else if (idx > 0) {
-                                  newIdx = idx - 1;
-                                  newField = keys[keys.length - 1];
-                                } else {
-                                  return; 
-                                }
-                              } else if (direction === 'down') {
-                                if (idx < filteredStats.length - 1) {
-                                  newIdx = idx + 1;
-                                } else {
-                                  return;
-                                }
-                              } else if (direction === 'up') {
-                                if (idx > 0) {
-                                  newIdx = idx - 1;
-                                } else {
-                                  return;
-                                }
-                              }
-                              requestAnimationFrame(() => {
-                                const cellRef = cellRefs.current[`${newIdx}-${newField}`];
-                                if (!cellRef) return;
-
-                                cellRef.clickToEdit?.();
-
-                                requestAnimationFrame(() => {
-                                  cellRef.focusInput?.();
-                                });
-                              });
-                            }}
+                            setEditingCell={navigateToEditableCell}
                           />
                         ) : (
                           s[field] ?? ''

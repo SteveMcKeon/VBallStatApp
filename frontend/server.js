@@ -106,13 +106,24 @@ app.post('/api/update-stat', async (req, res) => {
   if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
 
   const decoded = verifySupabaseToken(token);
-  if (!decoded || decoded.user_metadata?.role !== 'admin') {
+  const userRole = decoded?.user_metadata?.role;
+
+  if (!decoded || !['admin', 'editor'].includes(userRole)) {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
   }
 
   const { statId, updates } = req.body;
   if (!statId || typeof updates !== 'object' || Array.isArray(updates)) {
     return res.status(400).json({ success: false, message: 'Invalid input: must include statId and updates object' });
+  }
+
+  const editorAllowedFields = ['player', 'action_type', 'quality', 'notes'];
+  if (userRole === 'editor') {
+    const attemptedFields = Object.keys(updates);
+    const invalidFields = attemptedFields.filter(f => !editorAllowedFields.includes(f));
+    if (invalidFields.length > 0) {
+      return res.status(403).json({ success: false, message: `Editors cannot modify fields: ${invalidFields.join(', ')}` });
+    }
   }
 
   try {
@@ -128,6 +139,7 @@ app.post('/api/update-stat', async (req, res) => {
     res.status(500).json({ success: false, message: 'Update failed' });
   }
 });
+
 
 app.patch('/api/update-game/:id', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];

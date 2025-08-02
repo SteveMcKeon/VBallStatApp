@@ -168,6 +168,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   };
 
   const handleKeyDown = (e) => {
+    e.stopPropagation();
     const key = e.key;
     if (key === 'Escape') {
       e.preventDefault();
