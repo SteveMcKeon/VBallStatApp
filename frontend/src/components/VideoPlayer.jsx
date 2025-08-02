@@ -770,7 +770,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   const RewindButton = ({ amount, onClick }) => {
     if (!document.fullscreenElement && isMobile) return null;
     return (
-      <button className="w-6 h-6 cursor-pointer focus:outline-none" aria-label="Rewind" onClick={onClick}>
+      <button className="w-6 h-6 cursor-pointer focus:outline-none" aria-label="Rewind" onMouseDown={onClick}>
         <div dangerouslySetInnerHTML={{ __html: rewindSVG(amount) }} />
       </button>
     );
@@ -783,7 +783,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   const ForwardButton = ({ amount, onClick }) => {
     if (!document.fullscreenElement && isMobile) return null;
     return (
-      <button className="w-6 h-6 cursor-pointer focus:outline-none" aria-label="Forward" onClick={onClick}>
+      <button className="w-6 h-6 cursor-pointer focus:outline-none" aria-label="Forward" onMouseDown={onClick}>
         <div dangerouslySetInnerHTML={{ __html: forwardSVG(amount) }} />
       </button>
     );
@@ -792,7 +792,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   const PreviousRallyButton = ({ onClick, disabled  }) => {
     if (!document.fullscreenElement && isMobile) return null;
     return (
-      <button onClick={onClick} disabled={disabled} aria-label="Previous Rally" className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}>
+      <button onMouseDown={onClick} disabled={disabled} aria-label="Previous Rally" className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}>
         <svg viewBox="0 0 48 48" fill="white" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 6H6V42H3V6Z" />
           <path d="M39.7485 41.7978C39.9768 41.9303 40.236 42.0001 40.5 42C40.8978 42 41.2794 41.842 41.5607 41.5607C41.842 41.2794 42 40.8978 42 40.5V7.50001C41.9998 7.23664 41.9303 6.97795 41.7985 6.74997C41.6666 6.52199 41.477 6.33274 41.2488 6.20126C41.0206 6.06978 40.7618 6.00071 40.4985 6.00098C40.2351 6.00125 39.9764 6.07086 39.7485 6.20281L11.2485 22.7028C11.0212 22.8347 10.8325 23.0239 10.7014 23.2516C10.5702 23.4793 10.5012 23.7375 10.5012 24.0003C10.5012 24.2631 10.5702 24.5213 10.7014 24.749C10.8325 24.9767 11.0212 25.1659 11.2485 25.2978L39.7485 41.7978Z" />
@@ -804,7 +804,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   const NextRallyButton = ({ onClick, disabled }) => {
     if (!document.fullscreenElement && isMobile) return null;
     return (
-      <button onClick={onClick} disabled={disabled} aria-label="Next Rally" className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}>
+      <button onMouseDown={onClick} disabled={disabled} aria-label="Next Rally" className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}>
         <svg viewBox="0 0 48 48" fill="white" xmlns="http://www.w3.org/2000/svg">
           <path d="M42 6H45V42H42V6Z" />
           <path d="M6.43934 41.5607C6.72064 41.842 7.10218 42 7.5 42C7.764 41.9999 8.02328 41.9299 8.2515 41.7972L36.7515 25.2972C36.9788 25.1653 37.1675 24.9761 37.2986 24.7484C37.4298 24.5207 37.4988 24.2625 37.4988 23.9997C37.4988 23.7369 37.4298 23.4787 37.2986 23.251C37.1675 23.0233 36.9788 22.8341 36.7515 22.7022L8.2515 6.2022C8.02352 6.07022 7.76481 6.00061 7.50139 6.00037C7.23797 6.00012 6.97913 6.06925 6.75091 6.2008C6.52269 6.33235 6.33314 6.52168 6.20132 6.74975C6.0695 6.97782 6.00007 7.23658 6 7.5V40.5C6 40.8978 6.15804 41.2793 6.43934 41.5607Z" />
@@ -824,7 +824,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     if (!document.fullscreenElement && isMobile) return null;
     return (
       <button
-        onClick={onClick}
+        onMouseDown={onClick}
         disabled={disabled}
         aria-label="Previous Set"
         className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
@@ -842,7 +842,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     if (!document.fullscreenElement && isMobile) return null;
     return (
       <button
-        onClick={onClick}
+        onMouseDown={onClick}
         disabled={disabled}
         aria-label="Next Set"
         className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
@@ -1010,15 +1010,15 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
         </div>            
         {/* Rewind Button */}
         <div className="relative group inline-flex items-center justify-center">
-          <RewindButton amount={REWIND_AMOUNT} onClick={() => { 
+          <RewindButton amount={REWIND_AMOUNT} onClick={() => {
             const video = videoRef.current;
             video.currentTime = Math.max(0,video.currentTime - REWIND_AMOUNT);
           }}
-        />
-        <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-          Rewind {REWIND_AMOUNT}s (←) 
+          />
+          <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
+            Rewind {REWIND_AMOUNT}s (←) 
+          </div>
         </div>
-      </div>
       {/*  Play/Pause Button */}
       <div className="relative group inline-flex items-center justify-center">
         <button onClick={() => { 
@@ -1097,7 +1097,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           {/* Autoplay Toggle */}
           <div className="relative group inline-flex items-center justify-center">
             <button
-              onClick={() => {
+              onMouseDown={() => {
                 if (isCustomPlayback) {
                   setIsCustomPlayback(false);
                   customPlaybackCancelledRef.current = true;  
@@ -1122,7 +1122,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           </div>            
           {/* Toggle Overlay */}
           <div className="relative group inline-flex items-center justify-center">
-            <button onClick={() => setShowOverlay((prev) => !prev)} className="w-8 h-8 cursor-pointer focus:outline-none" aria-label="Toggle Overlay" >
+            <button onMouseDown={() => setShowOverlay((prev) => !prev)} className="w-8 h-8 cursor-pointer focus:outline-none" aria-label="Toggle Overlay" >
               <svg className="" viewBox="0 0 36 36" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" >
                 <path d="M11,11 C9.89,11 9,11.9 9,13 L9,23 C9,24.1 9.89,25 11,25 L25,25 C26.1,25 27,24.1 27,23 L27,13 C27,11.9 26.1,11 25,11 L11,11 Z M17,17 L15.5,17 L15.5,16.5 L13.5,16.5 L13.5,19.5 L15.5,19.5 L15.5,19 L17,19 L17,20 C17,20.55 16.55,21 16,21 L13,21 C12.45,21 12,20.55 12,20 L12,16 C12,15.45 12.45,15 13,15 L16,15 C16.55,15 17,15.45 17,16 L17,17 L17,17 Z M24,17 L22.5,17 L22.5,16.5 L20.5,16.5 L20.5,19.5 L22.5,19.5 L22.5,19 L24,19 L24,20 C24,20.55 23.55,21 23,21 L20,21 C19.45,21 19,20.55 19,20 L19,16 C19,15.45 19.45,15 20,15 L23,15 C23.55,15 24,15.45 24,16 L24,17 L24,17 Z" fill={showOverlay ? "white" : "gray"} className="transition-colors duration-200" />
               </svg>
@@ -1133,7 +1133,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           </div>
           {/* PiP */}
           <div className="relative group inline-flex items-center justify-center">
-            <button onClick={async () => { 
+            <button onMouseDown={async () => { 
                 try {
                   if (document.pictureInPictureElement) {
                     await document.exitPictureInPicture();
@@ -1156,7 +1156,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           </div>
           {/* Fullscreen */}
           <div className="relative group inline-flex items-center justify-center">
-            <button onClick={() => { 
+            <button onMouseDown={() => { 
                 if (document.fullscreenElement) {
                   document.exitFullscreen();
                 } else {
@@ -1187,7 +1187,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           {!( !document.fullscreenElement && isMobile) && (
             <div className="relative inline-flex items-center justify-center" ref={settingsRef}>
               <button type="button" tabIndex="0"
-                onClick={() => {
+                onMouseDown={() => {
                   setIsSettingsOpen((prev) => !prev);
                   setSettingsView("main");
                 }}

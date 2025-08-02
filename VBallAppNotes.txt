@@ -27,11 +27,6 @@ Fix editing being janky. particularly when filtered.
 
 git add .
 
-git commit -m "feat(auth): migrate to Supabase OAuth/JWT, UI overhaul for login/reset, role-based stat editing
-- Migrated backend authentication to Supabase OAuth and JWT tokens.
-- Updated Login page UI to reflect new auth flow.
-- Added Password Reset page and integrated Supabase password recovery.
-- Editing stats now checks user role from Supabase metadata instead of password gating.
-- Still pending: implement email/password registration flow."
+git commit -m "Make cell editing snappy: decouple navigation from async blur, apply optimistic updates"
 
 git push
