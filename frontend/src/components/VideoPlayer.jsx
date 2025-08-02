@@ -13,6 +13,7 @@ const VOLUME_OVERLAY_TIMEOUT_MS = 1000;
 const CONTROLS_TIMEOUT_MS = 3000;
 const INTRO_SKIP_THRESHOLD = 0.5;
 const TOUCH_BUFFER_INTERVAL_MS = 500;
+const FRAME_DURATION = 1 / 60;
 
 const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
@@ -618,6 +619,17 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
         return;
       }
 
+      if (video.paused) {
+        if (e.key === ",") {
+          e.preventDefault();
+          video.currentTime = Math.max(0, video.currentTime - FRAME_DURATION);
+        }
+        if (e.key === ".") {
+          e.preventDefault();
+          video.currentTime = Math.min(video.duration, video.currentTime + FRAME_DURATION);
+        }
+      }
+  
       switch (e.key) {
         case "a":
         case "A":
@@ -899,6 +911,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
                 const clickedTime = percent * (videoRef.current?.duration || 0);
                 videoRef.current.currentTime = clickedTime;
                 setIsAutoplayOn(false);
+                e.currentTarget.blur();
               }}
               onMouseMove={(e) => {
                 const seekBarRect = e.currentTarget.getBoundingClientRect();

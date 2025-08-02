@@ -5,6 +5,7 @@ import '../App.css';
 import { useSidebar } from './SidebarContext';
 import StyledSelect from './StyledSelect';
 import ColumnSelector from './columnSelector';
+import SidebarFooter from './SidebarFooter';
 
 const StatsSummary = () => {
   const [teamName, setTeamName] = useState('');
@@ -452,19 +453,10 @@ const StatsSummary = () => {
                   className={`w-full px-3 py-2 rounded text-white ${'bg-blue-400 hover:bg-blue-800'}`}
                 >
                   Return to Home
-                </button>
-                <button
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    localStorage.clear();
-                    navigate('/login');
-                  }}
-                  className="w-full px-3 py-2 rounded text-white bg-red-500 hover:bg-red-700"
-                >
-                  Logout
-                </button>                   
+                </button>                  
               </div>
             </div>
+            <SidebarFooter />
           </div>
         </div>
 

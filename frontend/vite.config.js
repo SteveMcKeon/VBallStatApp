@@ -22,7 +22,7 @@ export default defineConfig({
         target: 'https://localhost:3001',
         changeOrigin: true,
         secure: false,
-      }
+      } 
     } 
   },  
   publicDir: false,
@@ -32,5 +32,5 @@ export default defineConfig({
       react: path.resolve('./node_modules/react'),
     },     
   },
-});
-    
+}); 
+         

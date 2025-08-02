@@ -22,11 +22,13 @@ team tactics or certain rotation options - by each team captain (Ask Tamir)
 
 #Fixes
 REFACTOR
-Zoom scrub should not highlight.
-Fix editing being janky. particularly when filtered.
 
 git add .
 
-git commit -m "Make cell editing snappy: decouple navigation from async blur, apply optimistic updates"
+git commit -m "feat: add sidebar footer divider and integrate logout popup
+- Added a horizontal divider line above the SidebarFooter component for visual separation.
+- Moved logout functionality into the SidebarFooter popup menu for a cleaner UI.
+- Ensured hover interactions and border rounding remain consistent on all sidebar footer buttons.
+- Removed the old Logout button from the main page layout."
 
 git push

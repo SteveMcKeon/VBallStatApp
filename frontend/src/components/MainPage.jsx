@@ -11,6 +11,7 @@ import StyledSelect from './StyledSelect';
 import EditMode from './EditMode';
 import EditableCell from './EditableCell';
 import DBStats from './DBStats';
+import SidebarFooter from './SidebarFooter';
 
 const HEADER_HOVER_ZONE_PX = 50;
 
@@ -659,19 +660,10 @@ const MainPage = () => {
               }`}
             >
               Statistic Matrix
-            </button>
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                localStorage.clear();
-                navigate('/login');
-              }}
-              className="w-full px-3 py-2 rounded text-white bg-red-600 hover:bg-red-700 !important"
-            >
-              Logout
-            </button>            
+            </button>           
           </div>          
         </div>
+        <SidebarFooter />
       </div>
     </div>
     <div ref={mainContentRef} className="flex-1 overflow-y-auto p-4">

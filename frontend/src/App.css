@@ -10,3 +10,6 @@ th {
   padding-right: 8px;
   padding-left: 8px;
 }
+* {
+  outline: none !important;
+}
