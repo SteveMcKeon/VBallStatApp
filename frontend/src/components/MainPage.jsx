@@ -648,7 +648,7 @@ const MainPage = () => {
               <button
                 onClick={handleEditModeToggle}
                 className={`w-full px-3 py-2 rounded text-white ${
-                  editMode ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                  editMode ? 'bg-red-600 hover:bg-red-700' : 'bg-green-700 hover:bg-green-800'
                 }`}
               >
                 {editMode  ? 'Exit Edit Mode' : 'Enter Edit Mode'}
@@ -656,7 +656,7 @@ const MainPage = () => {
             )}
             <button
               onClick={NavToStats}
-              className={`w-full px-3 py-2 rounded text-white ${'bg-blue-400 hover:bg-blue-800'
+              className={`w-full px-3 py-2 rounded text-white ${'bg-blue-700 hover:bg-blue-800'
               }`}
             >
               Statistic Matrix

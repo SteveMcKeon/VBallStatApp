@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useEffect  } from 'react';
 import SortableFilterHeader from './SortableFilterHeader';
 import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
+import Toast from './Toast';
 
 const IconWithTooltip = ({ children, tooltip }) => {
   const [hovered, setHovered] = React.useState(false);
@@ -75,6 +76,14 @@ const DBStats = ({
 }) => {
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
+  const [toastMessage, setToastMessage] = React.useState('');
+  const [toastType, setToastType] = React.useState('error');
+  const [showToast, setShowToast] = React.useState(false);  
+  const setToast = (message, type = 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+  };  
   const [editingCell, setEditingCell] = React.useState(null);
   const cellRefs = useRef({});
   const isFiltered = Object.values(textColumnFilters).some((filter) => {
@@ -188,11 +197,10 @@ const DBStats = ({
       if (result.success) {
         refreshStats();
       } else {
-        alert(`Failed to update ${field}: ${result.message}`);
+        setToast(`Failed to update ${field}: ${result.message}`);
       }
     } catch (err) {
-      console.error(`Failed to update ${field}`, err);
-      alert(`Error updating ${field}`);
+      setToast(`Error updating ${field}`);
     }
   };
 
@@ -335,12 +343,13 @@ const DBStats = ({
                             const updated = [...stats];
                             updated.splice(index + 1, 0, inserted);
                             setStats(updated);
+                            setToast('Added row.', 'success');                        
                           } else {
-                            alert('Failed to insert row.');
+                            setToast('Failed to insert row.');
                           }
                         } catch (err) {
                           console.error('Insert failed', err);
-                          alert('Insert failed');
+                          setToast('Insert failed');
                         }
                       }}
                     >
@@ -387,9 +396,8 @@ const DBStats = ({
                           }
                         } else {
                           console.error('Timestamp update failed:', result.message);
-                          alert('Failed to update timestamp: ' + result.message);
-                        }
-                      }}
+                          setToast('Failed to update timestamp: ' + result.message);
+                      }}}
                     >
                       {s.timestamp != null ? formatTimestamp(s.timestamp) : <span className="text-gray-400 italic">—</span>}
                     </td>
@@ -429,6 +437,7 @@ const DBStats = ({
                             setStats={setStats}
                             gamePlayers={gamePlayers}
                             setEditingCell={navigateToEditableCell}
+                            setToast={setToast}
                           />
                         ) : (
                           s[field] ?? ''
@@ -450,12 +459,14 @@ const DBStats = ({
                             if (result.success) {
                               const updated = stats.filter(row => row.id !== s.id);
                               setStats(updated);
+                              setToast('Deleted row');                  
                             } else {
-                              alert('Delete failed: ' + result.message);
+                              console.error('Delete failed:', result.message);
+                              setToast('Delete failed: ' + result.message);
                             }
                           } catch (err) {
                             console.error('Delete failed', err);
-                            alert('Delete failed');
+                            setToast('Delete failed');
                           }
                         }}
                       >
@@ -513,11 +524,12 @@ const DBStats = ({
                   if (result.success && result.insertedRows?.length) {
                     setStats([...stats, ...result.insertedRows]);
                   } else {
-                    alert('Failed to add rows.');
+                    console.error('Failed to add rows:', result.message);
+                    setToast('Failed to add rows.');
                   }
                 } catch (err) {
                   console.error('Add 10 rows failed', err);
-                  alert('Add 10 rows failed');
+                  setToast('Add 10 rows failed');
                 }
               }}
             >
@@ -571,8 +583,14 @@ const DBStats = ({
           >
             🔄 Refresh DB
           </button>
-        </div>
+        </div>     
       )}      
+      <Toast
+        message={toastMessage}
+        show={showToast}
+        onClose={() => setShowToast(false)}
+        type={toastType}
+      />         
     </>
   );
 };

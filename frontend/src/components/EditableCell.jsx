@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } from 'react';
 import EditMode from './EditMode';
 
-const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell }, ref) => {
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast }, ref) => {
   const RESULT_OPTIONS = ['In Play', 'Won Point', 'Lost Point'];
   const ACTION_TYPE_OPTIONS = [
     'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free', 'Taylor Dump'
   ];  
-  const [interactionMode, setInteractionMode] = useState('keyboard'); // 'keyboard' | 'mouse'
+  const [interactionMode, setInteractionMode] = useState('keyboard');
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -104,7 +104,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       (['float4', 'float8', 'numeric'].includes(type) && (parsed === null || !isNaN(parsed))) ||
       (type === 'text' && (typeof parsed === 'string' || parsed === null));
     if (!isValid) {
-      alert(`Invalid value for type ${type}`);
+      setToast(`Invalid value for type ${type}`);
       setTempValue(value ?? '');
       return;
     }
@@ -153,11 +153,11 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           setTimeout(() => setEditing(false), 0);
           return;          
         } else {
-          alert('Stat not found by id.');
+          setToast('Stat not found by id.');
           setTempValue(value ?? '');
         }
       } else {
-        alert('Failed to update: ' + result.message);
+        setToast('Failed to update: ' + result.message);
         setTempValue(value ?? '');
       }
     } catch (err) {

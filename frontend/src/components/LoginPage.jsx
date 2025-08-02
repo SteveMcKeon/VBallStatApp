@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import supabase from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import Toast from './Toast';
 
 const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, onChange }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -41,6 +42,15 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [authError, setAuthError] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('error');
+  const [showToast, setShowToast] = useState(false);
+
+  const setToast = (message, type = 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+  };
 
   const handleLogin = async (provider) => {
     await supabase.auth.signInWithOAuth({ provider });
@@ -56,7 +66,7 @@ const LoginPage = () => {
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({ email, password,   options: { data: { display_name: displayName } } });
       if (error) setAuthError(error.message);
-      else alert('Check your email to verify your account!');
+      else setToast('Check your email to verify your account!', 'success');
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setAuthError(error.message);
@@ -145,6 +155,12 @@ const LoginPage = () => {
         </p>       
       </div>
     </div>
+  <Toast
+    message={toastMessage}
+    show={showToast}
+    onClose={() => setShowToast(false)}
+    type={toastType}
+  />    
   );
 };
 

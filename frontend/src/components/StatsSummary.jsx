@@ -450,7 +450,7 @@ const StatsSummary = () => {
               <div className="mt-auto p-4 space-y-4">
                 <button
                   onClick={NavToHome}
-                  className={`w-full px-3 py-2 rounded text-white ${'bg-blue-400 hover:bg-blue-800'}`}
+                  className={`w-full px-3 py-2 rounded text-white ${'bg-blue-700 hover:bg-blue-800'}`}
                 >
                   Return to Home
                 </button>                  
