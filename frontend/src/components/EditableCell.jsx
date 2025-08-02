@@ -95,7 +95,8 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       setEditing(false);
       return;
     }
-    if (value !== null && parsed === value) {
+    
+    if ((value ?? '') === (parsed ?? '')) {
       setEditing(false);
       return;
     }
@@ -108,9 +109,9 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       if (result.success) {
         const statIndex = stats.findIndex(row => row.id === statId);
         if (statIndex !== -1) {
-          const newStats = [...stats];
-          newStats[statIndex] = { ...newStats[statIndex], [field]: parsed };
-
+          const newStats = stats.map((row, i) => 
+            i === statIndex ? { ...row, [field]: parsed } : row
+          );
           if (field === 'result' && (parsed === 'Point Won' || parsed === 'Point Lost')) {
             const isWon = parsed === 'Point Won';
             const updatedScore = isWon
@@ -276,10 +277,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           }}   
           value={tempValue}
           onChange={(e) => {
-            setTempValue(e.target.value);
-            const newStats = [...stats];
-            newStats[idx] = { ...newStats[idx], [field]: e.target.value };
-            setStats(newStats);            
+            setTempValue(e.target.value);           
           }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
@@ -351,7 +349,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           }
           setEditing(true);
         }}
-        className="cursor-pointer hover:bg-gray-100"
+        className="cursor-pointer hover:bg-gray-100 w-full h-full flex items-center justify-center"
       >
         {(value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) ? (
           <span className="text-gray-400 italic">–</span>

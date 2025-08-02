@@ -18,11 +18,12 @@ Make isscored/timestamps setting automatic update the circle colours
 add ability to register account with email
 Add "stat editor" user role
 Add comments instead of notes.
+team tactics or certain rotation options - by each team captain (Ask Tamir)
 
 #Fixes
 REFACTOR
 Zoom scrub should not highlight.
-check admintoken and remove admin access if its stale when I load the page.
+Fix editing being janky. particularly when filtered.
 
 git add .
 

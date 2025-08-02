@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import supabase from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
-const FloatingLabelInput = ({ label, type = 'text', id, name }) => {
-  const [value, setValue] = useState('');
+const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, onChange }) => {
   const [isFocused, setIsFocused] = useState(false);
   const shouldFloat = isFocused || value.length > 0;
   return (
@@ -13,15 +12,21 @@ const FloatingLabelInput = ({ label, type = 'text', id, name }) => {
         id={id}
         name={name}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={onChange}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        className="w-full px-4 pt-6 pb-2 text-sm text-black border border-gray-400 rounded-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+        className={`w-full px-4 pt-6 pb-2 text-sm text-black border rounded-full focus:outline-none transition-all ${
+          isError
+            ? 'border-red-500 focus:border-red-500'
+            : 'border-gray-400 focus:border-blue-500'
+        }`}
       />
       <label
         htmlFor={id}
         className={`absolute left-4 px-1 transition-all pointer-events-none duration-300 ease-in-out
-          ${shouldFloat ? 'top-1 text-xs text-blue-500' : 'top-3.5 text-base text-gray-400'}`}
+          ${shouldFloat ? 'top-1 text-xs' : 'top-3.5 text-base'} ${
+            isError ? 'text-red-500' : shouldFloat ? 'text-blue-500' : 'text-gray-400'
+          }`}
       >
         {label}
       </label>
@@ -31,20 +36,31 @@ const FloatingLabelInput = ({ label, type = 'text', id, name }) => {
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [authError, setAuthError] = useState('');
+
   const handleLogin = async (provider) => {
     await supabase.auth.signInWithOAuth({ provider });
   };
 
-  const handleEmailLogin = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
+    setAuthError('');
     const email = e.target.email.value;
     const password = e.target.password.value;
-    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      alert(error.message);
+    const displayName = isSignUp ? e.target.displayName.value : null;
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password,   options: { data: { display_name: displayName } } });
+      if (error) setAuthError(error.message);
+      else alert('Check your email to verify your account!');
     } else {
-      navigate('/');
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setAuthError(error.message);
+      else navigate('/');
     }
   };
 
@@ -52,24 +68,45 @@ const LoginPage = () => {
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <img src="../../public/android-chrome-512x512.png" alt="Logo" className="w-20 h-20 mx-auto mb-6 animate-bounce" />
-        <h2 className="text-2xl font-semibold text-center mb-6">Welcome back</h2>
-        <form onSubmit={handleEmailLogin} className="space-y-4">
-          <FloatingLabelInput label="Email address" id="email" name="email" type="email" />
-          <FloatingLabelInput label="Password" id="password" name="password" type="password" />
+        <h2 className="text-2xl font-semibold text-center mb-6">
+          {isSignUp ? 'Create an account' : 'Welcome back'}
+        </h2>
+        <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <FloatingLabelInput label="Display Name" id="displayName" name="displayName" value={displayName} onChange={(e) => { setDisplayName(e.target.value); setAuthError(''); }} />
+          )}        
+          <FloatingLabelInput label="Email address" id="email" name="email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setAuthError(''); }} />
+          <FloatingLabelInput label="Password" id="password" name="password" type="password" value={password} isError={!!authError} onChange={(e) => { setPassword(e.target.value); setAuthError(''); }} />
+          {authError && (
+            <div className="flex items-center text-sm text-red-500 mt-1 ml-4">
+              <span className="mr-1">❗</span> {authError}
+            </div>
+          )}          
           <button
             type="submit"
             className="w-full py-3 bg-black text-white rounded-full font-semibold hover:bg-gray-600 transition-colors cursor-pointer"
           >
-            Continue
+            {isSignUp ? 'Sign Up' : 'Log In'}
           </button>
         </form>
 
         <p className="text-sm text-center mt-4 text-gray-500">
-          Don’t have an account? <span className="text-blue-600 cursor-pointer">Sign up</span>
+          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <span
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-blue-600 cursor-pointer"
+          >
+            {isSignUp ? 'Log In' : 'Sign up'}
+          </span>
         </p>
-        <p className="text-sm text-center mt-4 text-gray-500">
-          <a href="/reset-password" className="text-blue-600 hover:underline">Forgot your password?</a>
-        </p>
+
+        {!isSignUp && (
+          <p className="text-sm text-center mt-4 text-gray-500">
+            <a href="/reset-password" className="text-blue-600 hover:underline">
+              Forgot your password?
+            </a>
+          </p>
+        )}
         <div className="flex items-center my-6">
           <hr className="flex-grow border-gray-300" />
           <span className="mx-2 text-sm text-gray-400">OR</span>
@@ -105,10 +142,11 @@ const LoginPage = () => {
         </div>
         <p className="text-xs text-center text-gray-400 mt-6">
           <a href="#" className="hover:underline">Terms of Use</a> | <a href="#" className="hover:underline">Privacy Policy</a>
-        </p>
+        </p>       
       </div>
     </div>
   );
 };
 
 export default LoginPage;
+
