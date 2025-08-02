@@ -82,7 +82,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   
   const handleBlur = async () => {
     if (!editing) return;
-
+    setEditing(false);
     let parsed;
     const isBlank =
       ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(type)
@@ -106,14 +106,17 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     if (!isValid) {
       alert(`Invalid value for type ${type}`);
       setTempValue(value ?? '');
-      setEditing(false);
       return;
     }
-    
-    if ((value ?? '') === (parsed ?? '')) {
-      setEditing(false);
-      return;
-    }
+    if ((value ?? '') === (parsed ?? '')) return;
+    setStats(prevStats => {
+      const newStats = [...prevStats];
+      const statIndex = newStats.findIndex(row => row.id === statId);
+      if (statIndex !== -1) {
+        newStats[statIndex] = { ...newStats[statIndex], [field]: parsed };
+      }
+      return newStats;
+    });    
     try {
       const res = await authorizedFetch('/api/update-stat', {
         body: { statId, updates: { [field]: parsed } },
@@ -142,12 +145,10 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
                 opp_score: newStats[i - 1].opp_score,
               };
             }
-
             await authorizedFetch('/api/save-stats', {
               body: { rows: newStats.slice(statIndex) },
             });
           }
-
           setStats(newStats);
           setTimeout(() => setEditing(false), 0);
           return;          
@@ -163,8 +164,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       console.error('Error during update:', err);
       setTempValue(value ?? '');
     }
-
-    setEditing(false);
   };
 
   const handleKeyDown = (e) => {
@@ -193,9 +192,9 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       if ((key === 'Enter' || key === 'Tab') && suggestions.length > 0) {
         setTempValue(suggestions[selectedSuggestionIndex]);
         setShowSuggestions(false);
-
-        handleBlur().then(() => {
-          if (setEditingCell) {
+        handleBlur();
+        if (setEditingCell) {
+          setTimeout(() => {
             setEditingCell({
               idx,
               field,
@@ -203,8 +202,8 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
                 ? (e.shiftKey ? 'prev' : 'next')
                 : (e.shiftKey ? 'up' : 'down'),
             });
-          }
-        });
+          }, 0);
+        }
         return;
       }
     }
@@ -239,23 +238,24 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
         null;
       if (direction && setEditingCell) {
         e.preventDefault();
-        handleBlur().then(() => {
+        handleBlur(); 
+        setTimeout(() => {
           setEditingCell({ idx, field, direction });
-        });
+        }, 0);
         return;
       }
     }    
     if (key === 'Enter' || key === 'Tab') {
       e.preventDefault();
-
       const direction = key === 'Tab'
         ? (e.shiftKey ? 'prev' : 'next')
         : (e.shiftKey ? 'up' : 'down');
-      handleBlur().then(() => {
-        if (setEditingCell) {
+      handleBlur();
+      if (setEditingCell) {
+        setTimeout(() => {
           setEditingCell({ idx, field, direction });
-        }
-      });
+        }, 0);
+      }
       return;
     }
   };
