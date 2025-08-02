@@ -73,6 +73,7 @@ const DBStats = ({
   containerRef,
   formatTimestamp,
   gameId,
+  refreshGames,
 }) => {
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
@@ -196,6 +197,9 @@ const DBStats = ({
       const result = await res.json();
       if (result.success) {
         refreshStats();
+        if (refreshGames) {
+          refreshGames();
+        }
       } else {
         setToast(`Failed to update ${field}: ${result.message}`);
       }

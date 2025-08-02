@@ -53,7 +53,19 @@ const MainPage = () => {
       setTeamGames(data);
     }
   };    
-
+  const refreshGames = async () => {
+    if (!teamName) return;
+    const { data, error } = await supabase
+      .from('games')
+      .select('id, title, date, video_url, hastimestamps, isscored')
+      .eq('team_name', teamName)
+      .order('date', { ascending: false });
+    if (error) {
+      console.error("Error refreshing games:", error);
+    } else {
+      setTeamGames(data);
+    }
+  };
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -554,16 +566,17 @@ const MainPage = () => {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
         <div className="text-lg font-semibold mb-4">Please select a game to continue</div>
-        <GameSelector
-          games={teamGames}
-          value={selectedGameId}
-          onChange={(selectedOption) => {
-            setSelectedGameId(selectedOption.value);
-            const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-            setSelectedVideo(selectedGame?.video_url || '');
-            localStorage.removeItem('videoTime');
-          }}
-        />
+          <GameSelector
+            key={teamGames.map(g => g.id + g.hastimestamps + g.isscored).join('-')}
+            games={teamGames}
+            value={selectedGameId}
+            onChange={(selectedOption) => {
+              setSelectedGameId(selectedOption.value);
+              const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+              setSelectedVideo(selectedGame?.video_url || '');
+              localStorage.removeItem('videoTime');
+            }}
+          />
       </div>
     );
   }
@@ -696,6 +709,7 @@ const MainPage = () => {
               containerRef={containerRef}
               formatTimestamp={formatTimestamp}
               gameId={gameId}
+              refreshGames={refreshGames}
             />
           </div>
           <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'}`}>

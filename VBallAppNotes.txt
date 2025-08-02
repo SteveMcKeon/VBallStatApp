@@ -25,10 +25,8 @@ REFACTOR
 
 git add .
 
-git commit -m "feat: add sidebar footer divider and integrate logout popup
-- Added a horizontal divider line above the SidebarFooter component for visual separation.
-- Moved logout functionality into the SidebarFooter popup menu for a cleaner UI.
-- Ensured hover interactions and border rounding remain consistent on all sidebar footer buttons.
-- Removed the old Logout button from the main page layout."
+git commit -m "feat: Replace alert() with reusable Toast notifications across app
+- Added Toast component integration for LoginPage, DBStats, and EditableCell
+- Replaced alert() calls with setToast() helper to manage message, type, and visibility"
 
 git push

@@ -75,6 +75,7 @@ const LoginPage = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <img src="../../public/android-chrome-512x512.png" alt="Logo" className="w-20 h-20 mx-auto mb-6 animate-bounce" />
@@ -155,12 +156,13 @@ const LoginPage = () => {
         </p>       
       </div>
     </div>
-  <Toast
-    message={toastMessage}
-    show={showToast}
-    onClose={() => setShowToast(false)}
-    type={toastType}
-  />    
+    <Toast
+      message={toastMessage}
+      show={showToast}
+      onClose={() => setShowToast(false)}
+      type={toastType}
+    />    
+  </>
   );
 };
 
