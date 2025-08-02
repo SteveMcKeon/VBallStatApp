@@ -6,7 +6,13 @@ const TooltipPortal = ({ children }) => {
 
   useEffect(() => {
     const el = document.createElement('div');
-    el.className = 'z-[1000] pointer-events-none';
+    el.style.position = 'fixed';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.width = '100%';
+    el.style.height = '100%';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '99999';
     document.body.appendChild(el);
     setTooltipContainer(el);
 

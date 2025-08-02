@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useImperativeHandle, forwardRef } from "react";
 import { getRallyTimes } from "@/utils/getRallyTimes";
+import TooltipPortal from '../utils/tooltipPortal';
 
 const REWIND_AMOUNT = 3;
 const FORWARD_AMOUNT = 10;
@@ -855,7 +856,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
       </button>
     );
   };
-
+  const [hoverTimeTooltip, setHoverTimeTooltip] = useState(null);
 
   return (
     <div
@@ -891,11 +892,42 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
                 videoRef.current.currentTime = parseFloat(e.target.value);
                 setIsAutoplayOn(false);
               }}
+              onClick={(e) => {
+                const seekBarRect = e.currentTarget.getBoundingClientRect();
+                const relativeX = e.clientX - seekBarRect.left;
+                const percent = Math.min(Math.max(relativeX / seekBarRect.width, 0), 1);
+                const clickedTime = percent * (videoRef.current?.duration || 0);
+                videoRef.current.currentTime = clickedTime;
+                setIsAutoplayOn(false);
+              }}
+              onMouseMove={(e) => {
+                const seekBarRect = e.currentTarget.getBoundingClientRect();
+                const relativeX = e.clientX - seekBarRect.left;
+                const percent = Math.min(Math.max(relativeX / seekBarRect.width, 0), 1);
+                const hoverTime = percent * (videoRef.current?.duration || 0);
+                setHoverTimeTooltip({ x: e.clientX, y: e.clientY, time: hoverTime });
+              }}
+              onMouseLeave={() => setHoverTimeTooltip(null)}              
               disabled={isCustomPlayback}
               className={`relative z-20 w-full h-1 accent-red-600 cursor-pointer focus:outline-none ${
                 isCustomPlayback ? "opacity-50 cursor-not-allowed" : ""
               }`}
             />
+            {hoverTimeTooltip && (
+              <TooltipPortal>
+                <div
+                  className="fixed px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap"
+                  style={{
+                    top: `${hoverTimeTooltip.y - 30}px`,
+                    left: `${hoverTimeTooltip.x}px`,
+                    transform: 'translateX(-50%)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {formatTime(hoverTimeTooltip.time)}
+                </div>
+              </TooltipPortal>
+            )}          
           </div>
         </div>
         <div className="absolute bottom-2 left-0 right-0 px-4 flex items-center justify-between bg-black/50 text-white rounded-lg py-2 text-sm z-50">
