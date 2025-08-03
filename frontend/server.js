@@ -50,31 +50,31 @@ const upload = multer({
 });
 
 app.post('/api/mark-processed', async (req, res) => {
-  const { date, gameNumber } = req.body;
+  const { gameId } = req.body;
 
-  if (!date || !gameNumber) {
-    return res.status(400).json({ success: false, message: 'Missing date or gameNumber' });
+  if (!gameId) {
+    return res.status(400).json({ success: false, message: 'Missing gameId' });
   }
 
   try {
     const { error } = await supabase
       .from('games')
       .update({ processed: true })
-      .eq('date', date)
-      .eq('title', `${date} Game ${gameNumber}`);
+      .eq('id', gameId);
 
     if (error) {
       console.error('Failed to mark video as processed:', error);
       return res.status(500).json({ success: false, message: 'Database update failed' });
     }
 
-    console.log(`Marked video as processed: ${date} Game ${gameNumber}`);
+    console.log(`Marked Game ID ${gameId} as processed`);
     res.json({ success: true });
   } catch (err) {
     console.error('Unexpected server error:', err);
     res.status(500).json({ success: false, message: 'Unexpected server error' });
   }
 });
+
 
 app.post('/api/upload-game', (req, res) => {
   let filePath = null;
@@ -288,7 +288,8 @@ app.patch('/api/update-game/:id', async (req, res) => {
   if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
 
   const decoded = verifySupabaseToken(token);
-  if (!decoded || decoded.user_metadata?.role !== 'admin') {
+  const userRole = decoded?.user_metadata?.role;
+  if (!decoded || !userRole) {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
   }
 

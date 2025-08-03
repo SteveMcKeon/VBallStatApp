@@ -357,7 +357,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       <div
         ref={wrapperRef}
         onClick={() => {
-          e.stopPropagation();
           if (displayRef.current) {
             const { offsetHeight, offsetWidth } = displayRef.current;
             setCellHeight(offsetHeight);

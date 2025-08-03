@@ -22,7 +22,7 @@ EditableCell suggestions only work on enter and not tab.
 Editor not authorized to change isscored?
 UPDATE TO YES/NO INSTEAD OF TRUE/FALSE for plebians
 Supabase Auth session missing.
-
+use tus.io for streaming the uploads
 
 
 
