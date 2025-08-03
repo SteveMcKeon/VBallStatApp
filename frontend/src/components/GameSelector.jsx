@@ -8,7 +8,7 @@ const getStatusColor = (game) => {
   return 'red';
 };
 
-const GameSelector = ({ games, onChange, value, refreshGames, videoPlayerRef, teamName }) => {
+const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const processedGames = games.filter((game) => game.processed);
   const options = processedGames.map((game) => ({
@@ -49,7 +49,6 @@ const GameSelector = ({ games, onChange, value, refreshGames, videoPlayerRef, te
         isOpen={showUploadModal}
         onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
         onClose={() => setShowUploadModal(false)}
-        onUploadSuccess={refreshGames}
         teamName={teamName}
       />
     </>

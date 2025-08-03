@@ -3,7 +3,7 @@ import FloatingLabelInput from './FloatingLabelInput';
 import Modal from './Modal';
 import Toast from './Toast'; 
 
-const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, onUploadSuccess, teamName }) => {
+const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName }) => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('error');
   const [showToast, setShowToast] = useState(false);
@@ -58,7 +58,6 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, onUploadSuccess, teamN
     const result = await res.json();
     if (result.success) {
       setToast('Game uploaded successfully!', 'success');
-      onUploadSuccess();
       onClose();
     } else {
       setToast(result.message || 'Upload failed');
@@ -166,7 +165,12 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, onUploadSuccess, teamN
         {/* Bottom buttons */}
         <div className="mt-6 flex justify-between">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100">Cancel</button>
-          <button onClick={handleSubmit} className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">Upload Game</button>
+            {/*<button onClick={handleSubmit} className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">Upload Game</button>*/}
+          <button
+            onClick={() => setToast('Upload functionality not fully implemented yet')}
+            className="px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-md cursor-pointer" >
+            Upload Game
+          </button> 
         </div>
       </Modal>
       <Toast
