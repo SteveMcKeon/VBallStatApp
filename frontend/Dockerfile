@@ -11,7 +11,3 @@ RUN npm install
 COPY . .
 
 EXPOSE 5174
-
-# Start Vite dev server directly
-CMD npm run dev & node server.js
-

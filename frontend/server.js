@@ -6,13 +6,11 @@ const https = require('https');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const verifySupabaseToken = require('./src/utils/verifySupabaseToken');
-
+const multer = require('multer');
 dotenv.config();
-
 const app = express();
 const PORT = 3001;
 const VIDEO_DIR = '/app/videos';
-
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -22,11 +20,93 @@ app.use((req, res, next) => {
   console.log(`🛰️  ${req.method} ${req.url}`);
   next();
 });
-
 app.use(cors());
 app.use(express.json());
-
 app.use('/videos', express.static(VIDEO_DIR));
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(VIDEO_DIR, 'user-uploads');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Sanitize the filename or generate unique names if needed
+    cb(null, file.originalname);
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'video/mp4') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only MP4 files are allowed'));
+    }
+  }
+});
+
+app.post('/api/upload-game', upload.single('video'), async (req, res) => {
+  const { date, players, team_name } = req.body;
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No video file uploaded' });
+  }
+
+  if (!date || !players) {
+    return res.status(400).json({ success: false, message: 'Missing date or players field' });
+  }
+
+  const { data: existingGames, error } = await supabase
+    .from('games')
+    .select('id')
+    .eq('date', date);
+
+  if (error) {
+    console.error('Supabase query failed:', error);
+    return res.status(500).json({ success: false, message: 'Database error' });
+  }
+
+  const count = existingGames.length;
+  const gameNumber = count + 1;
+  const ext = path.extname(req.file.originalname); 
+  const baseFileName = `${date}_Game${gameNumber}`;
+  const originalFileName = `${baseFileName}_original${ext}`;
+  const processedFileName = `${baseFileName}_h.264${ext}`; 
+  const uploadDir = path.join(VIDEO_DIR, 'user-uploads');
+  const oldPath = path.join(uploadDir, req.file.filename);
+  const newPath = path.join(uploadDir, originalFileName);
+
+  fs.renameSync(oldPath, newPath);
+
+  console.log(`Saved uploaded file as: ${originalFileName}`);
+
+  // Insert into Supabase Games Table
+  const { data: insertedGame, error: insertError } = await supabase
+    .from('games')
+    .insert([
+      {
+        date: date,
+        title: `${date} Game ${gameNumber}`,
+        video_url: processedFileName,
+        players: players.split(',').map(p => p.trim()),
+        team_name: team_name
+      }
+    ])
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('Failed to insert game into Supabase:', insertError);
+    return res.status(500).json({ success: false, message: 'Failed to create game record' });
+  }
+
+  return res.json({ success: true, filename: processedFileName });
+});
+
 
 app.get('/api/videos', (req, res) => {
   console.log('Reading video directory:', VIDEO_DIR);

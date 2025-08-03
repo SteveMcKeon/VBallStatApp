@@ -6,17 +6,11 @@ Add video upload functionaility
 	-Automate encoding pipeline.
 Add tooltip intro for new users to introduce features.
 Add resize video option (drag) in side-by-side mode.
-Show timestamp on video seekbar as you scrub
-After I scrub, seek doesn't work right? it's going frame by frame. Add frame seek with "<" and ">" (in reality "," and ".")
 	Shift + -> and <- for seek to set.
 	Shift + n for next video (by date).
-Re add Header animation to disappear on scroll, and to work for mobile(add to app.jsx)
 Resize table columns button?
 Add contact / bug report / suggestions email?
 Register team, invite other users to team.
-Make isscored/timestamps setting automatic update the circle colours
-add ability to register account with email
-Add "stat editor" user role
 Add comments instead of notes.
 team tactics or certain rotation options - by each team captain (Ask Tamir)
 
@@ -25,8 +19,17 @@ REFACTOR
 
 git add .
 
-git commit -m "feat: Replace alert() with reusable Toast notifications across app
-- Added Toast component integration for LoginPage, DBStats, and EditableCell
-- Replaced alert() calls with setToast() helper to manage message, type, and visibility"
+git commit -m "feat: Implement video upload workflow with processed game filtering and hot-reload dev setup
+- Added drag-and-drop video upload modal with MP4 validation and dynamic filename generation
+- Implemented server-side upload handling with Multer, saving files to user-uploads directory
+- Automatically generates game title and filename based on upload date and existing game count
+- Inserted uploaded games into Supabase with team name, players, and processing flags
+- Filtered unprocessed games from GameSelector and StatsSummary dropdowns
+- Ensured UploadGameModal closes video player controls overlay programmatically
+- Added frontend form validations for file type, required fields, and UI consistency (fixed dropzone height)
+- Integrated Express + Vite hot-reload dev workflow in Docker"
 
 git push
+
+
+Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou

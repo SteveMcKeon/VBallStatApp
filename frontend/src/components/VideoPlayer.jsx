@@ -45,6 +45,16 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
         });
       }
       setIsCustomPlayback(false);
+    },
+    closeControlsOverlay: () => {
+      if (controlTimeoutRef.current) {
+        clearTimeout(controlTimeoutRef.current);
+        controlTimeoutRef.current = null;
+      }
+      setIsSettingsOpen(false);
+      setSettingsView("main");
+      setShowControls(false);
+      setHideCursor(true);
     }
   }));
   const getLocal = (key) => localStorage.getItem(key); 
@@ -723,8 +733,10 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           break;
         }
         case "Escape":
-          setIsSettingsOpen(false);
-          setSettingsView("main");
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          }
+          ref.current?.closeControlsOverlay();
           break;
         default:
           break;

@@ -17,6 +17,18 @@ const HEADER_HOVER_ZONE_PX = 50;
 
 const MainPage = () => {
   const navigate = useNavigate();
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const handleOpenUploadModal = () => {
+    requestAnimationFrame(() => {
+      videoPlayerRef.current?.forceHideControls();
+    });
+    setIsUploadModalOpen(true);
+  };
+
+  const handleCloseUploadModal = () => {
+    videoPlayerRef.current?.allowControls();
+    setIsUploadModalOpen(false);
+  };  
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
   const [gamePlayers, setGamePlayers] = useState([]);
@@ -44,7 +56,7 @@ const MainPage = () => {
     setSelectedGameId('');
     const { data, error } = await supabase
       .from('games')
-      .select('id, title, date, video_url, hastimestamps, isscored')
+      .select('id, title, date, video_url, hastimestamps, isscored, processed')
       .eq('team_name', selected)
       .order('date', { ascending: false });
     if (error) {
@@ -57,7 +69,7 @@ const MainPage = () => {
     if (!teamName) return;
     const { data, error } = await supabase
       .from('games')
-      .select('id, title, date, video_url, hastimestamps, isscored')
+      .select('id, title, date, video_url, hastimestamps, isscored, processed')
       .eq('team_name', teamName)
       .order('date', { ascending: false });
     if (error) {
@@ -307,7 +319,7 @@ const MainPage = () => {
         await handleTeamChange({ target: { value: savedTeam } });
         const { data: gamesData, error: gamesError } = await supabase
           .from('games')
-          .select('id, title, date, video_url, hastimestamps, isscored')
+          .select('id, title, date, video_url, hastimestamps, isscored, processed')
           .eq('team_name', savedTeam)
           .order('date', { ascending: false });
 
@@ -571,11 +583,16 @@ const MainPage = () => {
             games={teamGames}
             value={selectedGameId}
             onChange={(selectedOption) => {
-              setSelectedGameId(selectedOption.value);
-              const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-              setSelectedVideo(selectedGame?.video_url || '');
-              localStorage.removeItem('videoTime');
+              if (selectedOption.value === 'upload-new') {
+                handleOpenUploadModal();
+              } else {              
+                setSelectedGameId(selectedOption.value);
+                const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+                setSelectedVideo(selectedGame?.video_url || '');
+                localStorage.removeItem('videoTime');
+              }
             }}
+            teamName={teamName}
           />
       </div>
     );
@@ -587,41 +604,47 @@ const MainPage = () => {
         className="flex flex-1 overflow-auto transition-all duration-300"
         style={{ paddingTop: "3.5rem" }}
       >
-      <div
-        className={`transition-all duration-300 overflow-hidden bg-gray-200 border-r h-full flex-shrink-0 ${
-          showSidebar ? 'w-64' : 'w-0'
-        }`}
-      >
-      <div className="h-full flex flex-col">    
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
-          <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
-          <StyledSelect
-            options={availableTeams.map(team => ({
-              label: team,
-              value: team,
-              color: 'blue', // or a color based on some logic
-            }))}
-            value={teamName}
-            onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
-            placeholder="Click here to select a team"
-            showStatus={false}
-          /> 
-          <div>
-            <label className={`font-semibold ${!selectedGameId ? "text-blue-700" : ""}`}>
-              {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
-            </label>
-            <GameSelector
-              games={teamGames}
-              value={selectedGameId}
-              onChange={(selectedOption) => {
-                setSelectedGameId(selectedOption.value);
-                const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-                setSelectedVideo(selectedGame?.video_url || '');
-                localStorage.removeItem('videoTime');
-                setTimeout(() => {
-                  videoRef.current?.focus();
-                }, 300);                
-              }}
+        <div
+          className={`transition-all duration-300 overflow-hidden bg-gray-200 border-r h-full flex-shrink-0 ${
+            showSidebar ? 'w-64' : 'w-0'
+          }`}
+        >
+        <div className="h-full flex flex-col">    
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
+            <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
+            <StyledSelect
+              options={availableTeams.map(team => ({
+                label: team,
+                value: team,
+                color: 'blue',
+              }))}
+              value={teamName}
+              onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
+              placeholder="Click here to select a team"
+              showStatus={false}
+            /> 
+            <div>
+              <label className={`font-semibold ${!selectedGameId ? "text-blue-700" : ""}`}>
+                {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
+              </label>
+              <GameSelector
+                games={teamGames}
+                value={selectedGameId}
+                onChange={(selectedOption) => {
+                  if (selectedOption.value === 'upload-new') {
+                    handleOpenUploadModal();
+                  } else {             
+                    setSelectedGameId(selectedOption.value);
+                    const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+                    setSelectedVideo(selectedGame?.video_url || '');
+                    localStorage.removeItem('videoTime');
+                    setTimeout(() => {
+                      videoRef.current?.focus();
+                    }, 300);                
+                  }
+                }}
+                videoPlayerRef={videoPlayerRef}
+                teamName={teamName}
             />     
           </div>
           <div>

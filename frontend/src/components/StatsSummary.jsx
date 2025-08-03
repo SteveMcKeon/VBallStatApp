@@ -93,7 +93,7 @@ const StatsSummary = () => {
       if (!teamName) return;
       const { data, error } = await supabase
         .from('games')
-        .select('id, title, team_name, isscored, date')
+        .select('id, title, team_name, isscored, date, processed')
         .eq('team_name', teamName);
       if (!error) {
         setGames(data);
@@ -396,12 +396,13 @@ const StatsSummary = () => {
                   options={[
                     { value: 'all', label: 'All Games' },
                     { value: 'scored', label: 'All Scored Games' },
-                    ...[...games]
+                    ...games
+                      .filter((game) => game.processed)  // <-- Only include processed games
                       .sort((a, b) => new Date(b.date) - new Date(a.date))
                       .map((game) => ({
                         value: game.id,
                         label: game.title,
-                        color: game.isscored ? 'green' : 'red', // red dot for unscored
+                        color: game.isscored ? 'green' : 'red',
                         tooltip: game.isscored ? 'Scored' : 'Not yet scored',
                       })),
                   ]}
