@@ -3,7 +3,11 @@ import FloatingLabelInput from './FloatingLabelInput';
 import Modal from './Modal';
 import Toast from './Toast'; 
 
-const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName }) => {
+const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName, onUpload }) => {
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const xhrRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);  
+  const [uploadStatus, setUploadStatus] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('error');
   const [showToast, setShowToast] = useState(false);
@@ -34,7 +38,10 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName }) => {
       setToast('Date format should be YYYY-MM-DD');
       return;
     }
-    
+    if (!players.trim()) {
+      setToast('Please enter players (comma-separated)');
+      return;
+    }    
     if (!videoFile) {
       setToast('Please select a video file');
       return;
@@ -44,25 +51,63 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName }) => {
       return;
     }
 
+    setIsUploading(true);
+    setUploadProgress(0);
+    onClose();
+
     const formData = new FormData();
     formData.append('date', date);
     formData.append('players', players);
     formData.append('video', videoFile);
     formData.append('team_name', teamName);
 
-    const res = await fetch('/api/upload-game', {
-      method: 'POST',
-      body: formData
-    });
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+    xhr.open('POST', '/api/upload-game', true);
 
-    const result = await res.json();
-    if (result.success) {
-      setToast('Game uploaded successfully!', 'success');
-      onClose();
-    } else {
-      setToast(result.message || 'Upload failed');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        setUploadProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      setIsUploading(false);
+      const result = JSON.parse(xhr.responseText);
+      if (xhr.status === 200 && result.success) {
+        setToast('Game uploaded successfully!', 'success');
+      } else {
+        setToast(result.message || 'Upload failed');
+      }
+    };
+
+    xhr.onerror = () => {
+      setIsUploading(false);
+      setToast('Upload failed due to network error');
+    };
+
+    xhr.send(formData);
+  };
+
+  const cancelUpload = () => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      setUploadStatus('cancelled');
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
+  
+  useEffect(() => {
+    if (uploadStatus === 'success' || uploadStatus === 'error' || uploadStatus === 'cancelled') {
+      const timeout = setTimeout(() => {
+        setUploadStatus('');
+        setUploadProgress(0);
+      }, 5000); // Hide after 5 seconds
+      return () => clearTimeout(timeout);
+    }
+  }, [uploadStatus]);
 
   useEffect(() => {
     if (isOpen && onBeforeOpen) {
@@ -165,12 +210,12 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName }) => {
         {/* Bottom buttons */}
         <div className="mt-6 flex justify-between">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100">Cancel</button>
-            {/*<button onClick={handleSubmit} className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">Upload Game</button>*/}
-          <button
+            <button onClick={handleSubmit} className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">Upload Game</button>
+          {/*<button
             onClick={() => setToast('Upload functionality not fully implemented yet')}
             className="px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-md cursor-pointer" >
             Upload Game
-          </button> 
+          </button> */}
         </div>
       </Modal>
       <Toast
@@ -179,6 +224,38 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName }) => {
         onClose={() => setShowToast(false)}
         type={toastType}
       />
+      {(isUploading || uploadStatus) && (
+        <div className="fixed top-0 right-4 transform h-14 flex items-center z-50">
+          <div className="flex items-center gap-3 px-4 py-2 bg-white shadow-xl rounded-xl border border-gray-200 pointer-events-auto">
+            <div className="w-40 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`
+                  h-full transition-all duration-300 ease-out
+                  ${uploadStatus === 'success' ? 'bg-green-500' :
+                    uploadStatus === 'error' ? 'bg-red-500' :
+                    'bg-gradient-to-r from-blue-500 to-blue-600'
+                  }
+                `}
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+            <div className="w-32 text-right text-sm font-medium text-gray-700">
+              {uploadStatus === 'success' && 'Done'}
+              {uploadStatus === 'error' && 'Failed'}
+              {uploadStatus === 'cancelled' && 'Cancelled'}
+              {isUploading && `Uploading... ${uploadProgress}%`}
+            </div>
+            {isUploading && (
+              <button
+                onClick={cancelUpload}
+                className="ml-2 text-gray-500 hover:text-red-500 text-lg leading-none"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 };

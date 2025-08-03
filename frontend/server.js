@@ -49,64 +49,126 @@ const upload = multer({
   }
 });
 
-app.post('/api/upload-game', upload.single('video'), async (req, res) => {
-  const { date, players, team_name } = req.body;
+app.post('/api/mark-processed', async (req, res) => {
+  const { date, gameNumber } = req.body;
 
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No video file uploaded' });
+  if (!date || !gameNumber) {
+    return res.status(400).json({ success: false, message: 'Missing date or gameNumber' });
   }
 
-  if (!date || !players) {
-    return res.status(400).json({ success: false, message: 'Missing date or players field' });
+  try {
+    const { error } = await supabase
+      .from('games')
+      .update({ processed: true })
+      .eq('date', date)
+      .eq('title', `${date} Game ${gameNumber}`);
+
+    if (error) {
+      console.error('Failed to mark video as processed:', error);
+      return res.status(500).json({ success: false, message: 'Database update failed' });
+    }
+
+    console.log(`Marked video as processed: ${date} Game ${gameNumber}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Unexpected server error:', err);
+    res.status(500).json({ success: false, message: 'Unexpected server error' });
   }
-
-  const { data: existingGames, error } = await supabase
-    .from('games')
-    .select('id')
-    .eq('date', date);
-
-  if (error) {
-    console.error('Supabase query failed:', error);
-    return res.status(500).json({ success: false, message: 'Database error' });
-  }
-
-  const count = existingGames.length;
-  const gameNumber = count + 1;
-  const ext = path.extname(req.file.originalname); 
-  const baseFileName = `${date}_Game${gameNumber}`;
-  const originalFileName = `${baseFileName}_original${ext}`;
-  const processedFileName = `${baseFileName}_h.264${ext}`; 
-  const uploadDir = path.join(VIDEO_DIR, 'user-uploads');
-  const oldPath = path.join(uploadDir, req.file.filename);
-  const newPath = path.join(uploadDir, originalFileName);
-
-  fs.renameSync(oldPath, newPath);
-
-  console.log(`Saved uploaded file as: ${originalFileName}`);
-
-  // Insert into Supabase Games Table
-  const { data: insertedGame, error: insertError } = await supabase
-    .from('games')
-    .insert([
-      {
-        date: date,
-        title: `${date} Game ${gameNumber}`,
-        video_url: processedFileName,
-        players: players.split(',').map(p => p.trim()),
-        team_name: team_name
-      }
-    ])
-    .select()
-    .single();
-
-  if (insertError) {
-    console.error('Failed to insert game into Supabase:', insertError);
-    return res.status(500).json({ success: false, message: 'Failed to create game record' });
-  }
-
-  return res.json({ success: true, filename: processedFileName });
 });
 
+app.post('/api/upload-game', (req, res) => {
+  let filePath = null;
+
+  // Handle abort event to clean up partial file
+  req.on('aborted', () => {
+    console.warn('Upload aborted by client.');
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlink(filePath, (err) => {
+        if (err) console.error('Failed to clean up aborted file:', err);
+        else console.log('Cleaned up partial file:', filePath);
+      });
+    }
+  });
+
+  // Proceed with multer upload handling
+  upload.single('video')(req, res, async (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(500).json({ success: false, message: 'Upload failed' });
+    }
+
+    const { date, players, team_name } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No video file uploaded' });
+    }
+
+    // Save the uploaded file path for potential cleanup
+    filePath = req.file.path;
+
+    try {
+      const { data: existingGames, error } = await supabase
+        .from('games')
+        .select('id')
+        .eq('date', date);
+
+      if (error) {
+        console.error('Supabase query failed:', error);
+        return res.status(500).json({ success: false, message: 'Database error' });
+      }
+
+      const count = existingGames.length;
+      const gameNumber = count + 1;
+      const ext = path.extname(req.file.originalname);
+      const baseFileName = `${date}_Game${gameNumber}`;
+      const processedFileName = `${baseFileName}_h.264${ext}`;
+      const uploadDir = path.join(VIDEO_DIR, 'user-uploads');
+      const oldPath = path.join(uploadDir, req.file.filename);
+
+      // Insert into Supabase Games Table
+      const { data: insertedGame, error: insertError } = await supabase
+        .from('games')
+        .insert([
+          {
+            date: date,
+            title: `${date} Game ${gameNumber}`,
+            video_url: processedFileName,
+            players: players.split(',').map(p => p.trim()),
+            team_name: team_name
+          }
+        ])
+        .select()
+        .single();
+      
+      const gameId = insertedGame.id;
+      const originalFileName = `${baseFileName}_original.${insertedGame.id}${ext}`;
+      const newPath = path.join(uploadDir, originalFileName);
+
+      if (fs.existsSync(newPath)) {
+        fs.unlinkSync(newPath);
+      }
+      
+      if (fs.existsSync(oldPath)) {
+        fs.renameSync(oldPath, newPath);
+        console.log(`Saved uploaded file as: ${originalFileName}`);
+      } else {
+        console.error('Uploaded file not found at:', oldPath);
+        return res.status(500).json({ success: false, message: 'Uploaded file missing before rename' });
+      }
+
+      if (insertError) {
+        console.error('Failed to insert game into Supabase:', insertError);
+        return res.status(500).json({ success: false, message: 'Failed to create game record' });
+      }
+
+      return res.json({ success: true, filename: processedFileName, gameId: insertedGame.id });
+
+    } catch (err) {
+      console.error('Unexpected server error:', err);
+      return res.status(500).json({ success: false, message: 'Server encountered an unexpected error' });
+    }
+  });
+});
 
 app.get('/api/videos', (req, res) => {
   console.log('Reading video directory:', VIDEO_DIR);

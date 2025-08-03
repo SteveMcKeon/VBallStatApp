@@ -32,4 +32,4 @@ export default defineConfig({
       react: path.resolve('./node_modules/react'),
     },     
   },
-});         
+});          

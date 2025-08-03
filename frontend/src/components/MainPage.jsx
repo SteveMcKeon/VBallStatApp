@@ -599,7 +599,7 @@ const MainPage = () => {
   }
   const selectedGame = teamGames.find(g => g.id === selectedGameId);
   return (
-    <div className="flex flex-col h-[100svh] overflow-hidden">
+    <div className="flex flex-col h-[100svh] overflow-hidden"> 
       <div
         className="flex flex-1 overflow-auto transition-all duration-300"
         style={{ paddingTop: "3.5rem" }}
@@ -683,29 +683,30 @@ const MainPage = () => {
             {userRole  && (
               <button
                 onClick={handleEditModeToggle}
-                className={`w-full px-3 py-2 rounded text-white ${
-                  editMode ? 'bg-red-600 hover:bg-red-700' : 'bg-green-700 hover:bg-green-800'
+                className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] ${
+                  editMode
+                    ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
+                    : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
                 }`}
               >
-                {editMode  ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
               </button>
             )}
             <button
               onClick={NavToStats}
-              className={`w-full px-3 py-2 rounded text-white ${'bg-blue-700 hover:bg-blue-800'
-              }`}
+              className="w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
             >
               Statistic Matrix
-            </button>           
+            </button>         
           </div>          
         </div>
         <SidebarFooter />
       </div>
     </div>
-    <div ref={mainContentRef} className="flex-1 overflow-y-auto p-4">
+    <div ref={mainContentRef} className={`flex-1 overflow-y-auto p-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}>
       {selectedVideo && (
         <div className={`flex gap-4 ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
-          <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
+          <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto bg-white shadow-md`}>
             <DBStats
               canEdit={editMode === 'admin' || editMode === 'editor'}
               editMode={editMode}

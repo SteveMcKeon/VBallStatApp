@@ -13,9 +13,18 @@ Add contact / bug report / suggestions email?
 Register team, invite other users to team.
 Add comments instead of notes.
 team tactics or certain rotation options - by each team captain (Ask Tamir)
+tracking sets with trajectory overlay
+
 
 #Fixes
 REFACTOR
+EditableCell suggestions only work on enter and not tab.
+Editor not authorized to change isscored?
+UPDATE TO YES/NO INSTEAD OF TRUE/FALSE for plebians
+Supabase Auth session missing.
+
+
+
 
 git add .
 

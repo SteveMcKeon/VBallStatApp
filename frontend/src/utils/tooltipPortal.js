@@ -5,6 +5,7 @@ const TooltipPortal = ({ children }) => {
   const [tooltipContainer, setTooltipContainer] = useState(null);
 
   useEffect(() => {
+    if (typeof document === 'undefined' || !document.body) return;
     const el = document.createElement('div');
     el.style.position = 'fixed';
     el.style.top = '0';
