@@ -1,0 +1,7 @@
+{
+  "ignore": [
+    "videos/user-uploads/*",
+    "videos/user-uploads/**/*.json"
+  ],
+  "watch": ["tusserver.js"]
+}

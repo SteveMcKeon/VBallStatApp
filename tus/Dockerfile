@@ -9,6 +9,3 @@ RUN npm install
 
 # Copy rest of the app
 COPY . .
-
-EXPOSE 5174
-

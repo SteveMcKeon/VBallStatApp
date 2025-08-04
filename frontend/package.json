@@ -1,16 +1,13 @@
 {
-  "name": "volleyball-tracker",
+  "name": "volleyball-tracker_frontend",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"vite --host\" \"nodemon server.js\""
-  },
+    "dev": "vite --host"
+  },  
   "dependencies": {
     "@supabase/supabase-js": "^2.42.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@tailwindcss/vite": "^4.1.11",
-    "ag-grid-community": "^34.0.1",
-    "ag-grid-react": "^34.0.1",
-    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "daisyui": "^5.0.43",
     "dotenv": "^17.0.1",
@@ -18,21 +15,19 @@
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.525.0",
-    "multer": "^2.0.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-grid-layout": "^1.5.2",
     "react-icons": "^5.5.0",
     "react-router-dom": "^6.30.1",
     "react-select": "^5.10.2",
+    "tus-js-client": "^4.3.1",
     "uuid": "^11.1.0",
     "video.js": "^8.23.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.0",
-    "nodemon": "^3.1.10",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.11",
     "vite": "^5.0.0"

@@ -6,10 +6,9 @@ const https = require('https');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const verifySupabaseToken = require('./src/utils/verifySupabaseToken');
-const multer = require('multer');
 dotenv.config();
 const app = express();
-const PORT = 3001;
+const EXPRESSPORT = 3001;
 const VIDEO_DIR = '/app/videos';
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -20,32 +19,44 @@ app.use((req, res, next) => {
   console.log(`🛰️  ${req.method} ${req.url}`);
   next();
 });
+
 app.use(cors());
 app.use(express.json());
 app.use('/videos', express.static(VIDEO_DIR));
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(VIDEO_DIR, 'user-uploads');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Sanitize the filename or generate unique names if needed
-    cb(null, file.originalname);
-  },
-});
+const options = {
+  key: fs.readFileSync('./cert/key.pem'),
+  cert: fs.readFileSync('./cert/cert.pem'),
+};
+ 
+app.patch('/api/update-game/:id', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
 
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'video/mp4') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only MP4 files are allowed'));
-    }
+  const decoded = verifySupabaseToken(token);
+  const userRole = decoded?.user_metadata?.role;
+  if (!decoded || !userRole) {
+    return res.status(403).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const { updates } = req.body;
+
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ success: false, message: 'Invalid updates object' });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('games')
+      .update(updates)
+      .eq('id', id);
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update game error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -75,100 +86,14 @@ app.post('/api/mark-processed', async (req, res) => {
   }
 });
 
-
-app.post('/api/upload-game', (req, res) => {
-  let filePath = null;
-
-  // Handle abort event to clean up partial file
-  req.on('aborted', () => {
-    console.warn('Upload aborted by client.');
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlink(filePath, (err) => {
-        if (err) console.error('Failed to clean up aborted file:', err);
-        else console.log('Cleaned up partial file:', filePath);
-      });
-    }
+const parseMetadata = (upload_metadata) => {
+  const meta = {};
+  upload_metadata.split(',').forEach(pair => {
+    const [key, b64value] = pair.split(' ');
+    meta[key] = Buffer.from(b64value, 'base64').toString('utf-8');
   });
-
-  // Proceed with multer upload handling
-  upload.single('video')(req, res, async (err) => {
-    if (err) {
-      console.error('Multer error:', err);
-      return res.status(500).json({ success: false, message: 'Upload failed' });
-    }
-
-    const { date, players, team_name } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No video file uploaded' });
-    }
-
-    // Save the uploaded file path for potential cleanup
-    filePath = req.file.path;
-
-    try {
-      const { data: existingGames, error } = await supabase
-        .from('games')
-        .select('id')
-        .eq('date', date);
-
-      if (error) {
-        console.error('Supabase query failed:', error);
-        return res.status(500).json({ success: false, message: 'Database error' });
-      }
-
-      const count = existingGames.length;
-      const gameNumber = count + 1;
-      const ext = path.extname(req.file.originalname);
-      const baseFileName = `${date}_Game${gameNumber}`;
-      const processedFileName = `${baseFileName}_h.264${ext}`;
-      const uploadDir = path.join(VIDEO_DIR, 'user-uploads');
-      const oldPath = path.join(uploadDir, req.file.filename);
-
-      // Insert into Supabase Games Table
-      const { data: insertedGame, error: insertError } = await supabase
-        .from('games')
-        .insert([
-          {
-            date: date,
-            title: `${date} Game ${gameNumber}`,
-            video_url: processedFileName,
-            players: players.split(',').map(p => p.trim()),
-            team_name: team_name
-          }
-        ])
-        .select()
-        .single();
-      
-      const gameId = insertedGame.id;
-      const originalFileName = `${baseFileName}_original.${insertedGame.id}${ext}`;
-      const newPath = path.join(uploadDir, originalFileName);
-
-      if (fs.existsSync(newPath)) {
-        fs.unlinkSync(newPath);
-      }
-      
-      if (fs.existsSync(oldPath)) {
-        fs.renameSync(oldPath, newPath);
-        console.log(`Saved uploaded file as: ${originalFileName}`);
-      } else {
-        console.error('Uploaded file not found at:', oldPath);
-        return res.status(500).json({ success: false, message: 'Uploaded file missing before rename' });
-      }
-
-      if (insertError) {
-        console.error('Failed to insert game into Supabase:', insertError);
-        return res.status(500).json({ success: false, message: 'Failed to create game record' });
-      }
-
-      return res.json({ success: true, filename: processedFileName, gameId: insertedGame.id });
-
-    } catch (err) {
-      console.error('Unexpected server error:', err);
-      return res.status(500).json({ success: false, message: 'Server encountered an unexpected error' });
-    }
-  });
-});
+  return meta;
+};
 
 app.get('/api/videos', (req, res) => {
   console.log('Reading video directory:', VIDEO_DIR);
@@ -282,38 +207,6 @@ app.post('/api/update-stat', async (req, res) => {
   }
 });
 
-
-app.patch('/api/update-game/:id', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
-
-  const decoded = verifySupabaseToken(token);
-  const userRole = decoded?.user_metadata?.role;
-  if (!decoded || !userRole) {
-    return res.status(403).json({ success: false, message: 'Unauthorized' });
-  }
-
-  const { id } = req.params;
-  const { updates } = req.body;
-
-  if (!updates || typeof updates !== 'object') {
-    return res.status(400).json({ success: false, message: 'Invalid updates object' });
-  }
-
-  try {
-    const { error } = await supabase
-      .from('games')
-      .update(updates)
-      .eq('id', id);
-    if (error) throw error;
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Update game error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
 app.delete('/api/delete-stat/:id', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
@@ -339,11 +232,6 @@ app.delete('/api/delete-stat/:id', async (req, res) => {
   }
 });
 
-const options = {
-  key: fs.readFileSync('./cert/key.pem'),
-  cert: fs.readFileSync('./cert/cert.pem'),
-};
-
-https.createServer(options, app).listen(PORT, '0.0.0.0', () => {
-  console.log(`HTTPS server running on port ${PORT}`);
+https.createServer(options, app).listen(EXPRESSPORT, '0.0.0.0', () => {
+  console.log(`HTTPS server running on port ${EXPRESSPORT}`);
 });

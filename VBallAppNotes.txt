@@ -19,12 +19,12 @@ tracking sets with trajectory overlay
 #Fixes
 REFACTOR
 EditableCell suggestions only work on enter and not tab.
-Editor not authorized to change isscored?
 UPDATE TO YES/NO INSTEAD OF TRUE/FALSE for plebians
 Supabase Auth session missing.
 use tus.io for streaming the uploads
-
-
+Sometimes seeking doesn't work on new videos. weird.
+Doesn't refresh DBStats until Exit Edit mode?
+Don't let "Select file" text be selectable on upload modal
 
 git add .
 

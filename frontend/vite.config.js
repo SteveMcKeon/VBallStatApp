@@ -10,6 +10,7 @@ export default defineConfig({
     watch: {
       usePolling: true, 
       interval: 300, 
+      ignored: ['**/videos/user-uploads/**']
     },   
   https: {
     key: fs.readFileSync('./cert/origin.key'),
@@ -18,12 +19,22 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'https://localhost:3001',
+      '/api/upload-game': {
+        target: 'https://tus:3002',
         changeOrigin: true,
         secure: false,
-      } 
-    } 
+      },
+      '/api': {
+        target: 'https://backend:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/videos': {
+        target: 'https://backend:3001',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },  
   publicDir: false,
   resolve: {
@@ -32,4 +43,4 @@ export default defineConfig({
       react: path.resolve('./node_modules/react'),
     },     
   },
-});          
+});           

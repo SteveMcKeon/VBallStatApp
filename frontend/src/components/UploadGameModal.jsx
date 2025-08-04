@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as tus from 'tus-js-client';
 import FloatingLabelInput from './FloatingLabelInput';
 import Modal from './Modal';
 import Toast from './Toast'; 
@@ -21,6 +22,7 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName, onUpload }) 
   const [players, setPlayers] = useState('');
   const [videoFile, setVideoFile] = useState(null);
   const dragCounter = useRef(0);
+  
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -50,44 +52,40 @@ const UploadGameModal = ({ isOpen, onBeforeOpen, onClose, teamName, onUpload }) 
       setToast('Only MP4 video files are supported');
       return;
     }
-
     setIsUploading(true);
     setUploadProgress(0);
     onClose();
 
-    const formData = new FormData();
-    formData.append('date', date);
-    formData.append('players', players);
-    formData.append('video', videoFile);
-    formData.append('team_name', teamName);
-
-    const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
-    xhr.open('POST', '/api/upload-game', true);
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        setUploadProgress(percent);
-      }
-    };
-
-    xhr.onload = () => {
-      setIsUploading(false);
-      const result = JSON.parse(xhr.responseText);
-      if (xhr.status === 200 && result.success) {
+    const upload = new tus.Upload(videoFile, {
+      endpoint: '/api/upload-game',
+      retryDelays: [0, 1000, 3000, 5000],
+      metadata: {
+        filename: videoFile.name,
+        filetype: videoFile.type,
+        date,
+        players,
+        team_name: teamName
+      },
+      onError: (error) => {
+        console.error('Upload failed:', error);
+        setIsUploading(false);
+        setToast('Upload failed');
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const percentage = Math.floor((bytesUploaded / bytesTotal) * 100);
+        setUploadProgress(percentage);
+      },
+      onSuccess: () => {
+        console.log('Upload completed');
+        setIsUploading(false);
+        setUploadStatus('success');
         setToast('Game uploaded successfully!', 'success');
-      } else {
-        setToast(result.message || 'Upload failed');
       }
-    };
+    });
 
-    xhr.onerror = () => {
-      setIsUploading(false);
-      setToast('Upload failed due to network error');
-    };
+    upload.start();
 
-    xhr.send(formData);
+    xhrRef.current = { abort: () => upload.abort() }; // For cancelUpload
   };
 
   const cancelUpload = () => {
