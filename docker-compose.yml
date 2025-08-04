@@ -22,7 +22,7 @@ services:
     volumes:
       - ./backend:/app
       - node_modules_backend:/app/node_modules
-      - G:/Videos:/app/videos:ro
+      - G:/Videos:/app/videos
     environment:
       - CHOKIDAR_USEPOLLING=true
     env_file:

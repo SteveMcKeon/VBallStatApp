@@ -205,6 +205,40 @@ app.post('/api/update-stat', async (req, res) => {
     console.error('Update stat error:', err);
     res.status(500).json({ success: false, message: 'Update failed' });
   }
+}); 
+
+app.delete('/api/delete-upload/:id', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
+
+  const decoded = verifySupabaseToken(token);
+  const userId = decoded?.sub;
+  if (!userId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+  const uploadId = req.params.id;
+  const filePath = path.join(VIDEO_DIR, 'user-uploads', uploadId);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: 'Upload not found' });
+  }
+
+  const infoPath = `${filePath}.json`;
+  if (!fs.existsSync(infoPath)) {
+    return res.status(500).json({ success: false, message: 'Metadata not found' });
+  }
+
+  const uploadInfo = JSON.parse(fs.readFileSync(infoPath, 'utf-8'));
+  const uploadUserId = uploadInfo.metadata.user_id;
+
+  if (uploadUserId !== userId) {
+    return res.status(403).json({ success: false, message: 'You do not have permission to delete this upload' });
+  }
+
+  fs.unlinkSync(filePath);
+  fs.unlinkSync(infoPath);
+
+  console.log(`Deleted upload ${uploadId} by user ${userId}`);
+  res.json({ success: true });
 });
 
 app.delete('/api/delete-stat/:id', async (req, res) => {

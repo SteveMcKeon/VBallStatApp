@@ -14,7 +14,7 @@ Register team, invite other users to team.
 Add comments instead of notes.
 team tactics or certain rotation options - by each team captain (Ask Tamir)
 tracking sets with trajectory overlay
-
+If not timestamp editor role, still click rest of non-editbale cells to jump to time.
 
 #Fixes
 REFACTOR
@@ -28,15 +28,18 @@ Don't let "Select file" text be selectable on upload modal
 
 git add .
 
-git commit -m "feat: Implement video upload workflow with processed game filtering and hot-reload dev setup
-- Added drag-and-drop video upload modal with MP4 validation and dynamic filename generation
-- Implemented server-side upload handling with Multer, saving files to user-uploads directory
-- Automatically generates game title and filename based on upload date and existing game count
-- Inserted uploaded games into Supabase with team name, players, and processing flags
-- Filtered unprocessed games from GameSelector and StatsSummary dropdowns
-- Ensured UploadGameModal closes video player controls overlay programmatically
-- Added frontend form validations for file type, required fields, and UI consistency (fixed dropzone height)
-- Integrated Express + Vite hot-reload dev workflow in Docker"
+git commit -m "feat: restructure backend, add tus upload server, and apply frontend fixes
+- Backend Restructure:
+  - Moved server.js from frontend/ to backend/.
+  - Added backend Dockerfile and nodemon config, package files.
+- Tus Upload Server:
+  - tusserver.js for handling resumable uploads.
+  - Dockerfile, nodemon.json, package files.
+- Frontend Updates:
+  - Updated vite.config.js for build adjustments.
+  - Updated frontend Dockerfile and package files.
+- Infrastructure:
+  - Updated docker-compose.yml to include new backend and tus services."
 
 git push
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, onChange }) => {
+const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, onChange, className = '' }) => {
   const [isFocused, setIsFocused] = useState(false);
   const shouldFloat = isFocused || value.length > 0;
 
@@ -14,9 +14,10 @@ const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, on
         onChange={onChange}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        className={`w-full px-4 pt-6 pb-2 text-sm text-black border rounded-full focus:outline-none transition-all ${
-          isError ? 'border-red-500 focus:border-red-500' : 'border-gray-400 focus:border-blue-500'
-        }`}
+        className={`w-full px-4 pt-6 pb-2 text-sm text-black border rounded-full focus:outline-none transition-all duration-300 ease-in-out 
+          ${isError ? 'border-red-500 focus:border-red-500' : 'border-gray-400 focus:border-blue-500'}
+          ${className}
+        `}
       />
       <label
         htmlFor={id}

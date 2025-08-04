@@ -14,7 +14,8 @@ const Toast = ({ message, show, duration = 5000, onClose, type = 'success' }) =>
 
   const typeStyles = {
     success: 'border-green-700 bg-green-700',
-    error: 'border-red-700 bg-red-700'
+    error: 'border-red-700 bg-red-700',
+    neutral: 'border-yellow-600 bg-yellow-500 text-black'
   };
 
   const iconPath = {
@@ -29,7 +30,14 @@ const Toast = ({ message, show, duration = 5000, onClose, type = 'success' }) =>
         <path fillRule="evenodd" clipRule="evenodd" d="M10.3333 2.08496C14.7046 2.08496 18.2483 5.62867 18.2483 10C18.2483 14.3713 14.7046 17.915 10.3333 17.915C5.96192 17.915 2.41821 14.3713 2.41821 10C2.41821 5.62867 5.96192 2.08496 10.3333 2.08496ZM10.3333 3.41504C6.69646 3.41504 3.74829 6.3632 3.74829 10C3.74829 13.6368 6.69646 16.585 10.3333 16.585C13.97 16.585 16.9182 13.6368 16.9182 10C16.9182 6.3632 13.97 3.41504 10.3333 3.41504Z" />
         <path d="M7.75 7.75L12.9167 12.9167M7.75 12.9167L12.9167 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </>
-    )
+    ),
+    neutral: (
+      <>
+        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
+        <line x1="10" y1="6" x2="10" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="10" cy="14" r="1" fill="currentColor" />
+      </>
+    )    
   };
 
   return (
