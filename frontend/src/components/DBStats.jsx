@@ -558,8 +558,8 @@ const DBStats = ({
                     toggleGameField('hastimestamps', value);
                   }}
                 >
-                  <option value="true">True</option>
-                  <option value="false">False</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
                 </select>
               </div>
               <div className="flex justify-between items-center w-full">
@@ -575,8 +575,8 @@ const DBStats = ({
                     toggleGameField('isscored', value);
                   }}
                 >
-                  <option value="true">True</option>
-                  <option value="false">False</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
                 </select>
               </div>
             </div>

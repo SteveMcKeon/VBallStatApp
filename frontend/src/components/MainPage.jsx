@@ -29,12 +29,64 @@ const MainPage = () => {
     videoPlayerRef.current?.allowControls();
     setIsUploadModalOpen(false);
   };  
+  const [currentUserId, setCurrentUserId] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [resumeSilently, setResumeSilently] = useState(false);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session) {
+        console.error('Failed to retrieve user session');
+        return;
+      }
+      const userId = session.user.id;
+      setCurrentUserId(userId);
+    };
+    fetchSession();
+  }, [teamName]);  
+  
+  useEffect(() => {
+    if (!currentUserId) return;
+    const scanIncompleteUploads = () => {
+      const incompleteUploads = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('tus::')) {
+          try {
+            const uploadData = JSON.parse(localStorage.getItem(key));
+            if (uploadData?.metadata?.user_id === currentUserId) {
+              incompleteUploads.push({ key, ...uploadData });
+            }
+          } catch (e) {
+            console.error('Error parsing tus entry:', e);
+          }
+        }
+      }
+      if (incompleteUploads.length > 0) {
+        const latestUpload = incompleteUploads.sort((a, b) =>
+          new Date(b.creationTime) - new Date(a.creationTime)
+        )[0];
+        return latestUpload.metadata;
+      }
+
+      return null;
+    };
+    const checkForIncompleteUpload = async () => {
+      const incompleteUploadData = scanIncompleteUploads();
+      if (incompleteUploadData) {
+        setShowResumeBanner(true);
+      }
+    };
+    checkForIncompleteUpload();
+  }, [currentUserId]);  
+  
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
   const [gamePlayers, setGamePlayers] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
-  const [teamName, setTeamName] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
   const [userRole, setUserRole] = useState(null);
   useEffect(() => {
@@ -593,6 +645,11 @@ const MainPage = () => {
               }
             }}
             teamName={teamName}
+            currentUserId={currentUserId}
+            isUploadModalOpen={isUploadModalOpen}
+            setIsUploadModalOpen={setIsUploadModalOpen}
+            setResumeSilently={setResumeSilently}
+            resumeSilently ={resumeSilently }
           />
       </div>
     );
@@ -645,6 +702,11 @@ const MainPage = () => {
                 }}
                 videoPlayerRef={videoPlayerRef}
                 teamName={teamName}
+                currentUserId={currentUserId}
+                isUploadModalOpen={isUploadModalOpen}
+                setIsUploadModalOpen={setIsUploadModalOpen}
+                setResumeSilently={setResumeSilently}
+                resumeSilently ={resumeSilently }
             />     
           </div>
           <div>
@@ -747,6 +809,29 @@ const MainPage = () => {
           </div>
         </div>
       )}
+      {showResumeBanner && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-900 p-3 flex justify-between items-center z-50 shadow">
+          <span>You have an incomplete upload. Would you like to resume it?</span>
+          <div className="space-x-2">
+            <button
+              onClick={() => {
+                setResumeSilently(true);
+                setIsUploadModalOpen(true);
+                setShowResumeBanner(false);
+              }}
+              className="bg-blue-600 text-white px-3 py-1 rounded"
+            >
+              Resume Upload
+            </button>
+            <button
+              onClick={() => setShowResumeBanner(false)}
+              className="bg-gray-300 px-3 py-1 rounded"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}      
     </div>
   </div>
 </div>
