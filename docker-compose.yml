@@ -14,7 +14,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
     env_file:
       - ./frontend/.env
-    #restart: unless-stopped 
+    restart: unless-stopped 
 
   backend:
     build:
@@ -28,7 +28,7 @@ services:
     env_file:
       - ./backend/.env
     command: npm run dev
-    #restart: unless-stopped
+    restart: unless-stopped
 
   tus:
     build:
@@ -42,7 +42,7 @@ services:
     env_file:
       - ./tus/.env      
     command: npm run dev
-    #restart: unless-stopped
+    restart: unless-stopped
 
 volumes:
   node_modules_frontend:

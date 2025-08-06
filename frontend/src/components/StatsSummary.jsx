@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import { useSidebar } from './SidebarContext';
 import StyledSelect from './StyledSelect';
-import ColumnSelector from './columnSelector';
+import ColumnSelector from './ColumnSelector';
 import SidebarFooter from './SidebarFooter';
 
 const StatsSummary = () => {

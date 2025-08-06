@@ -2,7 +2,8 @@
   "name": "volleyball-tracker_tus",
   "version": "1.0.0",
   "scripts": {
-    "dev": "nodemon tusserver.js"
+    "dev": "nodemon tusserver.js",
+    "prod": "nodemon tusserver.js"
   },  
   "dependencies": {
     "@tus/server": "^1.0.0",

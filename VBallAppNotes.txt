@@ -15,30 +15,31 @@ Add comments instead of notes.
 team tactics or certain rotation options - by each team captain (Ask Tamir)
 tracking sets with trajectory overlay
 If not timestamp editor role, still click rest of non-editbale cells to jump to time.
+Create welcome page, with short video and highlights of website features.
+Get rid of header and just have sidebar. make it look like ChatGPTs.
+Look into this header information:
+    <!DOCTYPE html><html lang="en-US" data-build="prod-c1cb37e1bfa4b703097423c143908cacb11052a3" dir="ltr" class=""><head><meta charSet="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/manifest-204081e3.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/opkocudvu5eq3wcx.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/buxga8tq3x9dba54.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/oumse3n2p07qrdfv.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/nij3guprj0e2u1um.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/j6hq890ye5ymoo22.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/orok48jbirgd74hl.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/icm8vhb7w0lwmskb.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/c7bygxpj72jqjdav.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/h6ow07l4qqttbdmm.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/ncrr7ze8brds2igd.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/j6fn4gvvp4svw4tt.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/jqyj9z0t0hz1cqnn.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/od1s290jqfmth3gi.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/mmstitvav1nc1cf7.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/bvsu9pm704l713p3.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/mjiv9op5n8lxfryb.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/lk8neq8mcziwq0n4.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/umoxkeus5v0jhg8t.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/d53fvb3kfi6ymr5q.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/hxmt3k3gfy25xjct.js"/><link rel="modulepreload" href="https://cdn.oaistatic.com/assets/lyz63g2pext04pr9.js"/><title>ChatGPT</title><meta name="description" content="ChatGPT helps you get answers, find inspiration and be more productive. It is free to use and easy to try. Just ask and ChatGPT can help with writing, learning, brainstorming and more."/><meta name="keyword" content="ai chat,ai,chap gpt,chat gbt,chat gpt 3,chat gpt login,chat gpt website,chat gpt,chat gtp,chat openai,chat,chatai,chatbot gpt,chatg,chatgpt login,chatgpt,gpt chat,open ai,openai chat,openai chatgpt,openai"/><meta property="og:description" content="A conversational AI system that listens, learns, and challenges"/><meta property="og:title" content="ChatGPT"/><meta property="og:image" content="https://cdn.oaistatic.com/assets/chatgpt-share-og-u7j5uyao.webp"/><meta property="og:url" content="https://chatgpt.com"/><link rel="preconnect" href="https://cdn.oaistatic.com"/><link rel="preconnect" href="https://ab.chatgpt.com"/><meta name="robots" content="index, follow"/><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><meta name="apple-itunes-app" content="app-id=6448311069"/><meta name="dd-trace-id" content="875973908687989232"/><meta name="dd-trace-time" content="1754500491284"/><link rel="icon" href="https://cdn.oaistatic.com/assets/favicon-eex17e9e.ico" sizes="32x32"/><link rel="icon" href="https://cdn.oaistatic.com/assets/favicon-l4nq08hd.svg" type="image/svg+xml"/><link rel="icon" href="https://cdn.oaistatic.com/assets/favicon-l4nq08hd.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)"/><link rel="apple-touch-icon" sizes="180x180" href="https://cdn.oaistatic.com/assets/favicon-180x180-od45eci6.webp"/><link rel="canonical" href="https://chatgpt.com"/><link rel="stylesheet" href="https://cdn.oaistatic.com/assets/root-l3oz93pu.css"/><link rel="stylesheet" href="https://cdn.oaistatic.com/assets/conversation-small-e8ntgdro.css"/><script nonce="b3358b93-47d7-4454-b7c6-bab6b014c767">!function initScrollTimelineInline(){try{if(CSS.supports("animation-timeline: --works"))return;var t=new Map;document.addEventListener("animationstart",(n=>{if(!(n.target instanceof HTMLElement))return;const e=n.target.getAnimations().filter((t=>t.animationName===n.animationName));t.set(n.target,e)})),document.addEventListener("scrolltimelineload",(n=>{t.forEach(((t,e)=>{t.forEach((t=>{n.detail.upgradeAnimation(t,e)}))})),t.clear()}),{once:!0})}catch{}}();</script></head>
 
 #Fixes
 REFACTOR
 EditableCell suggestions only work on enter and not tab.
-UPDATE TO YES/NO INSTEAD OF TRUE/FALSE for plebians
 Supabase Auth session missing.
 Sometimes seeking doesn't work on new videos. weird.
 Doesn't refresh DBStats until Exit Edit mode?
 Don't let "Select file" text be selectable on upload modal
+Failed to resume file handle when upload file after something was ready for resume.
+Switching teams and the resume upload fails, or restarts.
+
 
 git add .
 
-git commit -m "feat: restructure backend, add tus upload server, and apply frontend fixes
-- Backend Restructure:
-  - Moved server.js from frontend/ to backend/.
-  - Added backend Dockerfile and nodemon config, package files.
-- Tus Upload Server:
-  - tusserver.js for handling resumable uploads.
-  - Dockerfile, nodemon.json, package files.
-- Frontend Updates:
-  - Updated vite.config.js for build adjustments.
-  - Updated frontend Dockerfile and package files.
-- Infrastructure:
-  - Updated docker-compose.yml to include new backend and tus services."
+git commit -m "feat: Implement resumable multi-file uploads with drag-and-drop reordering and persistent file handles
+- Integrated drag-and-drop reordering of pending uploads in UploadGameModal.
+- Refactored UploadGameModal to support multiple simultaneous uploads with individual progress tracking.
+- Enabled resumable uploads by persisting file handles in IndexedDB and scanning localStorage for incomplete uploads.
+- Added upload resume banner in MainPage to prompt resuming interrupted uploads.
+- Modified GameSelector to control UploadGameModal via props and trigger resume actions.
+- Customized TUS server to rename uploaded files based on metadata (game group, set number)."
 
 git push
 

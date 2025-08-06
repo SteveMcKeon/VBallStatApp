@@ -47,7 +47,7 @@ const LoginPage = () => {
     <>
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <img src="../../public/android-chrome-512x512.png" alt="Logo" className="w-20 h-20 mx-auto mb-6 animate-bounce" />
+        <img src="/android-chrome-512x512.png" alt="Logo" className="w-20 h-20 mx-auto mb-6 animate-bounce" />
         <h2 className="text-2xl font-semibold text-center mb-6">
           {isSignUp ? 'Create an account' : 'Welcome back'}
         </h2>

@@ -52,7 +52,7 @@ const SidebarFooter = () => {
 
   return (
     <div className="relative">
-      <div className="h-px bg-gray-300 mx-2 mb-2" />      
+      <div className="h-px bg-gray-300 mx-2" />      
       {/* Footer Display (Clickable) */}
       <button
         onClick={() => setIsPopupOpen((prev) => !prev)}

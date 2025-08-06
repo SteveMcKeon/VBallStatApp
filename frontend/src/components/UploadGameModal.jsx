@@ -330,7 +330,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         setToast('Only 5 files allowed. Some were not added.', 'error');
       }
     } catch (err) {
-      console.error('File selection cancelled or failed', err);
     }
   };
 

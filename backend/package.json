@@ -2,7 +2,8 @@
   "name": "volleyball-tracker_backend",
   "version": "1.0.0",
   "scripts": {
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "prod": "nodemon server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.42.0",
