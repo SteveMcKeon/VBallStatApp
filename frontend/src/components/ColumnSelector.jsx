@@ -18,7 +18,7 @@ const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
     <div className="relative" ref={selectorRef}>
       <button
         type="button"
-        className="w-full border p-2 text-left bg-gray-100 rounded"
+        className="w-full border border-black p-2 text-left bg-gray-100 rounded hover:border-gray-400 text-sm focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors"
         onClick={() => setOpen(!open)}
       >
         {columns
@@ -27,11 +27,13 @@ const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
           .join(', ') || 'None Selected'}
       </button>
       {open && (
-        <div className="absolute z-10 bg-gray-100 border rounded shadow-md mt-1 w-full max-h-60 overflow-y-auto p-2 space-y-1">
+        <div className="absolute z-10 bg-white border border-gray-300 rounded-md shadow mt-1 w-full max-h-60 overflow-y-auto">
           {columns.map(({ key, label, disabled }) => (
             <label
               key={key}
-              className={`flex items-center space-x-2 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`flex items-center space-x-2 px-2 text-base rounded cursor-pointer transition-colors ${
+                disabled ? 'opacity-50 cursor-not-allowed' : 'bg-white hover:bg-gray-100'
+              }`}
             >
               <input
                 type="checkbox"

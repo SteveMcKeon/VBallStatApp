@@ -28,10 +28,6 @@ const EditMode = () => {
     editMode,
     authorizedFetch,
     toggleEditMode, 
-    logout: async () => {
-      await supabase.auth.signOut();
-      setEditMode(null);
-    },
   };
 };
 

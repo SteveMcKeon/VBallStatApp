@@ -426,7 +426,7 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
         <div className="mt-auto p-4 space-y-4">
           <button
             onClick={NavToHome}
-            className="w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+            className="w-full px-4 py-2 cursor-pointer rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
           >
             Return to Home
           </button>               

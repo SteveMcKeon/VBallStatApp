@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import supabase from '../supabaseClient';
 import Toast from './Toast';
 
-const SidebarFooter = () => {
+const SidebarFooter = ({ mini = false }) => {
   const [user, setUser] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const popupRef = useRef(null);
@@ -52,32 +52,62 @@ const SidebarFooter = () => {
 
   return (
     <div className="relative">
-      <div className="h-px bg-gray-300 mx-2" />      
+      <div className={mini ? "h-px bg-gray-300 my-2 w-6 mx-auto" : "h-px bg-gray-300 mx-2"} />  
       {/* Footer Display (Clickable) */}
       <button
         onClick={() => setIsPopupOpen((prev) => !prev)}
-        className="w-full mt-auto px-[10px] py-2 flex items-center justify-between focus:outline-none"
+        className={`mt-auto cursor-pointer focus:outline-none ${mini ? 'p-1 rounded hover:bg-gray-200' : 'w-full px-[10px] py-2 flex items-center justify-between'}`}
       >
-        <div className="w-full px-2 py-2 rounded-md hover:bg-gray-300 transition flex items-center space-x-3">
-          {user?.avatarUrl ? (
-            <img src={user.avatarUrl} alt="User" className="w-8 h-8 rounded-full object-cover" />
+        {mini ? (
+          user?.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt="User"
+              className="w-6 h-6 rounded-full object-cover"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/default-avatar.png';
+              }}
+            />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold">
+            <div className="w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-semibold">
               {user?.name?.[0] || 'U'}
             </div>
-          )}
-          <div className="text-left">
-            <div className="text-sm font-medium text-gray-900">{user?.name}</div>
-            <div className="text-xs text-gray-500 capitalize">{user?.role}</div>
+          )
+        ) : (
+          <div className="w-full px-2 py-2 rounded-md hover:bg-gray-300 transition flex items-center space-x-3">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt="User"
+                className="w-8 h-8 rounded-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = '/default-avatar.png';
+                }}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold">
+                {user?.name?.[0] || 'U'}
+              </div>
+            )}
+            <div className="text-left">
+              <div className="text-sm font-medium text-gray-900">{user?.name}</div>
+              <div className="text-xs text-gray-500 capitalize">{user?.role}</div>
+            </div>
           </div>
-        </div>
+        )}
       </button>
 
       {/* Popup */}
       {isPopupOpen && (
         <div
           ref={popupRef}
-          className="absolute bottom-[60px] left-[10px] right-[10px] bg-white border border-gray-300 rounded-[12px] shadow-lg z-50 w-[calc(100%-20px)] max-w-full"
+          className={`absolute z-50 shadow-lg border border-gray-300 rounded-[12px] bg-white ${
+            mini
+              ? 'fixed bottom-[60px] left-[10px] w-48'
+              : 'bottom-[60px] left-[10px] right-[10px] w-[calc(100%-20px)]'
+          }`}
         >
           <div className="p-4 flex items-center space-x-2 w-full overflow-hidden">
             <div className="flex-shrink-0">
