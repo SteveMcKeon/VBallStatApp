@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback  } from 'react';
 import supabase from '..//supabaseClient';
-import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import { useSidebar } from './SidebarContext';
 import StyledSelect from './StyledSelect';
 import ColumnSelector from './ColumnSelector';
 import SidebarFooter from './SidebarFooter';
 
-const StatsSummary = () => {
+const StatsSummary = ({ onBack, setSidebarContent  }) => {
   const [teamName, setTeamName] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
@@ -16,15 +15,7 @@ const StatsSummary = () => {
   const { registerToggle } = useSidebar();
   useEffect(() => {
     registerToggle(() => setShowSidebar((prev) => !prev));
-  }, [registerToggle]);
-  const navigate = useNavigate();
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate('/login');
-      }
-    });
-  }, [navigate]);    
+  }, [registerToggle]);  
   const [actions, setActions] = useState([]);  
   const [stats, setStats] = useState([]);
   const [games, setGames] = useState([]);
@@ -38,7 +29,7 @@ const StatsSummary = () => {
     ? settingStats
     : settingStats.filter(stat => stat.player === selectedSetter);
   const NavToHome = () => {
-    navigate('/');
+    if (typeof onBack === 'function') onBack();
   };  
   useEffect(() => {
     const fetchActions = async () => {
@@ -60,6 +51,7 @@ const StatsSummary = () => {
 
     fetchActions();
   }, []);
+  
   useEffect(() => {
     const savedTeam = getLocal('teamName');
     const fetchTeams = async () => {
@@ -354,113 +346,126 @@ const StatsSummary = () => {
   const totalAvg2 = grandTotals.qty ? (grandTotals.sum / grandTotals.qty).toFixed(2) : '-';
   const totalSuccess2 = grandTotals.qty ? ((grandTotals.won / grandTotals.qty) * 100).toFixed(1) + '%' : '';
   const totalFail2 = grandTotals.qty ? ((grandTotals.lost / grandTotals.qty) * 100).toFixed(1) + '%' : '';
+  const renderSidebar = useCallback(() => (
+      <div className="space-y-4 flex flex-col h-full">
+        <div>
+          <label className="font-semibold block mb-1">Your Team:</label>
+          <StyledSelect
+            options={availableTeams.map(team => ({
+              label: team,
+              value: team,
+              color: 'blue',
+            }))}
+            value={teamName}
+            onChange={(selected) => {
+              const selectedValue = selected?.value || '';
+              setTeamName(selectedValue);
+              setLocal('teamName', selectedValue);
+              setSelectedGame('all');
+            }}
+            placeholder="Select a team"
+            showStatus={false}
+          />
+        </div>            
+        <div>
+          <label className="font-semibold block mb-1">Select Game:</label>
+          <StyledSelect
+            options={[
+              { value: 'all', label: 'All Games' },
+              { value: 'scored', label: 'All Scored Games' },
+              ...games
+                .filter((game) => game.processed)
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .map((game) => ({
+                  value: game.id,
+                  label: game.title,
+                  color: game.isscored ? 'green' : 'red',
+                  tooltip: game.isscored ? 'Scored' : 'Not yet scored',
+                })),
+            ]}
+            value={selectedGame}
+            onChange={(selected) => setSelectedGame(selected?.value || 'all')}
+            placeholder="Select a game"
+            showStatus={true}
+            showTooltip={true}
+          />
+        </div>
+        {selectedGame && (
+          <div>
+            <label className="font-semibold block mb-1">Select Set:</label>
+            <StyledSelect
+              options={[
+                { value: 'all', label: 'All Sets' },
+                { value: '1', label: 'Set 1' },
+                { value: '2', label: 'Set 2' },
+                { value: '3', label: 'Set 3' },
+              ]}
+              value={selectedSet}
+              onChange={(selected) => setSelectedSet(selected?.value || 'all')}
+              placeholder="Select Set"
+              showStatus={false}
+            />
+          </div>
+        )}
+      <div>
+        <label className="font-semibold block mb-1">Visible Columns:</label>
+          <ColumnSelector
+            columns={allColumns}
+            visibleColumns={visibleColumns}
+            toggleColumn={toggleColumn}
+          />
+      </div>    
+      <div>
+        <label className="font-semibold block mb-1">Visible SubColumns:</label>
+          <ColumnSelector
+            columns={allSubColumns}
+            visibleColumns={visibleSubColumns}
+            toggleColumn={toggleSubColumn}
+          />
+      </div>             
+        <div className="mt-auto p-4 space-y-4">
+          <button
+            onClick={NavToHome}
+            className="w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+          >
+            Return to Home
+          </button>               
+        </div>
+      </div>
+  ), [
+    teamName,
+    setTeamName,
+    availableTeams,
+    selectedGame,
+    setSelectedGame,
+    selectedSet,
+    setSelectedSet,
+    games,
+    allColumns,
+    visibleColumns,
+    toggleColumn,
+    allSubColumns,
+    visibleSubColumns,
+    toggleSubColumn,
+    NavToHome
+  ]);
+  
+  useEffect(() => {
+    setSidebarContent(renderSidebar());
+    return () => setSidebarContent(null);
+  }, [
+    setSidebarContent,
+    teamName,
+    availableTeams,
+    selectedGame,
+    selectedSet,
+    games,
+    visibleColumns,
+    visibleSubColumns,
+  ]);
   
   return (
-    <div className="flex flex-col h-[100svh] overflow-hidden">
-        <div
-          className="flex flex-1 overflow-auto transition-all duration-300"
-          style={{ paddingTop: "3.5rem" }}
-        >
-          {/* Sidebar */}
-          <div
-            className={`transition-all duration-300 overflow-hidden bg-gray-200 border-r h-full flex-shrink-0 ${
-              showSidebar ? 'w-64' : 'w-0'
-            }`}
-          >
-          <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
-              {/* Team Selector */}
-              <div>
-                <label className="font-semibold block mb-1">Select Your Team:</label>
-                <StyledSelect
-                  options={availableTeams.map(team => ({
-                    label: team,
-                    value: team,
-                    color: 'blue',
-                  }))}
-                  value={teamName}
-                  onChange={(selected) => {
-                    const selectedValue = selected?.value || '';
-                    setTeamName(selectedValue);
-                    setLocal('teamName', selectedValue);
-                    setSelectedGame('all');
-                  }}
-                  placeholder="Select a team"
-                  showStatus={false}
-                />
-              </div>            
-              {/* Game Filter */}
-              <div>
-                <label className="font-semibold block mb-1">Select Game:</label>
-                <StyledSelect
-                  options={[
-                    { value: 'all', label: 'All Games' },
-                    { value: 'scored', label: 'All Scored Games' },
-                    ...games
-                      .filter((game) => game.processed)  // <-- Only include processed games
-                      .sort((a, b) => new Date(b.date) - new Date(a.date))
-                      .map((game) => ({
-                        value: game.id,
-                        label: game.title,
-                        color: game.isscored ? 'green' : 'red',
-                        tooltip: game.isscored ? 'Scored' : 'Not yet scored',
-                      })),
-                  ]}
-                  value={selectedGame}
-                  onChange={(selected) => setSelectedGame(selected?.value || 'all')}
-                  placeholder="Select a game"
-                  showStatus={true}
-                  showTooltip={true}
-                />
-              </div>
-
-              {/* Set Filter */}
-              {selectedGame && (
-                <div>
-                  <label className="font-semibold block mb-1 mt-2">Select Set:</label>
-                  <StyledSelect
-                    options={[
-                      { value: 'all', label: 'All Sets' },
-                      { value: '1', label: 'Set 1' },
-                      { value: '2', label: 'Set 2' },
-                      { value: '3', label: 'Set 3' },
-                    ]}
-                    value={selectedSet}
-                    onChange={(selected) => setSelectedSet(selected?.value || 'all')}
-                    placeholder="Select Set"
-                    showStatus={false}
-                  />
-                </div>
-              )}
-            <div>
-              <label className="font-semibold block mb-1">Visible Columns:</label>
-                <ColumnSelector
-                  columns={allColumns}
-                  visibleColumns={visibleColumns}
-                  toggleColumn={toggleColumn}
-                />
-            </div>    
-            <div>
-              <label className="font-semibold block mb-1">Visible SubColumns:</label>
-                <ColumnSelector
-                  columns={allSubColumns}
-                  visibleColumns={visibleSubColumns}
-                  toggleColumn={toggleSubColumn}
-                />
-            </div>             
-              <div className="mt-auto p-4 space-y-4">
-                <button
-                  onClick={NavToHome}
-                  className="w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-                >
-                  Return to Home
-                </button>               
-              </div>
-            </div>
-            <SidebarFooter />
-          </div>
-        </div>
-
+    <div className="flex flex-col overflow-hidden">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {/* Original Table Content */}
@@ -711,7 +716,6 @@ const StatsSummary = () => {
             </div>
           )}       
         </div>
-      </div>
       </div>
     </div>
   );

@@ -12,11 +12,13 @@ import EditMode from './EditMode';
 import EditableCell from './EditableCell';
 import DBStats from './DBStats';
 import SidebarFooter from './SidebarFooter';
+import StatsSummary from './StatsSummary';
 
 const HEADER_HOVER_ZONE_PX = 50;
 
 const MainPage = () => {
   const navigate = useNavigate();
+  const [sidebarContent, setSidebarContent] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const handleOpenUploadModal = () => {
     requestAnimationFrame(() => {
@@ -24,7 +26,6 @@ const MainPage = () => {
     });
     setIsUploadModalOpen(true);
   };
-
   const handleCloseUploadModal = () => {
     videoPlayerRef.current?.allowControls();
     setIsUploadModalOpen(false);
@@ -33,7 +34,7 @@ const MainPage = () => {
   const [teamName, setTeamName] = useState('');
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [resumeSilently, setResumeSilently] = useState(false);
-
+  const [showStatsView, setShowStatsView] = useState(false);
   useEffect(() => {
     const fetchSession = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -597,9 +598,6 @@ const MainPage = () => {
       </th>
     );
   };
-  const NavToStats = () => {
-    navigate('/stats');
-  };
   if (isAppLoading) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
@@ -667,148 +665,156 @@ const MainPage = () => {
           }`}
         >
         <div className="h-full flex flex-col">    
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
-            <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
-            <StyledSelect
-              options={availableTeams.map(team => ({
-                label: team,
-                value: team,
-                color: 'blue',
-              }))}
-              value={teamName}
-              onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
-              placeholder="Click here to select a team"
-              showStatus={false}
-            /> 
+          {sidebarContent ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
+              {sidebarContent}
+            </div>
+          ) : (        
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
+              <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
+              <StyledSelect
+                options={availableTeams.map(team => ({
+                  label: team,
+                  value: team,
+                  color: 'blue',
+                }))}
+                value={teamName}
+                onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
+                placeholder="Click here to select a team"
+                showStatus={false}
+              /> 
+              <div>
+                <label className={`font-semibold block mb-1 ${!selectedGameId ? "text-blue-700" : ""}`}>
+                  {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
+                </label>
+                <GameSelector
+                  games={teamGames}
+                  value={selectedGameId}
+                  onChange={(selectedOption) => {
+                    if (selectedOption.value === 'upload-new') {
+                      handleOpenUploadModal();
+                    } else {             
+                      setSelectedGameId(selectedOption.value);
+                      const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+                      setSelectedVideo(selectedGame?.video_url || '');
+                      localStorage.removeItem('videoTime');
+                      setTimeout(() => {
+                        videoRef.current?.focus();
+                      }, 300);                
+                    }
+                  }}
+                  videoPlayerRef={videoPlayerRef}
+                  teamName={teamName}
+                  currentUserId={currentUserId}
+                  isUploadModalOpen={isUploadModalOpen}
+                  setIsUploadModalOpen={setIsUploadModalOpen}
+                  setResumeSilently={setResumeSilently}
+                  resumeSilently ={resumeSilently }
+              />     
+            </div>
             <div>
-              <label className={`font-semibold ${!selectedGameId ? "text-blue-700" : ""}`}>
-                {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
-              </label>
-              <GameSelector
-                games={teamGames}
-                value={selectedGameId}
-                onChange={(selectedOption) => {
-                  if (selectedOption.value === 'upload-new') {
-                    handleOpenUploadModal();
-                  } else {             
-                    setSelectedGameId(selectedOption.value);
-                    const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-                    setSelectedVideo(selectedGame?.video_url || '');
-                    localStorage.removeItem('videoTime');
-                    setTimeout(() => {
-                      videoRef.current?.focus();
-                    }, 300);                
-                  }
-                }}
-                videoPlayerRef={videoPlayerRef}
-                teamName={teamName}
-                currentUserId={currentUserId}
-                isUploadModalOpen={isUploadModalOpen}
-                setIsUploadModalOpen={setIsUploadModalOpen}
-                setResumeSilently={setResumeSilently}
-                resumeSilently ={resumeSilently }
-            />     
-          </div>
-          <div>
-            <label className="font-semibold block mb-1">Display Layout:</label>
-            <StyledSelect
-              options={[
-                { label: 'Stacked', value: 'stacked', color: 'orange' },
-                { label: 'Side-by-Side', value: 'side-by-side', color: 'purple' },
-              ]}
-              value={layoutMode}
-              onChange={(selected) => setLayoutMode(selected.value)}
-              placeholder="Select layout"
-              showStatus={false}
-            />
-          </div>
-          <div>
-            <label className="font-semibold block mb-1">Visible Columns:</label>
-            <ColumnSelector
-              columns={[
-              { key: 'timestamp', label: 'Timestamp' },
-              { key: 'set', label: 'Set' },
-              { key: 'rally_id', label: 'Rally' },
-              { key: 'posession_seq', label: 'Possession' },
-              { key: 'player', label: 'Player' },
-              { key: 'action_type', label: 'Action Type' },
-              { key: 'quality', label: 'Quality' },
-              { key: 'result', label: 'Transition' },
-              { key: 'notes', label: 'Notes' },
-              { key: 'score', label: 'Score' },
-              ]}
-              visibleColumns={visibleColumns}
-              toggleColumn={toggleColumn}
-            />
-          </div>
-          <div className="mt-auto p-4 space-y-4">
-            {userRole  && (
+              <label className="font-semibold block mb-1">Display Layout:</label>
+              <StyledSelect
+                options={[
+                  { label: 'Stacked', value: 'stacked', color: 'orange' },
+                  { label: 'Side-by-Side', value: 'side-by-side', color: 'purple' },
+                ]}
+                value={layoutMode}
+                onChange={(selected) => setLayoutMode(selected.value)}
+                placeholder="Select layout"
+                showStatus={false}
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Visible Columns:</label>
+              <ColumnSelector
+                columns={[
+                { key: 'timestamp', label: 'Timestamp' },
+                { key: 'set', label: 'Set' },
+                { key: 'rally_id', label: 'Rally' },
+                { key: 'posession_seq', label: 'Possession' },
+                { key: 'player', label: 'Player' },
+                { key: 'action_type', label: 'Action Type' },
+                { key: 'quality', label: 'Quality' },
+                { key: 'result', label: 'Transition' },
+                { key: 'notes', label: 'Notes' },
+                { key: 'score', label: 'Score' },
+                ]}
+                visibleColumns={visibleColumns}
+                toggleColumn={toggleColumn}
+              />
+            </div>
+            <div className="mt-auto p-4 space-y-4">
+              {userRole  && (
+                <button
+                  onClick={handleEditModeToggle}
+                  className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] ${
+                    editMode
+                      ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
+                      : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
+                  }`}
+                >
+                  {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                </button>
+              )}
               <button
-                onClick={handleEditModeToggle}
-                className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] ${
-                  editMode
-                    ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
-                    : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
-                }`}
+                onClick={() => setShowStatsView(true)}
+                className="w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
               >
-                {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
-              </button>
-            )}
-            <button
-              onClick={NavToStats}
-              className="w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-            >
-              Statistic Matrix
-            </button>         
-          </div>          
+                Statistic Matrix
+              </button>         
+            </div>          
+          </div>
+          )}
+          <SidebarFooter />
         </div>
-        <SidebarFooter />
-      </div>
     </div>
     <div ref={mainContentRef} className={`flex-1 overflow-y-auto p-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}>
-      {selectedVideo && (
-        <div className={`flex gap-4 ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
-          <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto bg-white shadow-md`}>
-            <DBStats
-              canEdit={editMode === 'admin' || editMode === 'editor'}
-              editMode={editMode}
-              hastimestamps={selectedGame?.hastimestamps}
-              isscored={selectedGame?.isscored}              
-              stats={stats}
-              refreshStats={refreshStats}
-              setStats={setStats}
-              filteredStats={sortedStats}
-              gamePlayers={gamePlayers}
-              visibleColumns={visibleColumns}
-              sortConfig={sortConfig}
-              setSortConfig={setSortConfig}
-              textColumnFilters={textColumnFilters}
-              handleTextColumnFilterChange={handleTextColumnFilterChange}
-              renderCell={renderCell}
-              insertButtonParentRef={insertButtonParentRef}
-              authorizedFetch={authorizedFetch}
-              layoutMode={layoutMode}
-              jumpToTime={jumpToTime}
-              videoRef={videoRef}
-              videoPlayerRef={videoPlayerRef}
-              mainContentRef={mainContentRef}
-              containerRef={containerRef}
-              formatTimestamp={formatTimestamp}
-              gameId={gameId}
-              refreshGames={refreshGames}
-            />
+      {showStatsView ? (
+        <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
+      ) : selectedVideo ? (
+          <div className={`flex gap-4 ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
+            <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto bg-white shadow-md`}>
+              <DBStats
+                canEdit={editMode === 'admin' || editMode === 'editor'}
+                editMode={editMode}
+                hastimestamps={selectedGame?.hastimestamps}
+                isscored={selectedGame?.isscored}              
+                stats={stats}
+                refreshStats={refreshStats}
+                setStats={setStats}
+                filteredStats={sortedStats}
+                gamePlayers={gamePlayers}
+                visibleColumns={visibleColumns}
+                sortConfig={sortConfig}
+                setSortConfig={setSortConfig}
+                textColumnFilters={textColumnFilters}
+                handleTextColumnFilterChange={handleTextColumnFilterChange}
+                renderCell={renderCell}
+                insertButtonParentRef={insertButtonParentRef}
+                authorizedFetch={authorizedFetch}
+                layoutMode={layoutMode}
+                jumpToTime={jumpToTime}
+                videoRef={videoRef}
+                videoPlayerRef={videoPlayerRef}
+                mainContentRef={mainContentRef}
+                containerRef={containerRef}
+                formatTimestamp={formatTimestamp}
+                gameId={gameId}
+                refreshGames={refreshGames}
+              />
+            </div>
+            <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'}`}>
+              <VideoPlayer
+                ref={videoPlayerRef}
+                selectedVideo={selectedVideo}
+                videoRef={videoRef}
+                containerRef={containerRef}
+                stats={stats}
+              />
+            </div>
           </div>
-          <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'}`}>
-            <VideoPlayer
-              ref={videoPlayerRef}
-              selectedVideo={selectedVideo}
-              videoRef={videoRef}
-              containerRef={containerRef}
-              stats={stats}
-            />
-          </div>
-        </div>
-      )}
+      ): null}
       {showResumeBanner && (
         <div className="fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-900 p-3 flex justify-between items-center z-50 shadow">
           <span>You have an incomplete upload. Would you like to resume it?</span>
