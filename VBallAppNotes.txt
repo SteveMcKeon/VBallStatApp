@@ -16,10 +16,8 @@ team tactics or certain rotation options - by each team captain (Ask Tamir)
 tracking sets with trajectory overlay
 If not timestamp editor role, still click rest of non-editbale cells to jump to time.
 Create welcome page, with short video and highlights of website features.
-Get rid of header and just have sidebar. make it look like ChatGPTs.
 Stats page - have entire row highlight on hover for readability.
-Look into this header information:
-
+Update index.html <head> info for SEO
 
 #Fixes
 REFACTOR

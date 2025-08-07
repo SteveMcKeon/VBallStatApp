@@ -180,19 +180,57 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     if (isNavigatingSuggestions) {
       e.preventDefault();
       if (key === 'ArrowDown') {
-        setInteractionMode('keyboard');
-        setSelectedSuggestionIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+        if (selectedSuggestionIndex >= suggestions.length - 1) {
+          setEditing(false);
+          setTempValue(value ?? '');
+          if (setEditingCell) {
+            setTimeout(() => {
+              setEditingCell({ idx, field, direction: 'down' });
+            }, 0);
+          }
+        } else {
+          setInteractionMode('keyboard');
+          setSelectedSuggestionIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+        }
         return;
       }
       if (key === 'ArrowUp') {
-        setInteractionMode('keyboard');
-        setSelectedSuggestionIndex((prev) => Math.max(prev - 1, 0));
+        if (selectedSuggestionIndex <= 0) {
+          setEditing(false);
+          setTempValue(value ?? '');
+          if (setEditingCell) {
+            setTimeout(() => {
+              setEditingCell({ idx, field, direction: 'up' });
+            }, 0);
+          }
+        } else {
+          setInteractionMode('keyboard');
+          setSelectedSuggestionIndex((prev) => Math.max(prev - 1, 0));
+        }
         return;
       }
       if ((key === 'Enter' || key === 'Tab') && suggestions.length > 0) {
-        setTempValue(suggestions[selectedSuggestionIndex]);
+        e.preventDefault();
+        const selected = suggestions[selectedSuggestionIndex];
+        setTempValue(selected);
         setShowSuggestions(false);
-        handleBlur();
+        setStats(prevStats => {
+          const newStats = [...prevStats];
+          const statIndex = newStats.findIndex(row => row.id === statId);
+          if (statIndex !== -1) {
+            newStats[statIndex] = { ...newStats[statIndex], [field]: selected };
+          }
+          return newStats;
+        });        
+        authorizedFetch('/api/update-stat', {
+          body: { statId, updates: { [field]: selected } },
+        }).then(res => res.json())
+          .then(result => {
+            if (!result.success) setToast('Failed to update: ' + result.message);
+          }).catch(err => {
+            console.error('Error during update:', err);
+            setToast('Update failed.');
+          });
         if (setEditingCell) {
           setTimeout(() => {
             setEditingCell({

@@ -13,6 +13,8 @@ import EditableCell from './EditableCell';
 import DBStats from './DBStats';
 import SidebarFooter from './SidebarFooter';
 import StatsSummary from './StatsSummary';
+import UploadGameModal from './UploadGameModal';
+
 
 const HEADER_HOVER_ZONE_PX = 50;
 
@@ -48,8 +50,10 @@ const MiniSidebar = ({ onExpand }) => {
 
 const MainPage = () => {
   const navigate = useNavigate();
+  const uploadModalRef = useRef();
   const [sidebarContent, setSidebarContent] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [resumeSilently, setResumeSilently] = useState(false);
   const handleOpenUploadModal = () => {
     requestAnimationFrame(() => {
       videoPlayerRef.current?.forceHideControls();
@@ -60,10 +64,14 @@ const MainPage = () => {
     videoPlayerRef.current?.allowControls();
     setIsUploadModalOpen(false);
   };  
+  useEffect(() => {
+    if (resumeSilently && isUploadModalOpen && uploadModalRef.current) {
+      uploadModalRef.current.triggerResumeAllUploads();
+    }
+  }, [resumeSilently, isUploadModalOpen]);
   const [currentUserId, setCurrentUserId] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [showResumeBanner, setShowResumeBanner] = useState(false);
-  const [resumeSilently, setResumeSilently] = useState(false);
   const [showStatsView, setShowStatsView] = useState(false);
   useEffect(() => {
     const fetchSession = async () => {
@@ -678,6 +686,7 @@ const MainPage = () => {
             setIsUploadModalOpen={setIsUploadModalOpen}
             setResumeSilently={setResumeSilently}
             resumeSilently ={resumeSilently }
+            hideUploadOption = {true}
           />
       </div>
     );
@@ -886,6 +895,18 @@ const MainPage = () => {
       )}      
     </div>
   </div>
+  <UploadGameModal
+    ref={uploadModalRef}
+    isOpen={isUploadModalOpen}
+    onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
+    onClose={() => {
+      setIsUploadModalOpen(false);
+      setResumeSilently(false);
+    }}
+    teamName={teamName}
+    userId={currentUserId}
+    resumeSilently={resumeSilently}
+  />  
 </div>
 );
 };

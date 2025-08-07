@@ -9,7 +9,7 @@ const getStatusColor = (game) => {
   return 'red';
 };
 
-const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, currentUserId, isUploadModalOpen, setIsUploadModalOpen, setResumeSilently, resumeSilently  }) => {
+const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, currentUserId, isUploadModalOpen, setIsUploadModalOpen, setResumeSilently, resumeSilently, hideUploadOption = false }) => {
   const processedGames = games.filter((game) => game.processed);
   const options = processedGames.map((game) => ({
     value: game.id,
@@ -21,12 +21,14 @@ const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, curren
       red: 'No stats or timestamps',
     }[getStatusColor(game)],
   }));
-
-  options.push({
-    value: 'upload-new',
-    label: <em>Upload New Game...</em>,
-  });
   
+  if (!hideUploadOption) {
+    options.push({
+      value: 'upload-new',
+      label: <em>Upload New Game...</em>,
+    });
+  }
+ 
   const modalRef = useRef();
   
   const handleChange = (selected) => {
@@ -53,18 +55,6 @@ const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, curren
         placeholder="Click here to select a game"
         showStatus
         showTooltip
-      />
-      <UploadGameModal
-        ref={modalRef} 
-        isOpen={isUploadModalOpen}
-        onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
-        onClose={() => {
-          setIsUploadModalOpen(false);
-          setResumeSilently(false);
-        }}
-        teamName={teamName}
-        userId={currentUserId}
-        resumeSilently={resumeSilently}
       />
     </>
   );

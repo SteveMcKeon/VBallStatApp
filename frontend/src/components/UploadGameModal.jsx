@@ -83,7 +83,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
   const [autofillDate, setAutofillDate] = useState(false);
   const [autofillPlayers, setAutofillPlayers] = useState(false);
   const uploadRef = useRef(null);
-  const [resumeFileHandle, setResumeFileHandle] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isUploading, setIsUploading] = useState(false);  
   const [isProgressHovering, setIsProgressHovering] = useState(false);
@@ -105,8 +104,8 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     );
   };  
   const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState('error');
-  const [toastDuration, setToastDuration] = useState('error');
+  const [toastType, setToastType] = useState(null);
+  const [toastDuration, setToastDuration] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const setToast = (message, type = 'error', duration) => {
@@ -125,7 +124,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
       const extraFingerprintData = [
         metadata.date || '',
         metadata.players || '',
-        metadata.team_name || '',
         metadata.user_id || ''
       ].join('-');
       return [
@@ -172,15 +170,16 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     return resumableUploads;
   };
   
-  const getNextSetNumber = (uploads) => {
-    const existingNumbers = uploads.map(u => u.setNumber).filter(Boolean);
+  const getNextSetNumberForGroup = (uploads, groupId) => {
+    const groupUploads = uploads.filter(u => u.metadata?.game_group_id === groupId);
+    const existingNumbers = groupUploads.map(u => u.setNumber).filter(Boolean);
     let num = 1;
     while (existingNumbers.includes(num)) {
       num++;
     }
     return num;
-  };  
-  
+  };
+
   useImperativeHandle(ref, () => ({
     triggerResumeAllUploads: async () => {
       const resumableUploads = await loadAllResumableUploads();
@@ -209,24 +208,28 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
               if (metadata.players) {
                 setPlayers(metadata.players);
                 setAutofillPlayers(true);
-              }
+              }            
               const fingerprint = await customFingerprint(file, {
                 endpoint: '/api/upload-game',
                 metadata
               });              
-              setUploads(prev => [
-                ...prev,
-                {
-                  file,
-                  progress: 0,
-                  status: 'pending',
-                  paused: false,
-                  uploadRef: null,
-                  fileHandle,
-                  id: fingerprint,
-                  setNumber: parseInt(uploadData.metadata.setNumber, 10)
-                }
-              ]);
+              const alreadyExists = uploads.some(u => u.id === fingerprint);
+              if (!alreadyExists) {
+                setUploads(prev => [
+                  ...prev,
+                  {
+                    file,
+                    progress: 0,
+                    status: 'pending',
+                    paused: false,
+                    uploadRef: null,
+                    fileHandle,
+                    id: fingerprint,
+                    setNumber: parseInt(uploadData.metadata.setNumber, 10),
+                    metadata
+                  }
+                ]);
+              }
               setToast(`Resumed upload for ${file.name}`, 'success');
               setTimeout(() => {
                 handleSubmit(fingerprint, file, metadata.date, metadata.players, fingerprint);
@@ -310,7 +313,8 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
           uploadRef: null,
           fileHandle,
           id: fingerprint,
-          setNumber: getNextSetNumber([...uploads, ...newUploads])
+          setNumber: getNextSetNumberForGroup([...uploads, ...newUploads], metadata.game_group_id),
+          metadata 
         });
       }
       if (invalidCount > 0) {
@@ -383,115 +387,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
       };
     });
   }
-
-  useEffect(() => {
-    const tryLoadFileHandle = async () => {
-      const incompleteUploads = scanIncompleteUploads();
-      if (incompleteUploads.length === 0) return;
-      for (const upload of incompleteUploads) {
-        const fileHandle = await getFileHandleFromIndexedDB(upload.key);
-        if (fileHandle) {
-          setResumeFileHandle(fileHandle);
-          break;
-        }
-      }
-    };
-    tryLoadFileHandle();
-  }, []);
-
-  useEffect(() => {
-    if (resumeFileHandle && isOpen) {
-      (async () => {
-        try {
-          const permission = await resumeFileHandle.requestPermission();
-          if (permission !== 'granted') {
-            setToast('Permission denied. Please re-select the file.', 'error');
-            await removeFileHandleFromIndexedDB();
-            setResumeFileHandle(null);
-            return;
-          }
-          const file = await resumeFileHandle.getFile();
-          let uploadData = null;
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('tus::')) {
-              const data = JSON.parse(localStorage.getItem(key));
-              if (data && data.metadata?.filename === file.name && data.metadata?.user_id === userId) {
-                uploadData = data;
-                break;
-              }
-            }
-          }
-          if (!uploadData) {
-            setToast('Could not find upload metadata for this file.', 'error');
-            await removeFileHandleFromIndexedDB();
-            setResumeFileHandle(null);
-            return;
-          }          
-          const metadata = {
-            filename: file.name,
-            filetype: file.type,
-            date,
-            players,
-            team_name: teamName,
-            user_id: userId,
-            game_group_id: gameGroupId,
-            setNumber: parseInt(uploadData.metadata.setNumber, 10)
-          };
-          const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata });
-          const newUpload = {
-            file,
-            progress: 0,
-            status: 'pending',
-            paused: false,
-            uploadRef: null,
-            fileHandle: resumeFileHandle,
-            id: fingerprint,
-            setNumber: parseInt(uploadData.metadata.setNumber, 10)
-          };
-          setUploads(prev => [...prev, newUpload]);
-          setResumeFileHandle(null);
-          onClose();
-          setToast('Resumed upload from previous session', 'success');
-          setTimeout(() => {
-            handleSubmit(newUpload.id);
-          }, 0);
-        } catch (err) {
-          console.error('Failed to resume file handle', err);
-          setToast('Failed to resume file handle', 'error');
-          await removeFileHandleFromIndexedDB();
-          setResumeFileHandle(null);
-        }
-      })();
-    }
-  }, [resumeFileHandle, isOpen]);
-
-  const handleResumeUpload = async () => {
-    if (!resumeFileHandle) return;
-
-    try {
-      const permission = await resumeFileHandle.requestPermission();
-      if (permission === 'granted') {
-        const file = await resumeFileHandle.getFile();
-        setVideoFile(file);
-        setResumeFileHandle(null);  // Clear resume state
-        if (!resumeSilently) {
-          onClose();
-        }
-        setToast('Resumed upload from previous session', 'success');
-        handleSubmit(file);
-      } else {
-        setToast('Permission denied. Please re-select the file.', 'error');
-        await removeFileHandleFromIndexedDB();
-        setResumeFileHandle(null);
-      }
-    } catch (err) {
-      console.error('Failed to resume file handle', err);
-      setToast('Failed to resume file handle', 'error');
-      await removeFileHandleFromIndexedDB();
-      setResumeFileHandle(null);
-    }
-  };
 
   const togglePauseResume = (uploadId) => {
     const index = uploads.findIndex(u => u.id === uploadId);
@@ -567,97 +462,95 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     }
   };
 
-const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, playersOverride = null, tusKeyOverride = null) => {
-  const uploadItem = uploads.find(u => u.id === uploadId);
-  if (!uploadItem && !fileOverride) {
-    setToast('No file selected for upload');
-    return;
-  }
-  const fileToUpload = fileOverride || uploadItem.file;
-  const dateToUse = dateOverride || date;
-  const playersToUse = playersOverride || players;
-  if (!/\d{4}-\d{2}-\d{2}/.test(dateToUse)) {
-    setToast('Date format should be YYYY-MM-DD');
-    return 'validation-error';
-  }
-  if (!playersToUse.trim()) {
-    setToast('Please enter players (comma-separated)');
-    return 'validation-error';
-  }
+  const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, playersOverride = null, tusKeyOverride = null) => {
+    const uploadItem = uploads.find(u => u.id === uploadId);
+    if (!uploadItem && !fileOverride) {
+      setToast('No file selected for upload');
+      return;
+    }
+    const fileToUpload = fileOverride || uploadItem.file;
+    const dateToUse = dateOverride || date;
+    const playersToUse = playersOverride || players;
+    if (!/\d{4}-\d{2}-\d{2}/.test(dateToUse)) {
+      setToast('Date format should be YYYY-MM-DD');
+      return 'validation-error';
+    }
+    if (!playersToUse.trim()) {
+      setToast('Please enter players (comma-separated)');
+      return 'validation-error';
+    }
 
-  let fileHandleSaved = false;
+    let fileHandleSaved = false;
 
-  const upload = new tus.Upload(fileToUpload, {
-    endpoint: '/api/upload-game',
-    retryDelays: [0, 1000, 3000, 5000],
-    metadata: {
-      filename: fileToUpload.name,
-      filetype: fileToUpload.type,
-      date: dateToUse,
-      players: playersToUse,
-      team_name: teamName,
-      user_id: userId,
-      game_group_id: gameGroupId,
-      setNumber: uploadItem?.setNumber?.toString() || '1'
-    },
-    fingerprint: customFingerprint,
-    onError: (error) => {
-      console.error('Upload failed:', error);
-      setUploads(prev => prev.map(u => u.id === uploadId ? { ...u, status: 'error' } : u));
-      setToast('Upload failed');
-    },
-    onProgress: async (bytesUploaded, bytesTotal) => {
-      const percentage = Math.floor((bytesUploaded / bytesTotal) * 100);
-      setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, progress: percentage } : u)));
+    const upload = new tus.Upload(fileToUpload, {
+      endpoint: '/api/upload-game',
+      retryDelays: [0, 1000, 3000, 5000],
+      metadata: {
+        filename: fileToUpload.name,
+        filetype: fileToUpload.type,
+        date: dateToUse,
+        players: playersToUse,
+        team_name: teamName,
+        user_id: userId,
+        game_group_id: gameGroupId,
+        setNumber: uploadItem?.setNumber?.toString() || '1'
+      },
+      fingerprint: customFingerprint,
+      onError: (error) => {
+        console.error('Upload failed:', error);
+        setUploads(prev => prev.map(u => u.id === uploadId ? { ...u, status: 'error' } : u));
+        setToast('Upload failed');
+      },
+      onProgress: async (bytesUploaded, bytesTotal) => {
+        const percentage = Math.floor((bytesUploaded / bytesTotal) * 100);
+        setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, progress: percentage } : u)));
 
-      if (!fileHandleSaved && uploadItem?.fileHandle) {
+        if (!fileHandleSaved && uploadItem?.fileHandle) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('tus::')) {
+              const data = JSON.parse(localStorage.getItem(key));
+              if (data && data.metadata?.user_id === userId && data.metadata?.filename === fileToUpload.name) {
+                await saveFileHandleToIndexedDB(uploadItem.fileHandle, key);
+                fileHandleSaved = true;
+                break;
+              }
+            }
+          }
+        }
+      },
+      onSuccess: async () => {
+        setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, status: 'success' } : u)));
+        setToast('Game uploaded successfully!', 'success');
+        setTimeout(() => {
+          setUploads(prev => prev.filter(u => u.id !== uploadId));
+        }, 5000);
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('tus::')) {
             const data = JSON.parse(localStorage.getItem(key));
             if (data && data.metadata?.user_id === userId && data.metadata?.filename === fileToUpload.name) {
-              await saveFileHandleToIndexedDB(uploadItem.fileHandle, key);
-              fileHandleSaved = true;
+              localStorage.removeItem(key);
+              await removeFileHandleFromIndexedDB(key);
               break;
             }
           }
         }
       }
-    },
-    onSuccess: async () => {
-      setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, status: 'success' } : u)));
-      setToast('Game uploaded successfully!', 'success');
-      setTimeout(() => {
-        setUploads(prev => prev.filter(u => u.id !== uploadId));
-      }, 5000);
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('tus::')) {
-          const data = JSON.parse(localStorage.getItem(key));
-          if (data && data.metadata?.user_id === userId && data.metadata?.filename === fileToUpload.name) {
-            localStorage.removeItem(key);
-            await removeFileHandleFromIndexedDB(key);
-            break;
-          }
-        }
+    });
+
+    setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, uploadRef: upload, status: 'uploading' } : u)));
+
+    upload.findPreviousUploads().then((previousUploads) => {
+      if (previousUploads.length > 0) {
+        upload.resumeFromPreviousUpload(previousUploads[0]);
       }
-    }
-  });
-
-  setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, uploadRef: upload, status: 'uploading' } : u)));
-
-  upload.findPreviousUploads().then((previousUploads) => {
-    if (previousUploads.length > 0) {
-      upload.resumeFromPreviousUpload(previousUploads[0]);
-    }
-    upload.start();
-  });
-};
-  
+      upload.start();
+    });
+  };
   useEffect(() => {
     if (isOpen) {
       setGameGroupId(crypto.randomUUID()); 
-      setUploads([]); 
       if (onBeforeOpen) {
         onBeforeOpen();
       }
@@ -670,22 +563,11 @@ const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, 
         e.stopPropagation();
       }
     };
-
     window.addEventListener('keydown', stopKeyPropagation, true);
     return () => {
       window.removeEventListener('keydown', stopKeyPropagation, true);
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    const refs = { ...progressRefs.current };
-    uploads.forEach(upload => {
-      if (!refs[upload.id]) {
-        refs[upload.id] = React.createRef();
-      }
-    });
-    progressRefs.current = refs;
-  }, [uploads]);
 
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
 
@@ -704,7 +586,7 @@ const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, 
 
   return (
     <>
-    {!resumeSilently && (
+    {!resumeSilently && (    
       <Modal isOpen={isOpen} onClose={onClose}>
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Upload New Game</h2>
@@ -789,7 +671,8 @@ const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, 
                   uploadRef: null,
                   fileHandle: null,
                   id: fingerprint,
-                  setNumber: getNextSetNumber([...uploads, ...validFiles])
+                  setNumber: getNextSetNumberForGroup([...uploads, ...validFiles], metadata.game_group_id),
+                  metadata 
                 });
               } else {
                 invalidCount++;
@@ -848,9 +731,9 @@ const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, 
         >
           Upload Game(s)
         </button>
-      </div>       
-    </Modal>
-  )}
+      </div>   
+    </Modal> 
+    )}
     <Toast
       message={toastMessage}
       show={showToast}
@@ -879,8 +762,13 @@ const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, 
                   `}
                   style={{ width: `${upload.progress}%` }}
                 ></div>
-                <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-black opacity-55 pointer-events-none">
-                  Set {upload.setNumber}
+                <div className="absolute inset-0 w-full px-1 text-xs font-medium text-black opacity-55 pointer-events-none flex items-center justify-between">
+                  <div className="text-left opacity-55">
+                    Game ID: {upload.metadata?.game_group_id?.slice(-6) || '------'}
+                  </div>
+                  <div className="w-7 text-left">
+                    Set {upload.setNumber}
+                  </div>
                 </div>
               </div>              
               <div className="flex-grow flex justify-end items-center ml-3">
@@ -923,28 +811,38 @@ const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, 
           ))}
       </div>
     )}
-      {isProgressHovering && uploads.find(u => u.id === isProgressHovering) && (
-        <TooltipPortal>
-          <div
-            style={{
-              position: 'fixed',
-              top: tooltipPosition.top,
-              left: tooltipPosition.left,
-              transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.8)',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-              zIndex: 9999
-            }}
-          >
-            Uploading {uploads.find(u => u.id === isProgressHovering)?.file.name}
-          </div>
-        </TooltipPortal>
-      )}
+    {isProgressHovering && uploads.find(u => u.id === isProgressHovering) && (
+      <TooltipPortal>
+        <div
+          style={{
+            position: 'fixed',
+            top: tooltipPosition.top,
+            left: tooltipPosition.left,
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.8)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 9999
+          }}
+        >
+        {(() => {
+          const hovered = uploads.find(u => u.id === isProgressHovering);
+          const fileName = hovered?.file?.name || 'Unknown file';
+          const teamName = hovered?.metadata?.team_name || 'Unknown team';
+          return (
+            <>
+              <div>Uploading {fileName}</div>
+              <div style={{ fontSize: '11px', color: '#ccc' }}>Team: {teamName}</div>
+            </>
+          );
+        })()}
+        </div>
+      </TooltipPortal>
+    )}
     </>
   );
 });
