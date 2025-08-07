@@ -824,40 +824,42 @@ const MainPage = () => {
         <MiniSidebar onExpand={() => setShowSidebar(true)} />
       )}        
     </div>
-    <div ref={mainContentRef} className={`flex-1 overflow-y-auto p-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}>
+    <div ref={mainContentRef} className={`flex-1 overflow-y-auto ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}>
       {showStatsView ? (
         <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
       ) : selectedVideo ? (
-          <div className={`flex gap-4 ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
-            <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto bg-white shadow-md`}>
-              <DBStats
-                canEdit={editMode === 'admin' || editMode === 'editor'}
-                editMode={editMode}
-                hastimestamps={selectedGame?.hastimestamps}
-                isscored={selectedGame?.isscored}              
-                stats={stats}
-                refreshStats={refreshStats}
-                setStats={setStats}
-                filteredStats={sortedStats}
-                gamePlayers={gamePlayers}
-                visibleColumns={visibleColumns}
-                sortConfig={sortConfig}
-                setSortConfig={setSortConfig}
-                textColumnFilters={textColumnFilters}
-                handleTextColumnFilterChange={handleTextColumnFilterChange}
-                renderCell={renderCell}
-                insertButtonParentRef={insertButtonParentRef}
-                authorizedFetch={authorizedFetch}
-                layoutMode={layoutMode}
-                jumpToTime={jumpToTime}
-                videoRef={videoRef}
-                videoPlayerRef={videoPlayerRef}
-                mainContentRef={mainContentRef}
-                containerRef={containerRef}
-                formatTimestamp={formatTimestamp}
-                gameId={gameId}
-                refreshGames={refreshGames}
-              />
+          <div className={`flex ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
+            <div className={`px-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
+              <div className="bg-white w-full ">
+                <DBStats
+                  canEdit={editMode === 'admin' || editMode === 'editor'}
+                  editMode={editMode}
+                  hastimestamps={selectedGame?.hastimestamps}
+                  isscored={selectedGame?.isscored}              
+                  stats={stats}
+                  refreshStats={refreshStats}
+                  setStats={setStats}
+                  filteredStats={sortedStats}
+                  gamePlayers={gamePlayers}
+                  visibleColumns={visibleColumns}
+                  sortConfig={sortConfig}
+                  setSortConfig={setSortConfig}
+                  textColumnFilters={textColumnFilters}
+                  handleTextColumnFilterChange={handleTextColumnFilterChange}
+                  renderCell={renderCell}
+                  insertButtonParentRef={insertButtonParentRef}
+                  authorizedFetch={authorizedFetch}
+                  layoutMode={layoutMode}
+                  jumpToTime={jumpToTime}
+                  videoRef={videoRef}
+                  videoPlayerRef={videoPlayerRef}
+                  mainContentRef={mainContentRef}
+                  containerRef={containerRef}
+                  formatTimestamp={formatTimestamp}
+                  gameId={gameId}
+                  refreshGames={refreshGames}
+                />
+              </div>
             </div>
             <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'}`}>
               <VideoPlayer

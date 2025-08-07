@@ -267,7 +267,7 @@ const DBStats = ({
   return (
     <>
       {isFiltered && filteredStats.length > 0 && (
-        <div className="mb-4">
+        <div className={`${editMode ? 'bg-yellow-50 transition-colors pb-4 rounded' : ''}`}>
           <button
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow"
             onClick={handlePlayFiltered}
@@ -504,7 +504,7 @@ const DBStats = ({
         </tbody>
       </table>
       {['admin', 'editor'].includes(editMode) && (
-        <div className="flex justify-between items-start mt-6 px-6 gap-6">
+        <div className={`flex justify-between items-start pt-4 px-4 gap-6 ${editMode ? 'bg-yellow-50 transition-colors pb-4 rounded' : ''}`}>
           {editMode === 'admin' && (
             <button
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
