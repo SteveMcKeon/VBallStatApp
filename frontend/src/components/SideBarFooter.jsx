@@ -52,6 +52,9 @@ const SidebarFooter = ({ mini = false }) => {
 
   return (
     <div className="relative">
+      <div className="text-center text-[10px] text-gray-400 mb-1">
+        Last updated: {new Date(__BUILD_DATE__).toLocaleString()}
+      </div>
       <div className={mini ? "h-px bg-gray-300 my-2 w-6 mx-auto" : "h-px bg-gray-300 mx-2"} />  
       {/* Footer Display (Clickable) */}
       <button

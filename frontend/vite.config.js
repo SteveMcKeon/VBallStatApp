@@ -10,6 +10,9 @@ export default defineConfig(async () => {
     plugins: [
       react()
     ],
+    define: {
+      __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    },    
     server: { 
       watch: {
         usePolling: true, 
@@ -27,7 +30,7 @@ export default defineConfig(async () => {
           target: 'https://tus:3002',
           changeOrigin: true,
           secure: false,
-        },
+        }, 
         '/api': {
           target: 'https://backend:3001',
           changeOrigin: true,
