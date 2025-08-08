@@ -281,7 +281,6 @@ const MainPage = () => {
     timestamp: { visible: false, type: 'float8' },
     set: { visible: false, type: 'int2' },
     rally_id: { visible: false, type: 'int2' },
-    posession_seq: { visible: false, type: 'int2' },
     player: { visible: true, type: 'text' },
     action_type: { visible: true, type: 'text' },
     quality: { visible: true, type: 'numeric' },
@@ -784,13 +783,12 @@ const MainPage = () => {
                 { key: 'timestamp', label: 'Timestamp' },
                 { key: 'set', label: 'Set' },
                 { key: 'rally_id', label: 'Rally' },
-                { key: 'posession_seq', label: 'Possession' },
                 { key: 'player', label: 'Player' },
                 { key: 'action_type', label: 'Action Type' },
                 { key: 'quality', label: 'Quality' },
-                { key: 'result', label: 'Transition' },
-                { key: 'notes', label: 'Notes' },
+                { key: 'result', label: 'Result' },
                 { key: 'score', label: 'Score' },
+                { key: 'notes', label: 'Notes' },
                 ]}
                 visibleColumns={visibleColumns}
                 toggleColumn={toggleColumn}

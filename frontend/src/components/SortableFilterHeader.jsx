@@ -30,7 +30,32 @@ const SortableFilterHeader = ({
   filterValue,
   onFilterChange,
   isFilterable = true,
+  width,
+  minWidth = 60,
+  onResize,
+  onAutoFit,
+  isLastColumn,
+  minFlexWidth = 160,
 }) => {
+  const px = (v) => (v ? parseFloat(v) || 0 : 0);
+  const headerIntrinsicMin = (th) => {
+    if (!th) return minWidth;
+    const thCS = getComputedStyle(th);
+    const thExtra = px(thCS.paddingLeft) + px(thCS.paddingRight) + px(thCS.borderLeftWidth) + px(thCS.borderRightWidth);
+    const btn = th.querySelector('button');
+    if (!btn) return Math.max(minWidth, Math.ceil(thExtra));
+    const clone = btn.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.visibility = 'hidden';
+    clone.style.whiteSpace = 'nowrap';
+    clone.style.width = 'max-content';
+    clone.classList?.remove('truncate');
+    clone.classList?.remove('w-full');
+    th.appendChild(clone);
+    const labelW = Math.ceil(clone.getBoundingClientRect().width);
+    th.removeChild(clone);
+    return Math.max(minWidth, labelW + Math.ceil(thExtra));
+  };  
   const firstInputRef = useRef(null);
   const isFilterableType = (type) =>
   ['text', 'numeric', 'int', 'int2', 'int4', 'int8', 'float', 'float4', 'float8'].includes(type);
@@ -166,12 +191,47 @@ const SortableFilterHeader = ({
     }
   }, [showFilterMenu]);
   
-  return (
-  <th className="relative px-2 py-1 text-sm font-medium text-gray-800 border border-black bg-gray-200 min-w-[100px]">
-  <div className="relative text-center w-full">
+  const startDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.dispatchEvent(new Event('db_col_resize_start')); // ← add
+
+    const startX = e.clientX;
+    const th = e.currentTarget.closest('th');
+    const startWidth = width ?? th.getBoundingClientRect().width;
+    const flexTh = th.parentElement.querySelector('th[data-flex="true"]');
+    const flexWidth = flexTh ? Math.round(flexTh.getBoundingClientRect().width) : 0;
+    const minFlexWidth = 160;
+    const maxGrow = Math.max(0, flexWidth - minFlexWidth);
+    const hardMin = headerIntrinsicMin(th);
+
+    const onMove = (ev) => {
+      const delta = ev.clientX - startX;
+      const unclamped = Math.round(startWidth + delta);
+      const upperBound = startWidth + maxGrow;
+      const next = Math.min(upperBound, Math.max(hardMin, unclamped));
+      onResize?.(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.dispatchEvent(new Event('db_col_resize_end')); // ← add
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+return (
+  <th
+    data-key={columnKey}
+    data-flex={isLastColumn ? 'true' : 'false'}
+    className="group relative px-2 py-1 text-sm font-medium text-gray-800 bg-gray-100 border-b border-gray-300"
+    style={width ? { width, maxWidth: width, minWidth } : { minWidth }}
+  >
+  <div className="relative text-center w-full overflow-hidden">
     <button
       onClick={toggleSort}
-      className="w-full truncate"
+      className="w-full truncate pr-8 pl-5"
       title={label}
     >
     <span className="absolute left-1 text-xs text-center pointer-events-none select-none">
@@ -187,9 +247,9 @@ const SortableFilterHeader = ({
           window.dispatchEvent(new Event('closeAllFilters'));
           setShowFilterMenu(shouldOpen);
         }}
-  className={`absolute right-[-5px] top-1/2 -translate-y-1/2 p-1 rounded transition-colors
-    ${isFilterActive() ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700'
-                       : 'text-gray-500 hover:text-black hover:bg-gray-300'}`}
+        className={`absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded transition-colors
+        ${isFilterActive() ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700'
+                           : 'text-gray-500 hover:text-black hover:bg-gray-300'}`}
         title="Filter"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -206,7 +266,14 @@ const SortableFilterHeader = ({
       </button>
     )}
   </div>
-
+  {!isLastColumn && (
+    <div
+      onMouseDown={startDrag}
+      onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); onAutoFit?.(); }}
+      className="absolute top-0 right-0 h-full w-1 cursor-col-resize select-none bg-gray-300/70 hover:bg-gray-400"
+      title="Drag to resize"
+    />
+  )}
   {showFilterMenu && isFilterableType(columnType) && (
     <div
       ref={wrapperRef}
@@ -313,7 +380,7 @@ const SortableFilterHeader = ({
           <button
             onClick={() => {
               onFilterChange(columnKey, null);
-              setShowFilterMenu(false); // 👈 closes the popup
+              setShowFilterMenu(false);
             }}
             className="mt-2 w-full text-xs text-gray-600 hover:text-red-600"
           >

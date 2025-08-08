@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } 
 import EditMode from './EditMode';
 
 const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast }, ref) => {
-  const RESULT_OPTIONS = ['In Play', 'Won Point', 'Lost Point'];
+  const RESULT_OPTIONS = ['Won Point', 'Lost Point'];
   const ACTION_TYPE_OPTIONS = [
     'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free', 'Taylor Dump'
   ];  
@@ -129,8 +129,8 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           const newStats = stats.map((row, i) => 
             i === statIndex ? { ...row, [field]: parsed } : row
           );
-          if (field === 'result' && (parsed === 'Point Won' || parsed === 'Point Lost')) {
-            const isWon = parsed === 'Point Won';
+          if (field === 'result' && (parsed === 'Won Point' || parsed === 'Lost Point')) {
+            const isWon = parsed === 'Won Point';
             const updatedScore = isWon
               ? { our_score: (newStats[statIndex].our_score ?? 0) + 1 }
               : { opp_score: (newStats[statIndex].opp_score ?? 0) + 1 };
@@ -140,7 +140,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
             for (let i = statIndex + 1; i < newStats.length; i++) {
               newStats[i] = {
                 ...newStats[i],
-                posession_seq: i === statIndex + 1 ? 1 : newStats[i - 1].posession_seq + 1,
                 our_score: newStats[i - 1].our_score,
                 opp_score: newStats[i - 1].opp_score,
               };

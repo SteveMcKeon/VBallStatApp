@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 export default defineConfig(async () => {
-  return {
+  return { 
     base: '/',
     cacheDir: 'node_modules/.vite',
     plugins: [

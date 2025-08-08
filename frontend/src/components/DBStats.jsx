@@ -1,44 +1,31 @@
-import React, { useRef, useMemo, useEffect  } from 'react';
+import React, { useRef, useMemo, useEffect, useLayoutEffect, useState } from 'react';
+import { VariableSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import SortableFilterHeader from './SortableFilterHeader';
 import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
 import Toast from './Toast';
 
-const IconWithTooltip = ({ children, tooltip }) => {
-  const [hovered, setHovered] = React.useState(false);
-  const ref = React.useRef(null);
-  const [coords, setCoords] = React.useState({ top: 0, left: 0 });
+const ROW_HEIGHT = 25; // px
 
-  React.useEffect(() => {
+const IconWithTooltip = ({ children, tooltip }) => {
+  const [hovered, setHovered] = useState(false);
+  const ref = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  useEffect(() => {
     if (hovered && ref.current) {
       const rect = ref.current.getBoundingClientRect();
-      setCoords({
-        top: rect.top - 36,
-        left: rect.left + rect.width / 2,
-      });
+      setCoords({ top: rect.top - 36, left: rect.left + rect.width / 2 });
     }
   }, [hovered]);
-
   return (
     <>
-      <div
-        ref={ref}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        className="inline-block"
-      >
+      <div ref={ref} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className="inline-block">
         {children}
       </div>
       {hovered && tooltip && (
         <TooltipPortal>
-          <div
-            className="fixed z-[9999] bg-black text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap"
-            style={{
-              top: coords.top,
-              left: coords.left,
-              transform: 'translateX(-50%)',
-            }}
-          >
+          <div className="fixed z-[9999] bg-black text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap" style={{ top: coords.top, left: coords.left, transform: 'translateX(-50%)' }}>
             {tooltip}
           </div>
         </TooltipPortal>
@@ -74,40 +61,33 @@ const DBStats = ({
   formatTimestamp,
   gameId,
   refreshGames,
-}) => {
+}) => { 
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
-  const [toastMessage, setToastMessage] = React.useState('');
-  const [toastType, setToastType] = React.useState('error');
-  const [showToast, setShowToast] = React.useState(false);  
-  const setToast = (message, type = 'error') => {
-    setToastMessage(message);
-    setToastType(type);
-    setShowToast(true);
-  };  
-  const [editingCell, setEditingCell] = React.useState(null);
-  const cellRefs = useRef({});
-  const isFiltered = Object.values(textColumnFilters).some((filter) => {
-    const conditions = filter?.conditions ?? [];
-    return conditions.some(({ operator, value }) =>
-      ['blank', 'not_blank'].includes(operator) ||
-      (operator === 'between'
-        ? value?.min?.toString().trim() || value?.max?.toString().trim()
-        : value?.toString().trim())
-    );
-  });
-  
-  const [gameSettings, setGameSettings] = React.useState({
-    hastimestamps: null,
-    isscored: null
-  });
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('error');
+  const [showToast, setShowToast] = useState(false);  
+  const setToast = (message, type = 'error') => { setToastMessage(message); setToastType(type); setShowToast(true); };
 
+  const cellRefs = useRef({});
+
+  const isFiltered = useMemo(() => {
+    const filtersObj = textColumnFilters ?? {};
+    return Object.values(filtersObj).some((filter) => {
+      const conditions = Array.isArray(filter?.conditions) ? filter.conditions : [];
+      return conditions.some(({ operator, value }) =>
+        ['blank', 'not_blank'].includes(operator) ||
+        (operator === 'between'
+          ? value?.min?.toString().trim() || value?.max?.toString().trim()
+          : value?.toString().trim())
+      );
+    });
+  }, [textColumnFilters]);
+  
+  const [gameSettings, setGameSettings] = useState({ hastimestamps: null, isscored: null });
   useEffect(() => {
     if (typeof hastimestamps === 'boolean' || typeof isscored === 'boolean') {
-      setGameSettings({
-        hastimestamps,
-        isscored
-      });
+      setGameSettings({ hastimestamps, isscored });
     }
   }, [hastimestamps, isscored]);
 
@@ -137,75 +117,181 @@ const DBStats = ({
     await videoPlayerRef.current.playCustomSequences(sequences);
   };
 
-  const renderHeader = () => (
-    <tr>
-      {editMode === 'admin' && <th></th>}
-      {Object.entries(visibleColumns).map(([key, config]) => {
-        if (!config.visible) return null;
+  const headerTableRef = useRef(null);
+  const listOuterRef = useRef(null);
+  const listRef = useRef(null);
+  const DEFAULT_ROW_H = 25;
+  const rowHeightsRef = useRef(new Map()); // index -> px
+  const getItemSize = (index) => rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;   
+  const [columnWidths, setColumnWidths] = useState({});
+  const [listNonce, setListNonce] = useState(0);
+  const [measuredColPx, setMeasuredColPx] = useState({});
+  const orderedKeys = useMemo(() => {
+    const all = Object.keys(visibleColumns).filter(k => visibleColumns[k]?.visible);
+    const withoutNotes = all.filter(k => k !== 'notes');
+    if (visibleColumns.notes?.visible) withoutNotes.push('notes');
+    return withoutNotes;
+  }, [visibleColumns]);
+  const bodyColumns = useMemo(() => {
+    const cols = [];
+    if (editMode === 'admin') cols.push({ key: '__insert__' });
+    if (visibleColumns.timestamp?.visible) cols.push({ key: 'timestamp' });
+    for (const key of orderedKeys) {
+      if (key === 'score' || key === 'timestamp') continue;
+      cols.push({ key });
+    }
+    if (editMode === 'admin') cols.push({ key: '__delete__' });
+    return cols;
+  }, [orderedKeys, visibleColumns, editMode]);
 
-        if (key === 'score') {
-          return (
-            <React.Fragment key="score-columns">
-              <SortableFilterHeader
-                columnKey="our_score"
-                label="Our Score"
-                sortConfig={sortConfig}
-                onSortChange={setSortConfig}
-                columnType={visibleColumns.our_score.type}
-                filterValue={textColumnFilters.our_score}
-                onFilterChange={handleTextColumnFilterChange}
-              />
-              <SortableFilterHeader
-                columnKey="opp_score"
-                label="Opp Score"
-                sortConfig={sortConfig}
-                onSortChange={setSortConfig}
-                columnType={visibleColumns.opp_score.type}
-                filterValue={textColumnFilters.opp_score}
-                onFilterChange={handleTextColumnFilterChange}
-              />
-            </React.Fragment>
-          );
-        }
+  const flexKey = useMemo(() => {
+    const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__');
+    return keys.includes('notes') ? 'notes' : keys[keys.length - 1];
+  }, [bodyColumns]); 
+  useLayoutEffect(() => {
+    if (!headerTableRef.current) return;
+    const ths = headerTableRef.current.querySelectorAll('thead th[data-key]');
+    const next = { ...columnWidths };
+    ths.forEach(th => {
+      const k = th.dataset.key;
+      if (!k) return;
+      const w = Math.floor(th.getBoundingClientRect().width);
+      if (k === flexKey) {
+        delete next[k];
+      } else {
+        next[k] = w;
+      }
+    });
+    setColumnWidths(next);
+  }, [flexKey, orderedKeys]);  
+  useEffect(() => {
+    if (!headerTableRef.current) return;
+    const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__');
+    const already = Object.keys(columnWidths);
+    const needInit = keys.some(k => k !== flexKey && !already.includes(k));
+    if (!needInit) return;
+    const ths = headerTableRef.current.querySelectorAll('thead th[data-key]');
+    const next = { ...columnWidths };
+    ths.forEach(th => {
+      const k = th.dataset.key;
+      if (k && k !== flexKey) next[k] = Math.floor(th.getBoundingClientRect().width);
+    });
+    setColumnWidths(next);
+  }, [bodyColumns, flexKey]);
+  
+  useLayoutEffect(() => {
+    const table = headerTableRef.current;
+    if (!table) return;
+    const ths = Array.from(table.querySelectorAll('thead th[data-key]'));
+    if (!ths.length) {
+      setMeasuredColPx({});
+      return;
+    }
+    const read = () => {
+      const next = {};
+      ths.forEach((th) => {
+        const key = th.dataset.key;
+        if (!key) return;
+        next[key] = th.getBoundingClientRect().width;
+      });
+      setMeasuredColPx(next);
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ths.forEach((th) => ro.observe(th));
+    return () => ro.disconnect();
+  }, [visibleColumns, sortConfig, textColumnFilters, editMode]);
+  
+  const didInitialAutofit = useRef(false);
+  useLayoutEffect(() => {
+    if (didInitialAutofit.current) return;
+    let raf;
+    const tick = () => {
+      if (!headerTableRef.current || !listOuterRef.current) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__' && k !== flexKey);
+      const allReady = keys.every(k => listOuterRef.current.querySelector(`[role="cell"][data-field="${k}"]`));
+      if (!allReady) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      keys.forEach(k => autofitColumn(k));
+      didInitialAutofit.current = true;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [bodyColumns, flexKey]);
 
-        if (['our_score', 'opp_score'].includes(key) && visibleColumns.score?.visible) return null;
+  useEffect(() => {
+    if (!headerTableRef.current || !listOuterRef.current) return;
+    const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__' && k !== flexKey);
+    keys.forEach(k => autofitColumn(k));
+  }, [bodyColumns, flexKey]);
 
-        return (
-          <SortableFilterHeader
-            key={key}
-            columnKey={key}
-            label={key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-            sortConfig={sortConfig}
-            onSortChange={setSortConfig}
-            columnType={config.type}
-            filterValue={textColumnFilters[key]}
-            onFilterChange={handleTextColumnFilterChange}
-            isFilterable={key !== 'timestamp'}
-          />
-        );
-      })}
-    </tr>
-  );
-
+  const gridTemplate = useMemo(() => {
+    const widthFor = (key) => {
+      if (key === '__insert__' || key === '__delete__') return 32;
+      if (key === flexKey) return null;
+      const explicit = columnWidths[key];
+      if (explicit) return Math.max(60, Math.floor(explicit));
+      const measured = measuredColPx[key];
+      if (measured) return Math.max(60, Math.floor(measured));
+      if (key === 'notes') return null;
+      return 120;
+    };
+    return bodyColumns.map(({ key }) => {
+      const w = widthFor(key);
+      return w == null ? 'minmax(160px,1fr)' : `${w}px`;
+    }).join(' ');
+  }, [bodyColumns, columnWidths, measuredColPx, flexKey]);
+  useLayoutEffect(() => {
+    listRef.current?.resetAfterIndex(0, true);
+  }, [gridTemplate, columnWidths]); 
+  
+  const [isResizingCol, setIsResizingCol] = useState(false);
+  
+  useEffect(() => {
+    const onStart = () => setIsResizingCol(true);
+    const onEnd = () => {
+      requestAnimationFrame(() => {
+        rowHeightsRef.current.clear();
+        listRef.current?.resetAfterIndex(0, true);
+        setIsResizingCol(false);
+      });
+    };
+    window.addEventListener('db_col_resize_start', onStart);
+    window.addEventListener('db_col_resize_end', onEnd);
+    return () => {
+      window.removeEventListener('db_col_resize_start', onStart);
+      window.removeEventListener('db_col_resize_end', onEnd);
+    };
+  }, []);
+  
+  useEffect(() => {
+    rowHeightsRef.current.clear();
+    requestAnimationFrame(() => {
+      listRef.current?.resetAfterIndex(0, true);
+      setListNonce(n => n + 1);
+    });
+  }, [editMode]);
+    
+  useEffect(() => {
+    rowHeightsRef.current.clear();
+    requestAnimationFrame(() => {
+      listRef.current?.resetAfterIndex(0, true);
+    });
+  }, [orderedKeys, gridTemplate]);
+  
   const toggleGameField = async (field, value) => {
     if (!gameId) return;
     try {
-      const res = await authorizedFetch(`/api/update-game/${gameId}`, {
-        method: 'PATCH',
-        body: { updates: { [field]: value } }
-      });
+      const res = await authorizedFetch(`/api/update-game/${gameId}`, { method: 'PATCH', body: { updates: { [field]: value } } });
       const result = await res.json();
-      if (result.success) {
-        refreshStats();
-        if (refreshGames) {
-          refreshGames();
-        }
-      } else {
-        setToast(`Failed to update ${field}: ${result.message}`);
-      }
-    } catch (err) {
-      setToast(`Error updating ${field}`);
-    }
+      if (result.success) { refreshStats(); if (refreshGames) refreshGames(); }
+      else { setToast(`Failed to update ${field}: ${result.message}`); }
+    } catch (err) { setToast(`Error updating ${field}`); }
   };
 
   const navigateToEditableCell = ({ idx, field, direction }) => {
@@ -224,285 +310,371 @@ const DBStats = ({
 
     const MAX_ROWS = filteredStats.length;
     const MAX_COLS = keys.length;
+    let guard = 0;
 
-    while (true) {
+    while (guard++ < MAX_ROWS * MAX_COLS) {
       if (direction === 'next') {
         colIndex++;
-        if (colIndex >= MAX_COLS) {
-          colIndex = 0;
-          newIdx++;
-        }
+        if (colIndex >= MAX_COLS) { colIndex = 0; newIdx++; }
       } else if (direction === 'prev') {
         colIndex--;
-        if (colIndex < 0) {
-          colIndex = MAX_COLS - 1;
-          newIdx--;
-        }
-      } else if (direction === 'down') {
-        newIdx++;
-      } else if (direction === 'up') {
-        newIdx--;
-      }
+        if (colIndex < 0) { colIndex = MAX_COLS - 1; newIdx--; }
+      } else if (direction === 'down') { newIdx++; }
+      else if (direction === 'up') { newIdx--; }
 
-      if (newIdx < 0 || newIdx >= MAX_ROWS) {
-        break;
-      }
+      if (newIdx < 0 || newIdx >= MAX_ROWS) break;
 
       const nextField = keys[colIndex];
       if (isEditable(nextField)) {
         requestAnimationFrame(() => {
           const cellRef = cellRefs.current[`${newIdx}-${nextField}`];
-          if (cellRef) {
-            cellRef.clickToEdit?.();
-            requestAnimationFrame(() => cellRef.focusInput?.());
-          } else {
-            setEditingCell({ idx: newIdx, field: nextField });
-          }
+          if (cellRef) { cellRef.clickToEdit?.(); requestAnimationFrame(() => cellRef.focusInput?.()); }
         });
         return;
       }
     }
   };
 
+  const Row = ({ index, style }) => {
+    const rowRef = useRef(null);
+    useLayoutEffect(() => {
+      if (!rowRef.current) return;
+      const el = rowRef.current;
+      let h = DEFAULT_ROW_H;
+      el.querySelectorAll('[role="cell"]').forEach((c) => {
+        const content = c.firstElementChild || c;
+        h = Math.max(h, Math.ceil(content.scrollHeight) + 2);
+      });
+      const prev = rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;
+      if (isResizingCol) {
+        if (h > prev) {
+          rowHeightsRef.current.set(index, h);
+          listRef.current?.resetAfterIndex(index, false);
+        }
+        return;
+      }
+      if (h !== prev) {
+        rowHeightsRef.current.set(index, h);
+        listRef.current?.resetAfterIndex(index, false);
+      }
+    }, [index, filteredStats, gridTemplate, isResizingCol]);
+    
+    const s = filteredStats[index];
+    const prevRow = index > 0 ? filteredStats[index - 1] : null;
+    const idx = index;
+
+    const onRowClick = !canEdit ? () => {
+      const validTimestamps = stats.slice(0, idx).map((r) => r.timestamp).filter((t) => t != null);
+      if (s.timestamp != null) jumpToTime(s.timestamp);
+      else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);
+      if (layoutMode === 'stacked' && !document.pictureInPictureElement && mainContentRef.current && containerRef.current) {
+        const scrollContainer = mainContentRef.current;
+        const videoEl = containerRef.current;
+        const videoBottom = videoEl.offsetTop + videoEl.offsetHeight;
+        const scrollTarget = videoBottom - scrollContainer.clientHeight;
+        scrollContainer.scrollTo({ top: scrollTarget });
+      }
+    } : undefined;
+
+    return (
+      <div
+        ref={rowRef}
+        role="row"
+        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch' }}
+        className={`db-row ${!canEdit ? 'hover:bg-gray-50' : ''}`}
+        onClick={onRowClick}
+      >
+        {editMode === 'admin' && (
+          <div role="cell" className="db-cell" style={{ alignItems: 'flex-end' }}>
+            <button
+              className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
+              onClick={async (e) => {
+                e.stopPropagation();
+                const newRow = {
+                  game_id: s.game_id,
+                  rally_id: s.rally_id,
+                  import_seq: (s.import_seq || 0) + 0.01,
+                  our_score: s.our_score,
+                  opp_score: s.opp_score,
+                  set: s.set,
+                };
+                try {
+                  const res = await authorizedFetch('/api/save-stats', { body: { rows: [newRow] } });
+                  const result = await res.json();
+                  if (result.success && result.insertedRows?.length) {
+                    const inserted = result.insertedRows[0];
+                    const index = stats.findIndex(row => row.id === s.id);
+                    const updated = [...stats];
+                    updated.splice(index + 1, 0, inserted);
+                    setStats(updated);
+                    setToast('Added row.', 'success');                        
+                  } else { setToast('Failed to insert row.'); }
+                } catch (err) { console.error('Insert failed', err); setToast('Insert failed'); }
+              }}
+            >
+              <IconWithTooltip tooltip="Add row below">
+                <svg viewBox="-2 -2 24.00 24.00" xmlns="http://www.w3.org/2000/svg" fill="none" className="w-5 h-5">
+                  <rect x="-2" y="-2" width="24.00" height="24.00" rx="12" fill="#ccdfe5"></rect>
+                  <path stroke="#88d8a0" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.343 4.343l11.314 11.314m0 0h-9.9m9.9 0v-9.9" />
+                </svg>
+              </IconWithTooltip>
+            </button>
+          </div>
+        )}
+
+        {visibleColumns.timestamp?.visible && (
+          <div role="cell" data-field="timestamp" className={`db-cell ${editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
+               onClick={async () => {
+                 if (editMode !== 'admin') return;
+                 const currentTimestamp = videoRef.current?.currentTime ?? 0;
+                 try {
+                   const res = await authorizedFetch('/api/update-stat', { body: { statId: s.id, updates: { timestamp: currentTimestamp } } });
+                   const result = await res.json();
+                   if (result.success) {
+                     const statIndex = stats.findIndex(row => row.id === s.id);
+                     if (statIndex !== -1) { const newStats = [...stats]; newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp }; setStats(newStats); }
+                   } else { console.error('Timestamp update failed:', result.message); setToast('Failed to update timestamp: ' + result.message); }
+                 } catch (err) { console.error('Timestamp update error', err); setToast('Error updating timestamp'); }
+               }}
+          >
+            {s.timestamp != null ? formatTimestamp(s.timestamp) : <span className="text-gray-400 italic">—</span>}
+          </div>
+        )}
+
+        {orderedKeys.map((field) => {
+          if (!visibleColumns[field]?.visible || field === 'score' || field === 'timestamp') return null;
+          const highlightClass =
+            field === 'our_score' && prevRow && s[field] > prevRow[field]
+              ? 'bg-green-100 text-green-800'
+              : field === 'opp_score' && prevRow && s[field] > prevRow[field]
+              ? 'bg-red-100 text-red-800'
+              : '';
+          const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
+          const shouldRenderEditableCell = editMode === 'admin' || (editMode === 'editor' && editableFieldsInEditorMode.includes(field));
+          return (
+            <div key={field} role="cell" data-field={field} className={`db-cell ${highlightClass} ${shouldRenderEditableCell ? '' : 'cursor-default'}`}>
+              {shouldRenderEditableCell ? (
+                <EditableCell
+                  ref={(el) => { cellRefs.current[`${idx}-${field}`] = el; }}
+                  value={s[field]}
+                  type={visibleColumns[field].type}
+                  statId={s.id}
+                  field={field}
+                  idx={idx}
+                  stats={stats}
+                  setStats={setStats}
+                  gamePlayers={gamePlayers}
+                  setEditingCell={navigateToEditableCell}
+                  setToast={setToast}
+                />
+              ) : (
+                s[field] ?? ''
+              )}
+            </div>
+          );
+        })}
+
+        {editMode === 'admin' && (
+          <div role="cell" className="db-cell" style={{ alignItems: 'center' }}>
+            <button
+              className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  const res = await authorizedFetch(`/api/delete-stat/${s.id}`, { method: 'DELETE' });
+                  const result = await res.json();
+                  if (result.success) {
+                    const updated = stats.filter(row => row.id !== s.id);
+                    setStats(updated);
+                    setToast('Deleted row');                  
+                  } else {
+                    console.error('Delete failed:', result.message);
+                    setToast('Delete failed: ' + result.message);
+                  }
+                } catch (err) {
+                  console.error('Delete failed', err);
+                  setToast('Delete failed');
+                }
+              }}
+            >
+              <IconWithTooltip tooltip="Delete row">
+                <svg viewBox="-102.4 -102.4 1228.80 1228.80" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none">
+                  <rect x="-102.4" y="-102.4" width="1228.80" height="1228.80" rx="614.4" fill="#ccdfe5" />
+                  <path d="M667.8 362.1H304V830c0 28.2 23 51 51.3 51h312.4c28.4 0 51.4-22.8 51.4-51V362.2h-51.3z" fill="#d24646"></path>
+                  <path d="M750.3 295.2c0-8.9-7.6-16.1-17-16.1H289.9c-9.4 0-17 7.2-17 16.1v50.9c0 8.9 7.6 16.1 17 16.1h443.4c9.4 0 17-7.2 17-16.1v-50.9z" fill="#d24646"></path>
+                  <path d="M733.3 258.3H626.6V196c0-11.5-9.3-20.8-20.8-20.8H419.1c-11.5 0-20.8 9.3-20.8 20.8v62.3H289.9c-20.8 0-37.7 16.5-37.7 36.8V346c0 18.1 13.5 33.1 31.1 36.2V830c0 39.6 32.3 71.8 72.1 71.8h312.4c39.8 0 72.1-32.2 72.1-71.8V382.2c17.7-3.1 31.1-18.1 31.1-36.2v-50.9c0.1-20.2-16.9-36.8-37.7-36.8z m-293.5-41.5h145.3v41.5H439.8v-41.5z m-146.2 83.1H729.5v41.5H293.6v-41.5z m404.8 530.2c0 16.7-13.7 30.3-30.6 30.3H355.4c-16.9 0-30.6-13.6-30.6-30.3V382.9h373.6v447.2z" fill="#211F1E"></path>
+                  <path d="M511.6 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.4 9.3 20.7 20.8 20.7zM407.8 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0.1 11.4 9.4 20.7 20.8 20.7zM615.4 799.6c11.5 0 20.8-9.3 20.8-20.8V467.4c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.5 9.3 20.8 20.8 20.8z" fill="#211F1E"></path>
+                </svg>
+              </IconWithTooltip>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderHeader = () => (
+    <tr>
+      {editMode === 'admin' && <th data-key="__insert__" style={{ width: 32 }}></th>}
+        {orderedKeys.map((key) => {
+          const config = visibleColumns[key];
+          if (key === 'score') {
+            return (
+              <React.Fragment key="score-columns">
+                <SortableFilterHeader
+                  columnKey="our_score"
+                  label="Our Score"
+                  sortConfig={sortConfig}
+                  onSortChange={setSortConfig}
+                  columnType={visibleColumns.our_score.type}
+                  filterValue={textColumnFilters.our_score}
+                  onFilterChange={handleTextColumnFilterChange}
+                  width={columnWidths['our_score']}
+                  onResize={(w) => {
+                    setColumnWidths((p) => ({ ...p, our_score: w }));
+                  }}
+                  onAutoFit={() => autofitColumn('our_score')}
+                  isLastColumn={'our_score' === flexKey}
+                />
+                <SortableFilterHeader
+                  columnKey="opp_score"
+                  label="Opp Score"
+                  sortConfig={sortConfig}
+                  onSortChange={setSortConfig}
+                  columnType={visibleColumns.opp_score.type}
+                  filterValue={textColumnFilters.opp_score}
+                  onFilterChange={handleTextColumnFilterChange}
+                  width={columnWidths['opp_score']}
+                  onResize={(w) => {
+                    setColumnWidths((p) => ({ ...p, opp_score: w }));
+                  }}
+                  onAutoFit={() => autofitColumn('opp_score')}
+                  isLastColumn={'opp_score' === flexKey}
+                />
+              </React.Fragment>
+            );
+          }
+          if (["our_score", "opp_score"].includes(key) && visibleColumns.score?.visible) return null;
+          return (
+            <SortableFilterHeader
+              key={key}
+              columnKey={key}
+              label={key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+              sortConfig={sortConfig}
+              onSortChange={setSortConfig}
+              columnType={config.type}
+              filterValue={textColumnFilters[key]}
+              onFilterChange={handleTextColumnFilterChange}
+              isFilterable={key !== 'timestamp'}
+              width={columnWidths[key]}
+              onResize={(w) => {
+                setColumnWidths((p) => ({ ...p, [key]: w }));
+              }}
+              onAutoFit={() => autofitColumn(key)}
+              isLastColumn={key === flexKey}
+            />
+          );
+        })}
+      {editMode === 'admin' && <th data-key="__delete__" style={{ width: 32 }}></th>}
+    </tr>
+  );
+
+  const OuterDiv = React.forwardRef(({ style, className, ...rest }, ref) => (
+    <div
+      ref={ref}
+      className={`db-list-outer ${className || ''}`}
+      style={{ ...style, overflowX: 'hidden', scrollbarGutter: 'stable', background: 'transparent' }}
+      {...rest}
+    />
+  ));
+
+  const autofitColumn = (key) => {
+    const th = headerTableRef.current?.querySelector(`thead th[data-key="${key}"]`);
+    const current = th?.getBoundingClientRect().width ?? 0;
+    const getNumber = (v) => (v ? parseFloat(v) || 0 : 0);
+    let headerNeeded = 0;
+    if (th) {
+      const thCS = window.getComputedStyle(th);
+      const thExtra = getNumber(thCS.paddingLeft) + getNumber(thCS.paddingRight) + getNumber(thCS.borderLeftWidth) + getNumber(thCS.borderRightWidth);
+      const btn = th.querySelector('button');
+      if (btn) {
+        const clone = btn.cloneNode(true);
+        clone.style.position = 'absolute';
+        clone.style.visibility = 'hidden';
+        clone.style.whiteSpace = 'nowrap';
+        clone.style.width = 'max-content';
+        clone.style.display = 'inline-block';
+        clone.classList?.remove('truncate');
+        clone.classList?.remove('w-full');
+        th.appendChild(clone);
+        const labelW = Math.ceil(clone.getBoundingClientRect().width);
+        th.removeChild(clone);
+        headerNeeded = labelW + Math.ceil(thExtra);
+      }
+    }
+    let cellsNeeded = 0;
+    const outer = listOuterRef.current;
+    if (outer) {
+      outer.querySelectorAll(`[role="cell"][data-field="${key}"]`).forEach((el) => {
+        const ctrl = el.querySelector('input,textarea,select') || el.firstElementChild || el;
+        const sw = Math.ceil((ctrl?.scrollWidth) || 0);
+        const cw = Math.ceil((ctrl?.clientWidth) || 0);
+        const w = sw > cw ? sw : 0;
+        if (w > cellsNeeded) cellsNeeded = w;
+      });
+    }
+    const MIN = 60;
+    let needed = Math.max(MIN, headerNeeded, cellsNeeded);
+    if (needed > current) needed += 6;
+    setColumnWidths((prev) => ({ ...prev, [key]: needed }));
+    requestAnimationFrame(() => {
+      rowHeightsRef.current.clear();
+      listRef.current?.resetAfterIndex(0, true);
+    });
+  };
+  
   return (
     <>
       {isFiltered && filteredStats.length > 0 && (
-        <div className={`${editMode ? 'bg-yellow-50 transition-colors pb-4 rounded' : ''}`}>
-          <button
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow"
-            onClick={handlePlayFiltered}
-          >
+        <div className={`pb-4 ${editMode ? 'bg-yellow-50 transition-colors  rounded' : ''}`}>
+          <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow" onClick={handlePlayFiltered}>
             ▶️ Play Filtered Touches ({filteredStats.length})
           </button>
         </div>
       )}
 
-      <table className="w-full border text-center">
-        <thead>{renderHeader()}</thead>
-        <tbody>
+      {/* Header table */}
+      <div className="w-full text-center">
+        <table className="w-full text-center" ref={headerTableRef}>
+          <thead>{renderHeader()}</thead>
+        </table>
+
+        {/* Virtualized Grid body */}
+        <div className="relative" style={{ height: '60vh', minHeight: 300 }}>
           {filteredStats.length > 0 ? (
-            filteredStats.map((s, idx) => {
-              const prevRow = idx > 0 ? filteredStats[idx - 1] : null;
-              const hasVisibleContent = Object.entries(visibleColumns).some(
-                ([key, config]) =>
-                  config.visible &&
-                  s[key] != null &&
-                  s[key] !== '' &&
-                  !(typeof s[key] === 'string' && s[key].trim() === '')
-              );
-
-              if (!hasVisibleContent) return null;
-
-              return (
-                <tr
-                  key={idx}
-                  className={`cursor-pointer ${!canEdit ? 'hover:bg-gray-100' : ''}`}
-                  onClick={!canEdit ? () => {
-                    const validTimestamps = stats
-                      .slice(0, idx)
-                      .map((r) => r.timestamp)
-                      .filter((t) => t != null);
-                    if (s.timestamp != null) jumpToTime(s.timestamp);
-                    else if (validTimestamps.length > 0)
-                      jumpToTime(validTimestamps[validTimestamps.length - 1]);
-
-                    if (
-                      layoutMode === 'stacked' &&
-                      !document.pictureInPictureElement &&
-                      mainContentRef.current &&
-                      containerRef.current
-                    ) {
-                      const scrollContainer = mainContentRef.current;
-                      const videoEl = containerRef.current;
-                      const videoBottom = videoEl.offsetTop + videoEl.offsetHeight;
-                      const scrollTarget = videoBottom - scrollContainer.clientHeight;
-
-                      scrollContainer.scrollTo({ top: scrollTarget });
-                    }
-                  } : undefined}
+            <AutoSizer>
+              {({ height, width }) => (
+                <List
+                  key={listNonce}
+                  ref={listRef}
+                  height={height}
+                  width={width}
+                  itemCount={filteredStats.length}
+                  itemSize={getItemSize}
+                  overscanCount={10}
+                  outerElementType={OuterDiv}
+                  outerRef={listOuterRef}
                 >
-                {editMode === 'admin' && (
-                  <td ref={idx === 0 ? insertButtonParentRef : null} className="text-center w-8 px-1">
-                    <button
-                      className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const newRow = {
-                          game_id: s.game_id,
-                          rally_id: s.rally_id,
-                          posession_seq: (s.posession_seq || 0),
-                          import_seq: (s.import_seq || 0) + 0.01,
-                          our_score: s.our_score,
-                          opp_score: s.opp_score,
-                          set: s.set,
-                        };
-                        try {
-                          const res = await authorizedFetch('/api/save-stats', {
-                            body: { rows: [newRow] },
-                          });
-                          const result = await res.json();
-                          if (result.success && result.insertedRows?.length) {
-                            const inserted = result.insertedRows[0];
-                            const index = stats.findIndex(row => row.id === s.id);
-                            const updated = [...stats];
-                            updated.splice(index + 1, 0, inserted);
-                            setStats(updated);
-                            setToast('Added row.', 'success');                        
-                          } else {
-                            setToast('Failed to insert row.');
-                          }
-                        } catch (err) {
-                          console.error('Insert failed', err);
-                          setToast('Insert failed');
-                        }
-                      }}
-                    >
-                      <IconWithTooltip tooltip="Add row below">
-                        <svg
-                          viewBox="-2 -2 24.00 24.00"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          className="w-5 h-5"
-                        >
-                          <rect x="-2" y="-2" width="24.00" height="24.00" rx="12" fill="#ccdfe5"></rect>
-                          <path
-                            stroke="#88d8a0"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M4.343 4.343l11.314 11.314m0 0h-9.9m9.9 0v-9.9"
-                          />
-                        </svg>
-                      </IconWithTooltip>
-                    </button>
-                  </td>
-                )}
-                  {visibleColumns.timestamp?.visible && (
-                    <td
-                      className={`border border-black ${
-                        editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
-                      }`}
-                      onClick={async () => {
-                        if (editMode !== 'admin') return;
-
-                        const currentTimestamp = videoRef.current?.currentTime ?? 0;
-
-                        const res = await authorizedFetch('/api/update-stat', {
-                          body: { statId: s.id, updates: { timestamp: currentTimestamp } },
-                        });
-                        const result = await res.json();
-                        if (result.success) {
-                          const statIndex = stats.findIndex(row => row.id === s.id);
-                          if (statIndex !== -1) {
-                            const newStats = [...stats];
-                            newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp };
-                            setStats(newStats);
-                          }
-                        } else {
-                          console.error('Timestamp update failed:', result.message);
-                          setToast('Failed to update timestamp: ' + result.message);
-                      }}}
-                    >
-                      {s.timestamp != null ? formatTimestamp(s.timestamp) : <span className="text-gray-400 italic">—</span>}
-                    </td>
-                  )}
-
-                  {Object.keys(visibleColumns).map((field) => {
-                    if (!visibleColumns[field]?.visible || field === 'score' || field === 'timestamp') return null;
-
-                    const highlightClass =
-                      field === 'our_score' && prevRow && s[field] > prevRow[field]
-                        ? 'bg-green-100 text-green-800'
-                        : field === 'opp_score' && prevRow && s[field] > prevRow[field]
-                        ? 'bg-red-100 text-red-800'
-                        : '';
-                        
-                    const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
-                    const shouldRenderEditableCell =
-                      editMode === 'admin' ||
-                      (editMode === 'editor' && editableFieldsInEditorMode.includes(field));
-                      
-                    return (
-                      <td
-                        key={field}
-                        className={`border border-black ${highlightClass} whitespace-pre-wrap ${
-                          shouldRenderEditableCell ? '' : 'cursor-default'
-                        }`}
-                      >
-                        {shouldRenderEditableCell ? (
-                          <EditableCell
-                            ref={(el) => { cellRefs.current[`${idx}-${field}`] = el; }}
-                            value={s[field]}
-                            type={visibleColumns[field].type}
-                            statId={s.id}
-                            field={field}
-                            idx={idx}
-                            stats={stats}
-                            setStats={setStats}
-                            gamePlayers={gamePlayers}
-                            setEditingCell={navigateToEditableCell}
-                            setToast={setToast}
-                          />
-                        ) : (
-                          s[field] ?? ''
-                        )}
-                      </td>
-                    );
-                  })}
-                  {editMode === 'admin' && (
-                    <td className="text-center w-8 px-1">
-                      <button
-                        className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            const res = await authorizedFetch(`/api/delete-stat/${s.id}`, {
-                              method: 'DELETE',
-                            });
-                            const result = await res.json();
-                            if (result.success) {
-                              const updated = stats.filter(row => row.id !== s.id);
-                              setStats(updated);
-                              setToast('Deleted row');                  
-                            } else {
-                              console.error('Delete failed:', result.message);
-                              setToast('Delete failed: ' + result.message);
-                            }
-                          } catch (err) {
-                            console.error('Delete failed', err);
-                            setToast('Delete failed');
-                          }
-                        }}
-                      >
-                        <IconWithTooltip tooltip="Delete row">
-                          <svg
-                            viewBox="-102.4 -102.4 1228.80 1228.80"
-                            className="w-6 h-6"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                          >
-                            <rect x="-102.4" y="-102.4" width="1228.80" height="1228.80" rx="614.4" fill="#ccdfe5" />
-                            <path d="M667.8 362.1H304V830c0 28.2 23 51 51.3 51h312.4c28.4 0 51.4-22.8 51.4-51V362.2h-51.3z" fill="#d24646"></path>
-                            <path d="M750.3 295.2c0-8.9-7.6-16.1-17-16.1H289.9c-9.4 0-17 7.2-17 16.1v50.9c0 8.9 7.6 16.1 17 16.1h443.4c9.4 0 17-7.2 17-16.1v-50.9z" fill="#d24646"></path>
-                            <path d="M733.3 258.3H626.6V196c0-11.5-9.3-20.8-20.8-20.8H419.1c-11.5 0-20.8 9.3-20.8 20.8v62.3H289.9c-20.8 0-37.7 16.5-37.7 36.8V346c0 18.1 13.5 33.1 31.1 36.2V830c0 39.6 32.3 71.8 72.1 71.8h312.4c39.8 0 72.1-32.2 72.1-71.8V382.2c17.7-3.1 31.1-18.1 31.1-36.2v-50.9c0.1-20.2-16.9-36.8-37.7-36.8z m-293.5-41.5h145.3v41.5H439.8v-41.5z m-146.2 83.1H729.5v41.5H293.6v-41.5z m404.8 530.2c0 16.7-13.7 30.3-30.6 30.3H355.4c-16.9 0-30.6-13.6-30.6-30.3V382.9h373.6v447.2z" fill="#211F1E"></path>
-                            <path d="M511.6 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.4 9.3 20.7 20.8 20.7zM407.8 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0.1 11.4 9.4 20.7 20.8 20.7zM615.4 799.6c11.5 0 20.8-9.3 20.8-20.8V467.4c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.5 9.3 20.8 20.8 20.8z" fill="#211F1E"></path>
-                          </svg>
-                        </IconWithTooltip>
-                      </button>
-                  </td>
-                  )}
-                </tr>
-              );
-            })
+                  {({ index, style }) => <Row index={index} style={style} />}
+                </List>
+              )}
+            </AutoSizer>
           ) : (
-            <tr>
-              <td colSpan={Object.values(visibleColumns).filter(c => c.visible).length + (canEdit ? 1 : 0)} className="py-20 text-gray-500 italic text-center border-t">
-                No matching data.
-              </td>
-            </tr>
+            <div className="py-20 text-gray-500 italic text-center border-t">No matching data.</div>
           )}
-        </tbody>
-      </table>
+        </div>
+      </div>
+
       {['admin', 'editor'].includes(editMode) && (
         <div className={`flex justify-between items-start pt-4 px-4 gap-6 ${editMode ? 'bg-yellow-50 transition-colors pb-4 rounded' : ''}`}>
           {editMode === 'admin' && (
@@ -513,7 +685,6 @@ const DBStats = ({
                 const newRows = Array.from({ length: 10 }, (_, i) => ({
                   game_id: lastRow?.game_id,
                   rally_id: lastRow?.rally_id,
-                  posession_seq: lastRow?.posession_seq || 0,
                   import_seq: (lastRow?.import_seq || 0) + 0.01 + i * 0.01,
                   our_score: lastRow?.our_score,
                   opp_score: lastRow?.opp_score,
@@ -521,36 +692,26 @@ const DBStats = ({
                 }));
 
                 try {
-                  const res = await authorizedFetch('/api/save-stats', {
-                    body: { rows: newRows },
-                  });
+                  const res = await authorizedFetch('/api/save-stats', { body: { rows: newRows } });
                   const result = await res.json();
                   if (result.success && result.insertedRows?.length) {
                     setStats([...stats, ...result.insertedRows]);
-                  } else {
-                    console.error('Failed to add rows:', result.message);
-                    setToast('Failed to add rows.');
-                  }
-                } catch (err) {
-                  console.error('Add 10 rows failed', err);
-                  setToast('Add 10 rows failed');
-                }
+                    setToast('Added 10 rows to bottom', 'success');
+                  } else { setToast('Failed to add rows'); }
+                } catch (err) { console.error('Add 10 rows failed', err); setToast('Add 10 rows failed'); }
               }}
             >
               ➕ Add 10 Rows to Bottom
             </button>
           )}
           <div className="mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md w-fit">
-            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">
-              🛠 Update Game Settings
-            </h3>
+            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">🛠 Update Game Settings</h3>
             <div className="flex flex-col space-y-3">
               <div className="flex justify-between items-center w-full">
                 <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
                 <select
                   disabled={editMode !== 'admin'}
-                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500
-                    ${editMode !== 'admin' ? 'opacity-50' : ''}`}
+                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${editMode !== 'admin' ? 'opacity-50' : ''}`}
                   value={gameSettings.hastimestamps ?? ''}
                   onChange={(e) => {
                     const value = e.target.value === 'true';
@@ -566,8 +727,7 @@ const DBStats = ({
                 <label className="text-sm font-medium text-gray-700">Is Scored:</label>
                 <select
                   disabled={!(editMode === 'admin' || editMode === 'editor')}
-                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500
-                    ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
+                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
                   value={gameSettings.isscored ?? ''}
                   onChange={(e) => {
                     const value = e.target.value === 'true';
@@ -581,20 +741,42 @@ const DBStats = ({
               </div>
             </div>
           </div>
-          <button
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1"
-            onClick={refreshStats}
-          >
-            🔄 Refresh DB
-          </button>
+          <button className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1" onClick={refreshStats}>🔄 Refresh DB</button>
         </div>     
       )}      
-      <Toast
-        message={toastMessage}
-        show={showToast}
-        onClose={() => setShowToast(false)}
-        type={toastType}
-      />         
+      <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />         
+
+      <style>{`
+        .db-row { border-bottom: 1px solid #e5e7eb; }
+        .db-cell { padding: 2px 4px; display: flex; align-items: flex-start; justify-content: center; }
+        .db-cell input, .db-cell select { height: auto; }
+        .db-cell textarea { height: auto; min-height: 21px; resize: none; }
+        .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
+        table { table-layout: fixed; border-collapse: collapse; width: 100%; }
+        thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 1; }
+        .db-list-outer::-webkit-scrollbar-track { background: transparent; }
+        .db-list-outer::-webkit-scrollbar { background: transparent; }
+        .db-list-outer { background: transparent; scrollbar-color: auto transparent; }
+        .db-list-outer::-webkit-scrollbar-track { background: transparent; }
+        .db-list-outer::-webkit-scrollbar { background: transparent; }
+        .db-list-outer {
+          background: transparent;
+          scrollbar-color: auto transparent;
+        }
+
+        .db-list-outer::-webkit-scrollbar {
+          width: 0px; /* adjust if needed */
+        }
+
+        .db-list-outer::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .db-list-outer::-webkit-scrollbar-thumb {
+          background-color: rgba(0,0,0,0.4);
+          border-radius: 4px;
+        }        
+      `}</style>
     </>
   );
 };
