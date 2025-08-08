@@ -70,6 +70,16 @@ const DBStats = ({
   const setToast = (message, type = 'error') => { setToastMessage(message); setToastType(type); setShowToast(true); };
 
   const cellRefs = useRef({});
+  
+  const handleClearAllFilters = () => {
+    window.dispatchEvent(new Event('closeAllFilters'));
+    const keys = Object.keys(textColumnFilters ?? {});
+    keys.forEach((k) => handleTextColumnFilterChange(k, null));
+    requestAnimationFrame(() => {
+      rowHeightsRef.current.clear?.();
+      listRef.current?.resetAfterIndex?.(0, true);
+    });
+  };
 
   const isFiltered = useMemo(() => {
     const filtersObj = textColumnFilters ?? {};
@@ -121,7 +131,21 @@ const DBStats = ({
   const listOuterRef = useRef(null);
   const listRef = useRef(null);
   const DEFAULT_ROW_H = 25;
-  const rowHeightsRef = useRef(new Map()); // index -> px
+  const getTotalListHeight = () => {
+    let sum = 0;
+    const map = rowHeightsRef.current;
+    map.forEach((v) => (sum += v));
+    const unknownCount = Math.max(0, filteredStats.length - map.size);
+    sum += unknownCount * DEFAULT_ROW_H;
+    return sum;
+  };  
+  const [vh60, setVh60] = useState(() => Math.round(window.innerHeight * 0.60));
+  useEffect(() => {
+    const onResize = () => setVh60(Math.round(window.innerHeight * 0.60));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);  
+  const rowHeightsRef = useRef(new Map());
   const getItemSize = (index) => rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;   
   const [columnWidths, setColumnWidths] = useState({});
   const [listNonce, setListNonce] = useState(0);
@@ -255,11 +279,14 @@ const DBStats = ({
   useEffect(() => {
     const onStart = () => setIsResizingCol(true);
     const onEnd = () => {
-      requestAnimationFrame(() => {
-        rowHeightsRef.current.clear();
-        listRef.current?.resetAfterIndex(0, true);
-        setIsResizingCol(false);
-      });
+     requestAnimationFrame(() => {
+       rowHeightsRef.current.clear();
+       listRef.current?.resetAfterIndex(0, true);
+       requestAnimationFrame(() => {
+         setIsResizingCol(false);
+         listRef.current?.resetAfterIndex(0, true);
+       });
+     });
     };
     window.addEventListener('db_col_resize_start', onStart);
     window.addEventListener('db_col_resize_end', onEnd);
@@ -283,7 +310,40 @@ const DBStats = ({
       listRef.current?.resetAfterIndex(0, true);
     });
   }, [orderedKeys, gridTemplate]);
+
+  const autofitAll = React.useCallback(() => {
+    if (!headerTableRef.current || !listOuterRef.current) return;
+    const keys = bodyColumns
+      .map(c => c.key)
+      .filter(k => k !== '__insert__' && k !== '__delete__' && k !== flexKey);
+    keys.forEach(k => autofitColumn(k));
+  }, [bodyColumns, flexKey]);
   
+  useEffect(() => {
+    let raf = requestAnimationFrame(() => autofitAll());
+    return () => cancelAnimationFrame(raf);
+  }, [textColumnFilters, sortConfig, visibleColumns, autofitAll]);
+
+  useEffect(() => {
+    const schedule = () => requestAnimationFrame(() => autofitAll());
+    window.addEventListener('resize', schedule);
+    window.addEventListener('db_layout_change', schedule);
+    return () => {
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('db_layout_change', schedule);
+    };
+  }, [autofitAll]);
+  
+  const filteredKey = React.useMemo(
+    () => filteredStats.map(r => r.id).join('|'),
+    [filteredStats]
+  );
+  
+  useEffect(() => {
+    rowHeightsRef.current.clear();
+    listRef.current?.resetAfterIndex(0, true);
+  }, [filteredStats, gridTemplate]);  
+
   const toggleGameField = async (field, value) => {
     if (!gameId) return;
     try {
@@ -339,24 +399,32 @@ const DBStats = ({
     const rowRef = useRef(null);
     useLayoutEffect(() => {
       if (!rowRef.current) return;
-      const el = rowRef.current;
-      let h = DEFAULT_ROW_H;
-      el.querySelectorAll('[role="cell"]').forEach((c) => {
-        const content = c.firstElementChild || c;
-        h = Math.max(h, Math.ceil(content.scrollHeight) + 2);
-      });
-      const prev = rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;
-      if (isResizingCol) {
-        if (h > prev) {
+      const measure = () => {
+        const el = rowRef.current;
+        if (!el) return;
+        let measured = DEFAULT_ROW_H;
+        el.querySelectorAll('[role="cell"]').forEach((c) => {
+          const content = c.firstElementChild || c;
+          measured = Math.max(measured, Math.ceil(content.getBoundingClientRect().height));
+        });
+        const h = measured + 1;
+        const prev = rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;
+        if (h !== prev) {
           rowHeightsRef.current.set(index, h);
           listRef.current?.resetAfterIndex(index, false);
         }
-        return;
+      };
+      measure();
+      const ro = new ResizeObserver(measure);
+      ro.observe(rowRef.current);
+      let raf = null;
+      if (!isResizingCol) {
+        raf = requestAnimationFrame(measure);
       }
-      if (h !== prev) {
-        rowHeightsRef.current.set(index, h);
-        listRef.current?.resetAfterIndex(index, false);
-      }
+      return () => {
+        ro.disconnect();
+        if (raf) cancelAnimationFrame(raf);
+      };
     }, [index, filteredStats, gridTemplate, isResizingCol]);
     
     const s = filteredStats[index];
@@ -423,21 +491,41 @@ const DBStats = ({
         )}
 
         {visibleColumns.timestamp?.visible && (
-          <div role="cell" data-field="timestamp" className={`db-cell ${editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
-               onClick={async () => {
-                 if (editMode !== 'admin') return;
-                 const currentTimestamp = videoRef.current?.currentTime ?? 0;
-                 try {
-                   const res = await authorizedFetch('/api/update-stat', { body: { statId: s.id, updates: { timestamp: currentTimestamp } } });
-                   const result = await res.json();
-                   if (result.success) {
-                     const statIndex = stats.findIndex(row => row.id === s.id);
-                     if (statIndex !== -1) { const newStats = [...stats]; newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp }; setStats(newStats); }
-                   } else { console.error('Timestamp update failed:', result.message); setToast('Failed to update timestamp: ' + result.message); }
-                 } catch (err) { console.error('Timestamp update error', err); setToast('Error updating timestamp'); }
-               }}
+          <div
+            role="cell"
+            data-field="timestamp"
+            className={`db-cell ${editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={async () => {
+              if (editMode !== 'admin') return;
+              const currentTimestamp = videoRef.current?.currentTime ?? 0;
+              try {
+                const res = await authorizedFetch('/api/update-stat', {
+                  body: { statId: s.id, updates: { timestamp: currentTimestamp } }
+                });
+                const result = await res.json();
+                if (result.success) {
+                  const statIndex = stats.findIndex(row => row.id === s.id);
+                  if (statIndex !== -1) {
+                    const newStats = [...stats];
+                    newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp };
+                    setStats(newStats);
+                  }
+                } else {
+                  console.error('Timestamp update failed:', result.message);
+                  setToast('Failed to update timestamp: ' + result.message);
+                }
+              } catch (err) {
+                console.error('Timestamp update error', err);
+                setToast('Error updating timestamp');
+              }
+            }}
           >
-            {s.timestamp != null ? formatTimestamp(s.timestamp) : <span className="text-gray-400 italic">—</span>}
+            {s.timestamp != null ? (
+              <span className="leading-normal">{formatTimestamp(s.timestamp)}</span>
+            ) : (
+              <span className="text-gray-400 italic leading-normal">—</span>
+            )}
           </div>
         )}
 
@@ -583,7 +671,15 @@ const DBStats = ({
     <div
       ref={ref}
       className={`db-list-outer ${className || ''}`}
-      style={{ ...style, overflowX: 'hidden', scrollbarGutter: 'stable', background: 'transparent' }}
+      style={{
+        ...style,
+        overflowX: 'hidden',
+        background: 'transparent',
+        scrollbarGutter: 'stable',
+        touchAction: 'pan-y',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+      }}
       {...rest}
     />
   ));
@@ -635,11 +731,32 @@ const DBStats = ({
   
   return (
     <>
+      {/* Toolbar shown when filters are active */}
       {isFiltered && filteredStats.length > 0 && (
-        <div className={`pb-4 ${editMode ? 'bg-yellow-50 transition-colors  rounded' : ''}`}>
-          <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow" onClick={handlePlayFiltered}>
-            ▶️ Play Filtered Touches ({filteredStats.length})
-          </button>
+        <div
+          className={`px-4 py-3 -mx-4 ${
+            editMode ? 'bg-yellow-50' : ''
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handlePlayFiltered}
+              className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+                         bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+              aria-label="Play filtered touches"
+            >
+              Play Filtered Touches ({filteredStats.length})
+            </button>
+
+            <button
+              onClick={handleClearAllFilters}
+              className="ml-auto px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+                         bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800"
+              aria-label="Clear all filters"
+            >
+              Clear All Filters
+            </button>
+          </div>
         </div>
       )}
 
@@ -650,14 +767,18 @@ const DBStats = ({
         </table>
 
         {/* Virtualized Grid body */}
-        <div className="relative" style={{ height: '60vh', minHeight: 300 }}>
+        <div className="relative mb-4" style={{ height: Math.min(vh60, getTotalListHeight()), }} >
           {filteredStats.length > 0 ? (
-            <AutoSizer>
-              {({ height, width }) => (
+          <AutoSizer>
+            {({ height, width }) => {
+              const contentHeight = getTotalListHeight();
+              const listHeight = Math.min(height, contentHeight);
+
+              return (
                 <List
                   key={listNonce}
                   ref={listRef}
-                  height={height}
+                  height={listHeight}
                   width={width}
                   itemCount={filteredStats.length}
                   itemSize={getItemSize}
@@ -667,8 +788,9 @@ const DBStats = ({
                 >
                   {({ index, style }) => <Row index={index} style={style} />}
                 </List>
-              )}
-            </AutoSizer>
+              );
+            }}
+          </AutoSizer>
           ) : (
             <div className="py-20 text-gray-500 italic text-center border-t">No matching data.</div>
           )}
@@ -748,7 +870,7 @@ const DBStats = ({
 
       <style>{`
         .db-row { border-bottom: 1px solid #e5e7eb; }
-        .db-cell { padding: 2px 4px; display: flex; align-items: flex-start; justify-content: center; }
+        .db-cell { padding: 2px 4px; display: flex; align-items: center; justify-content: center; }
         .db-cell input, .db-cell select { height: auto; }
         .db-cell textarea { height: auto; min-height: 21px; resize: none; }
         .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
@@ -759,6 +881,11 @@ const DBStats = ({
         .db-list-outer { background: transparent; scrollbar-color: auto transparent; }
         .db-list-outer::-webkit-scrollbar-track { background: transparent; }
         .db-list-outer::-webkit-scrollbar { background: transparent; }
+        .db-list-outer {
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-y;
+          overscroll-behavior: contain;
+        }
         .db-list-outer {
           background: transparent;
           scrollbar-color: auto transparent;

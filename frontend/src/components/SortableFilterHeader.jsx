@@ -68,14 +68,17 @@ const SortableFilterHeader = ({
   }, [showFilterMenu]);    
   const wrapperRef = useRef(null);
   const defaultOperator = isFilterableType(columnType) && columnType !== 'text' ? 'equals' : 'contains';
-  const effectiveFilter = filterValue || {
-    conditions: [
-      {
-        operator: defaultOperator,
-        value: ''
-      }
-    ]
-  };
+  
+  const effectiveFilter = React.useMemo(() => {
+   const hasActive =
+     filterValue &&
+     Array.isArray(filterValue.conditions) &&
+     filterValue.conditions.length > 0;
+   return hasActive
+     ? filterValue
+     : { conditions: [{ operator: defaultOperator, value: '' }] };
+  }, [filterValue, defaultOperator]);
+
   useLayoutEffect(() => {
     if (showFilterMenu && wrapperRef.current) {
     const raf = requestAnimationFrame(() => {

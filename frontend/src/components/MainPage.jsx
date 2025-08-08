@@ -200,21 +200,25 @@ const MainPage = () => {
   const [textColumnFilters, setTextColumnFilters] = useState({});
   
   const handleTextColumnFilterChange = (column, value) => {
-    const colType = visibleColumns[column]?.type;
-    if (typeof value === 'string') {
-      const operator = ['text'].includes(colType) ? 'contains' : 'equals';
-      setTextColumnFilters((prev) => ({
-        ...prev,
-        [column]: {
-          conditions: [{ operator, value }]
-        }
-      }));
-    } else {
-      setTextColumnFilters((prev) => ({
-        ...prev,
-        [column]: value
-      }));
-    }
+   const colType = visibleColumns[column]?.type;
+   setTextColumnFilters((prev) => {
+     const next = { ...prev };
+     const isEmpty =
+       value == null ||
+       (Array.isArray(value?.conditions) && value.conditions.length === 0);
+     if (typeof value === 'string') {
+       const operator = colType === 'text' ? 'contains' : 'equals';
+       next[column] = { conditions: [{ operator, value }] };
+     } else if (isEmpty) {
+       delete next[column];
+     } else {
+       next[column] = value;
+     }
+     return next;
+   });
+   requestAnimationFrame(() =>
+     window.dispatchEvent(new Event('db_layout_change'))
+   );
   };
   
   const [containerHeight, setContainerHeight] = useState(0); 
@@ -262,8 +266,14 @@ const MainPage = () => {
   const { registerToggle } = useSidebar();  
   
   useEffect(() => {
-    registerToggle(() => setShowSidebar((prev) => !prev));
-  }, [registerToggle]);  
+    registerToggle(() => {
+      setShowSidebar((prev) => {
+        const next = !prev;
+        requestAnimationFrame(() => window.dispatchEvent(new Event('db_layout_change')));
+        return next;
+      });
+    });
+  }, [registerToggle]);
   
   const [layoutMode, setLayoutMode] = useState(() => {
     try {
@@ -324,6 +334,7 @@ const MainPage = () => {
         }
       };
     });
+    requestAnimationFrame(() => window.dispatchEvent(new Event('db_layout_change')));
   };
   const lastScrollY = useRef(0);
   const suppressScrollDetection = useRef(false);
