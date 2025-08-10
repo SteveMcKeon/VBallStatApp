@@ -1019,7 +1019,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           </div>
           {/* Video Time Display */}
           <div className="ml-2 whitespace-nowrap transition-transform duration-200 group-hover:translate-x-28">
-            {formatTime(videoTime.current)} / {formatTime(videoTime.duration)}
+            {formatTime(videoTime.current)} / {formatTime(videoTime.duration)} //TODO
             {currentSet != null && currentRallyNumber != null && (!isMobile || document.fullscreenElement) && (
               <span className="ml-2 text-sm text-gray-300">
                 Set {currentSet}, Rally {currentRallyNumber}

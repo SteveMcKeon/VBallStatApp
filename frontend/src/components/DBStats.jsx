@@ -62,6 +62,7 @@ const DBStats = ({
   gameId,
   refreshGames,
 }) => { 
+  const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
   const [toastMessage, setToastMessage] = useState('');
@@ -128,9 +129,21 @@ const DBStats = ({
   };
 
   const headerTableRef = useRef(null);
-  const listOuterRef = useRef(null);
+  const headerScrollRef = useRef(null);
+  const listOuterRef = useRef(null); 
+ const setHeaderScrollEl = React.useCallback((el) => {
+   headerScrollRef.current = el;
+ }, []);
+
+ const setBodyOuterEl = React.useCallback((el) => {
+   listOuterRef.current = el;
+ }, []);
   const listRef = useRef(null);
+
   const DEFAULT_ROW_H = 25;
+  const rowHeightsRef = useRef(new Map());
+  const getItemSize = (index) => rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;   
+
   const getTotalListHeight = () => {
     let sum = 0;
     const map = rowHeightsRef.current;
@@ -139,23 +152,25 @@ const DBStats = ({
     sum += unknownCount * DEFAULT_ROW_H;
     return sum;
   };  
+
   const [vh60, setVh60] = useState(() => Math.round(window.innerHeight * 0.60));
   useEffect(() => {
     const onResize = () => setVh60(Math.round(window.innerHeight * 0.60));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);  
-  const rowHeightsRef = useRef(new Map());
-  const getItemSize = (index) => rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;   
+
   const [columnWidths, setColumnWidths] = useState({});
   const [listNonce, setListNonce] = useState(0);
   const [measuredColPx, setMeasuredColPx] = useState({});
+
   const orderedKeys = useMemo(() => {
     const all = Object.keys(visibleColumns).filter(k => visibleColumns[k]?.visible);
     const withoutNotes = all.filter(k => k !== 'notes');
     if (visibleColumns.notes?.visible) withoutNotes.push('notes');
     return withoutNotes;
   }, [visibleColumns]);
+
   const bodyColumns = useMemo(() => {
     const cols = [];
     if (editMode === 'admin') cols.push({ key: '__insert__' });
@@ -172,6 +187,8 @@ const DBStats = ({
     const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__');
     return keys.includes('notes') ? 'notes' : keys[keys.length - 1];
   }, [bodyColumns]); 
+
+  // Initial column widths based on header ths
   useLayoutEffect(() => {
     if (!headerTableRef.current) return;
     const ths = headerTableRef.current.querySelectorAll('thead th[data-key]');
@@ -188,6 +205,7 @@ const DBStats = ({
     });
     setColumnWidths(next);
   }, [flexKey, orderedKeys]);  
+
   useEffect(() => {
     if (!headerTableRef.current) return;
     const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__');
@@ -203,6 +221,7 @@ const DBStats = ({
     setColumnWidths(next);
   }, [bodyColumns, flexKey]);
   
+  // Track live measured header cell widths
   useLayoutEffect(() => {
     const table = headerTableRef.current;
     if (!table) return;
@@ -254,22 +273,58 @@ const DBStats = ({
     keys.forEach(k => autofitColumn(k));
   }, [bodyColumns, flexKey]);
 
-  const gridTemplate = useMemo(() => {
+  // Compute total pixel width needed for all columns.
+  const totalColumnsPx = useMemo(() => {
     const widthFor = (key) => {
       if (key === '__insert__' || key === '__delete__') return 32;
-      if (key === flexKey) return null;
+      if (key === flexKey) {
+        return Math.max(
+          60,
+          Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? 160)
+        );
+      }
       const explicit = columnWidths[key];
       if (explicit) return Math.max(60, Math.floor(explicit));
       const measured = measuredColPx[key];
       if (measured) return Math.max(60, Math.floor(measured));
-      if (key === 'notes') return null;
+      if (key === 'notes') return 200;
+      return 120;
+    };
+    return bodyColumns.reduce((sum, { key }) => sum + widthFor(key), 0);
+  }, [bodyColumns, columnWidths, measuredColPx, flexKey]);
+
+  // Build grid template; if content exceeds viewport, fix the flex col width so we can overflow horizontally.
+  const gridTemplate = useMemo(() => {
+    const available =
+      headerScrollRef.current?.clientWidth ??
+      listOuterRef.current?.clientWidth ??
+      0;
+    const needsOverflow = totalColumnsPx > available && available > 0;
+    const widthFor = (key) => {
+      if (key === '__insert__' || key === '__delete__') return 32;
+      if (key === flexKey) {
+        if (needsOverflow) {
+          return Math.max(
+            60,
+            Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? 160)
+          );
+        }
+        return null;
+      }
+      const explicit = columnWidths[key];
+      if (explicit) return Math.max(60, Math.floor(explicit));
+      const measured = measuredColPx[key];
+      if (measured) return Math.max(60, Math.floor(measured));
+      if (key === 'notes' && !needsOverflow) return null;
+      if (key === 'notes') return 200;
       return 120;
     };
     return bodyColumns.map(({ key }) => {
       const w = widthFor(key);
       return w == null ? 'minmax(160px,1fr)' : `${w}px`;
     }).join(' ');
-  }, [bodyColumns, columnWidths, measuredColPx, flexKey]);
+  }, [bodyColumns, columnWidths, measuredColPx, flexKey, totalColumnsPx]);
+
   useLayoutEffect(() => {
     listRef.current?.resetAfterIndex(0, true);
   }, [gridTemplate, columnWidths]); 
@@ -325,7 +380,12 @@ const DBStats = ({
   }, [textColumnFilters, sortConfig, visibleColumns, autofitAll]);
 
   useEffect(() => {
-    const schedule = () => requestAnimationFrame(() => autofitAll());
+    const alignScroll = () => {
+      if (headerScrollRef.current && listOuterRef.current) {
+        headerScrollRef.current.scrollLeft = listOuterRef.current.scrollLeft;
+      }
+    };
+    const schedule = () => requestAnimationFrame(() => { autofitAll(); alignScroll(); });
     window.addEventListener('resize', schedule);
     window.addEventListener('db_layout_change', schedule);
     return () => {
@@ -395,25 +455,101 @@ const DBStats = ({
     }
   };
 
+  // ===== Scroll-aware measuring (skip while touch scrolling) =====
+  const isTouchScrollingRef = useRef(false);
+  const scrollIdleTimerRef = useRef(null);
+
+  const remeasureAllRows = React.useCallback(() => {
+    rowHeightsRef.current.clear();
+    listRef.current?.resetAfterIndex(0, true);
+    requestAnimationFrame(() => {});
+  }, []);
+
+  // Listen for vertical scrolls on the list's outer element (react-window)
+  useEffect(() => {
+    const bodyEl = listOuterRef.current;
+    if (!bodyEl) return;
+
+    const onScroll = () => {
+      isTouchScrollingRef.current = true;
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+      scrollIdleTimerRef.current = setTimeout(() => {
+        isTouchScrollingRef.current = false;
+        remeasureAllRows();
+      }, 160);
+    };
+
+    bodyEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      bodyEl.removeEventListener('scroll', onScroll);
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+    };
+  }, [remeasureAllRows]);
+
+  // Imperative scroll sync: (re)bind when either DOM node changes, no state updates
+  const scrollSyncRef = useRef({ header: null, body: null, onHeader: null, onBody: null });
+  useLayoutEffect(() => {
+    const headerEl = headerScrollRef.current;
+    const bodyEl   = listOuterRef.current;
+
+    const prev = scrollSyncRef.current;
+    const headerChanged = prev.header !== headerEl;
+    const bodyChanged   = prev.body   !== bodyEl;
+    if (!headerChanged && !bodyChanged) return;
+    if (prev.header && prev.onHeader) prev.header.removeEventListener('scroll', prev.onHeader);
+    if (prev.body   && prev.onBody)   prev.body.removeEventListener('scroll',   prev.onBody);
+
+    if (!headerEl || !bodyEl) {
+      scrollSyncRef.current = { header: headerEl, body: bodyEl, onHeader: null, onBody: null };
+      return;
+    }
+    let isSyncing = false;
+    const sync = (src, dst) => {
+      if (isSyncing) return;
+      isSyncing = true;
+      dst.scrollLeft = src.scrollLeft;
+      requestAnimationFrame(() => { isSyncing = false; });
+    };
+    const onHeader = () => sync(headerEl, bodyEl);
+    const onBody   = () => sync(bodyEl, headerEl);
+
+    headerEl.addEventListener('scroll', onHeader, { passive: true });
+    bodyEl.addEventListener('scroll',   onBody,   { passive: true });
+    headerEl.scrollLeft = bodyEl.scrollLeft;
+    scrollSyncRef.current = { header: headerEl, body: bodyEl, onHeader, onBody };
+  });
+
+  useEffect(() => {
+    return () => {
+      const { header, body, onHeader, onBody } = scrollSyncRef.current;
+      if (header && onHeader) header.removeEventListener('scroll', onHeader);
+      if (body   && onBody)   body.removeEventListener('scroll',   onBody);
+    };
+  }, []);
+
   const Row = ({ index, style }) => {
     const rowRef = useRef(null);
     useLayoutEffect(() => {
       if (!rowRef.current) return;
       const measure = () => {
+        if (isTouchScrollingRef.current) return; // skip noisy measurements mid-scroll
         const el = rowRef.current;
         if (!el) return;
+
         let measured = DEFAULT_ROW_H;
         el.querySelectorAll('[role="cell"]').forEach((c) => {
           const content = c.firstElementChild || c;
-          measured = Math.max(measured, Math.ceil(content.getBoundingClientRect().height));
+          measured = Math.max(measured, content?.offsetHeight || DEFAULT_ROW_H);
         });
         const h = measured + 1;
         const prev = rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;
-        if (h !== prev) {
+        const DIFF_THRESHOLD = 2;
+        if (Math.abs(h - prev) > DIFF_THRESHOLD) {
           rowHeightsRef.current.set(index, h);
           listRef.current?.resetAfterIndex(index, false);
         }
       };
+
       measure();
       const ro = new ResizeObserver(measure);
       ro.observe(rowRef.current);
@@ -448,7 +584,7 @@ const DBStats = ({
       <div
         ref={rowRef}
         role="row"
-        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch' }}
+        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch', minWidth: totalColumnsPx }}
         className={`db-row ${!canEdit ? 'hover:bg-gray-50' : ''}`}
         onClick={onRowClick}
       >
@@ -591,7 +727,7 @@ const DBStats = ({
                   <path d="M667.8 362.1H304V830c0 28.2 23 51 51.3 51h312.4c28.4 0 51.4-22.8 51.4-51V362.2h-51.3z" fill="#d24646"></path>
                   <path d="M750.3 295.2c0-8.9-7.6-16.1-17-16.1H289.9c-9.4 0-17 7.2-17 16.1v50.9c0 8.9 7.6 16.1 17 16.1h443.4c9.4 0 17-7.2 17-16.1v-50.9z" fill="#d24646"></path>
                   <path d="M733.3 258.3H626.6V196c0-11.5-9.3-20.8-20.8-20.8H419.1c-11.5 0-20.8 9.3-20.8 20.8v62.3H289.9c-20.8 0-37.7 16.5-37.7 36.8V346c0 18.1 13.5 33.1 31.1 36.2V830c0 39.6 32.3 71.8 72.1 71.8h312.4c39.8 0 72.1-32.2 72.1-71.8V382.2c17.7-3.1 31.1-18.1 31.1-36.2v-50.9c0.1-20.2-16.9-36.8-37.7-36.8z m-293.5-41.5h145.3v41.5H439.8v-41.5z m-146.2 83.1H729.5v41.5H293.6v-41.5z m404.8 530.2c0 16.7-13.7 30.3-30.6 30.3H355.4c-16.9 0-30.6-13.6-30.6-30.3V382.9h373.6v447.2z" fill="#211F1E"></path>
-                  <path d="M511.6 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.4 9.3 20.7 20.8 20.7zM407.8 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0.1 11.4 9.4 20.7 20.8 20.7zM615.4 799.6c11.5 0 20.8-9.3 20.8-20.8V467.4c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.5 9.3 20.8 20.8 20.8z" fill="#211F1E"></path>
+                  <path d="M511.6 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.5 9.3 20.8 20.8 20.8zM407.8 798.9c11.5 0 20.8-9.3 20.8-20.8V466.8c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.4 9.3 20.7 20.8 20.7zM615.4 799.6c11.5 0 20.8-9.3 20.8-20.8V467.4c0-11.5-9.3-20.8-20.8-20.8s-20.8 9.3-20.8 20.8v311.4c0 11.5 9.3 20.8 20.8 20.8z" fill="#211F1E"></path>
                 </svg>
               </IconWithTooltip>
             </button>
@@ -603,67 +739,67 @@ const DBStats = ({
 
   const renderHeader = () => (
     <tr>
-      {editMode === 'admin' && <th data-key="__insert__" style={{ width: 32 }}></th>}
-        {orderedKeys.map((key) => {
-          const config = visibleColumns[key];
-          if (key === 'score') {
-            return (
-              <React.Fragment key="score-columns">
-                <SortableFilterHeader
-                  columnKey="our_score"
-                  label="Our Score"
-                  sortConfig={sortConfig}
-                  onSortChange={setSortConfig}
-                  columnType={visibleColumns.our_score.type}
-                  filterValue={textColumnFilters.our_score}
-                  onFilterChange={handleTextColumnFilterChange}
-                  width={columnWidths['our_score']}
-                  onResize={(w) => {
-                    setColumnWidths((p) => ({ ...p, our_score: w }));
-                  }}
-                  onAutoFit={() => autofitColumn('our_score')}
-                  isLastColumn={'our_score' === flexKey}
-                />
-                <SortableFilterHeader
-                  columnKey="opp_score"
-                  label="Opp Score"
-                  sortConfig={sortConfig}
-                  onSortChange={setSortConfig}
-                  columnType={visibleColumns.opp_score.type}
-                  filterValue={textColumnFilters.opp_score}
-                  onFilterChange={handleTextColumnFilterChange}
-                  width={columnWidths['opp_score']}
-                  onResize={(w) => {
-                    setColumnWidths((p) => ({ ...p, opp_score: w }));
-                  }}
-                  onAutoFit={() => autofitColumn('opp_score')}
-                  isLastColumn={'opp_score' === flexKey}
-                />
-              </React.Fragment>
-            );
-          }
-          if (["our_score", "opp_score"].includes(key) && visibleColumns.score?.visible) return null;
+      {editMode === 'admin' && <th data-key="__insert__" style={{ width: 32 }} />}
+
+      {orderedKeys.map((key) => {
+        const config = visibleColumns[key];
+        if (key === 'score') {
           return (
-            <SortableFilterHeader
-              key={key}
-              columnKey={key}
-              label={key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-              sortConfig={sortConfig}
-              onSortChange={setSortConfig}
-              columnType={config.type}
-              filterValue={textColumnFilters[key]}
-              onFilterChange={handleTextColumnFilterChange}
-              isFilterable={key !== 'timestamp'}
-              width={columnWidths[key]}
-              onResize={(w) => {
-                setColumnWidths((p) => ({ ...p, [key]: w }));
-              }}
-              onAutoFit={() => autofitColumn(key)}
-              isLastColumn={key === flexKey}
-            />
+            <React.Fragment key="score-columns">
+              <SortableFilterHeader
+                columnKey="our_score"
+                label="Our Score"
+                sortConfig={sortConfig}
+                onSortChange={setSortConfig}
+                columnType={visibleColumns.our_score.type}
+                filterValue={textColumnFilters.our_score}
+                onFilterChange={handleTextColumnFilterChange}
+                width={columnWidths.our_score}
+                onResize={(w) => setColumnWidths(p => ({ ...p, our_score: w }))}
+                onAutoFit={() => autofitColumn('our_score')}
+                isLastColumn={'our_score' === flexKey}
+                portalEl={filterPortalEl}
+              />
+              <SortableFilterHeader
+                columnKey="opp_score"
+                label="Opp Score"
+                sortConfig={sortConfig}
+                onSortChange={setSortConfig}
+                columnType={visibleColumns.opp_score.type}
+                filterValue={textColumnFilters.opp_score}
+                onFilterChange={handleTextColumnFilterChange}
+                width={columnWidths.opp_score}
+                onResize={(w) => setColumnWidths(p => ({ ...p, opp_score: w }))}
+                onAutoFit={() => autofitColumn('opp_score')}
+                isLastColumn={'opp_score' === flexKey}
+                portalEl={filterPortalEl}
+              />
+            </React.Fragment>
           );
-        })}
-      {editMode === 'admin' && <th data-key="__delete__" style={{ width: 32 }}></th>}
+        }
+        if (["our_score", "opp_score"].includes(key) && visibleColumns.score?.visible) return null;
+
+        return (
+          <SortableFilterHeader
+            key={key}
+            columnKey={key}
+            label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            sortConfig={sortConfig}
+            onSortChange={setSortConfig}
+            columnType={config.type}
+            filterValue={textColumnFilters[key]}
+            onFilterChange={handleTextColumnFilterChange}
+            isFilterable={key !== 'timestamp'}
+            width={columnWidths[key]}
+            onResize={(w) => setColumnWidths(p => ({ ...p, [key]: w }))}
+            onAutoFit={() => autofitColumn(key)}
+            isLastColumn={key === flexKey}
+            portalEl={filterPortalEl}
+          />
+        );
+      })}
+
+      {editMode === 'admin' && <th data-key="__delete__" style={{ width: 32 }} />}
     </tr>
   );
 
@@ -673,12 +809,12 @@ const DBStats = ({
       className={`db-list-outer ${className || ''}`}
       style={{
         ...style,
-        overflowX: 'hidden',
+        overflowX: 'auto',                // <— allow horizontal scroll on body
         background: 'transparent',
         scrollbarGutter: 'stable',
-        touchAction: 'pan-y',
+        touchAction: 'pan-x pan-y',
         WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'contain',
+        overscrollBehavior: 'auto',
       }}
       {...rest}
     />
@@ -721,24 +857,23 @@ const DBStats = ({
     }
     const MIN = 60;
     let needed = Math.max(MIN, headerNeeded, cellsNeeded);
-    if (needed > current) needed += 6;
-    setColumnWidths((prev) => ({ ...prev, [key]: needed }));
-    requestAnimationFrame(() => {
-      rowHeightsRef.current.clear();
-      listRef.current?.resetAfterIndex(0, true);
-    });
+    const GROW_THRESHOLD = 3;
+    if (needed > current + GROW_THRESHOLD) needed += 6;
+    if (needed > (columnWidths[key] ?? 0)) {
+      setColumnWidths((prev) => ({ ...prev, [key]: needed }));
+      requestAnimationFrame(() => {
+        rowHeightsRef.current.clear();
+        listRef.current?.resetAfterIndex(0, true);
+      });
+    }
   };
-  
+
   return (
     <>
       {/* Toolbar shown when filters are active */}
       {isFiltered && filteredStats.length > 0 && (
-        <div
-          className={`px-4 py-3 -mx-4 ${
-            editMode ? 'bg-yellow-50' : ''
-          }`}
-        >
-          <div className="flex flex-wrap items-center gap-3">
+        <div className={`px-4 py-3 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
+          <div className="db-toolbar flex items-center gap-3 flex-wrap">
             <button
               onClick={handlePlayFiltered}
               className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
@@ -748,9 +883,12 @@ const DBStats = ({
               Play Filtered Touches ({filteredStats.length})
             </button>
 
+            {/* spacer pushes the next button to the right on wide screens */}
+            <div className="db-toolbar-spacer flex-1" />
+
             <button
               onClick={handleClearAllFilters}
-              className="ml-auto px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+              className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
                          bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800"
               aria-label="Clear all filters"
             >
@@ -759,16 +897,26 @@ const DBStats = ({
           </div>
         </div>
       )}
-
-      {/* Header table */}
-      <div className="w-full text-center">
-        <table className="w-full text-center" ref={headerTableRef}>
+      <div
+        ref={setHeaderScrollEl}
+        className="db-x-scroll"
+        style={{
+          overflowX: 'auto',
+          overflowY: 'visible',
+          position: 'relative',
+          zIndex: 100,
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y'
+        }}
+      >
+        <table className="w-full text-center" ref={headerTableRef} style={{ minWidth: totalColumnsPx }}>
           <thead>{renderHeader()}</thead>
         </table>
-
-        {/* Virtualized Grid body */}
-        <div className="relative mb-4" style={{ height: Math.min(vh60, getTotalListHeight()), }} >
-          {filteredStats.length > 0 ? (
+      </div>
+      <div ref={setFilterPortalEl} id="db-filter-portal" />
+      {/* Body (react-window outer will scroll horizontally) */}
+      <div className="relative mb-4" style={{ height: Math.min(vh60, getTotalListHeight()), zIndex: 0 }}>
+        {filteredStats.length > 0 ? (
           <AutoSizer>
             {({ height, width }) => {
               const contentHeight = getTotalListHeight();
@@ -784,17 +932,18 @@ const DBStats = ({
                   itemSize={getItemSize}
                   overscanCount={10}
                   outerElementType={OuterDiv}
-                  outerRef={listOuterRef}
+                  outerRef={setBodyOuterEl}
                 >
-                  {({ index, style }) => <Row index={index} style={style} />}
+                  {({ index, style }) => (
+                    <Row index={index} style={{ ...style, minWidth: totalColumnsPx }} />
+                  )}
                 </List>
               );
             }}
           </AutoSizer>
-          ) : (
-            <div className="py-20 text-gray-500 italic text-center border-t">No matching data.</div>
-          )}
-        </div>
+        ) : (
+          <div className="py-20 text-gray-500 italic text-center border-t">No matching data.</div>
+        )}
       </div>
 
       {['admin', 'editor'].includes(editMode) && (
@@ -875,33 +1024,35 @@ const DBStats = ({
         .db-cell textarea { height: auto; min-height: 21px; resize: none; }
         .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
         table { table-layout: fixed; border-collapse: collapse; width: 100%; }
-        thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 1; }
-        .db-list-outer::-webkit-scrollbar-track { background: transparent; }
-        .db-list-outer::-webkit-scrollbar { background: transparent; }
-        .db-list-outer { background: transparent; scrollbar-color: auto transparent; }
-        .db-list-outer::-webkit-scrollbar-track { background: transparent; }
-        .db-list-outer::-webkit-scrollbar { background: transparent; }
+        thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 200; }
+
+        /* Shared scroller cosmetics */
+        .db-x-scroll::-webkit-scrollbar { height: 0px; }
+        .db-x-scroll { scrollbar-width: none; overflow-y: visible; position: relative; }
         .db-list-outer {
           -webkit-overflow-scrolling: touch;
-          touch-action: pan-y;
-          overscroll-behavior: contain;
-        }
-        .db-list-outer {
+          touch-action: pan-x pan-y;
+          overscroll-behavior: auto;
           background: transparent;
           scrollbar-color: auto transparent;
         }
-
-        .db-list-outer::-webkit-scrollbar {
-          width: 0px; /* adjust if needed */
-        }
-
-        .db-list-outer::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
+        .db-list-outer::-webkit-scrollbar { width: 0px; height: 0px; }
+        .db-list-outer::-webkit-scrollbar-track { background: transparent; }
         .db-list-outer::-webkit-scrollbar-thumb {
           background-color: rgba(0,0,0,0.4);
           border-radius: 4px;
+        }
+        .db-toolbar { /* already flex from JSX */ }
+        .db-toolbar-spacer { flex: 1 1 auto; }
+        @media (max-width: 360px) {
+          .db-toolbar {
+            flex-direction: column;
+            align-items: flex-start;  /* left align when stacked */
+            gap: 8px;
+          }
+          .db-toolbar-spacer {
+            display: none;            /* no push-right on the stacked layout */
+          }
         }        
       `}</style>
     </>

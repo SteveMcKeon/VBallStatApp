@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect  } from 'react';
+import { createPortal } from 'react-dom';
 
 const TEXT_OPERATORS = [
   { label: "Contains", value: "contains" },
@@ -36,6 +37,7 @@ const SortableFilterHeader = ({
   onAutoFit,
   isLastColumn,
   minFlexWidth = 160,
+  portalEl
 }) => {
   const px = (v) => (v ? parseFloat(v) || 0 : 0);
   const headerIntrinsicMin = (th) => {
@@ -224,8 +226,37 @@ const SortableFilterHeader = ({
     window.addEventListener('mouseup', onUp);
   };
 
+  const thRef = useRef(null);
+  const [menuFixedStyle, setMenuFixedStyle] = useState({});
+  const computeFixedPos = () => {
+    if (!thRef.current) return {};
+    const rect = thRef.current.getBoundingClientRect();
+    const menuWidth =
+      (wrapperRef.current && wrapperRef.current.offsetWidth) || 224;
+    const gutter = 8;
+    let left = rect.left;
+    const maxLeft = window.innerWidth - menuWidth - gutter;
+    if (left > maxLeft) left = maxLeft;
+    if (left < gutter) left = gutter;
+    const top = rect.bottom + 4;
+    return { position: 'fixed', top, left, right: 'auto', bottom: 'auto' };
+  };
+
+  useLayoutEffect(() => {
+    if (!showFilterMenu) return;
+    const update = () => setMenuFixedStyle(computeFixedPos());
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [showFilterMenu]);
+
 return (
   <th
+    ref={thRef}
     data-key={columnKey}
     data-flex={isLastColumn ? 'true' : 'false'}
     className="group relative px-2 py-1 text-sm font-medium text-gray-800 bg-gray-100 border-b border-gray-300"
@@ -278,10 +309,11 @@ return (
     />
   )}
   {showFilterMenu && isFilterableType(columnType) && (
+  (portalEl ? createPortal(
     <div
       ref={wrapperRef}
-      className="absolute z-10 mt-2 bg-white border border-gray-300 shadow-md p-2 rounded w-56 right-0 space-y-2 max-h-96 overflow-y-auto"
-      style={menuStyles}
+      className="z-[9999] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
+      style={menuFixedStyle}
     >
           {effectiveFilter.conditions.map((condition, idx) => {
             const OPERATORS = columnType === 'text' ? TEXT_OPERATORS : NUMERIC_OPERATORS;
@@ -389,7 +421,9 @@ return (
           >
             Clear Filter
           </button>
-        </div>
+        </div>,
+        portalEl || document.body
+      ) : null)
       )}
     </th>
   );
