@@ -124,7 +124,18 @@ const DBStats = ({
       sequences.push([start, end]);
       lastEnd = end;
     }
-
+    if (
+      layoutMode === 'stacked' &&
+      !document.pictureInPictureElement &&
+      mainContentRef.current &&
+      containerRef.current
+    ) {
+      const scrollContainer = mainContentRef.current;
+      const videoEl = containerRef.current;
+      const videoBottom = videoEl.offsetTop + videoEl.offsetHeight;
+      const scrollTarget = videoBottom - scrollContainer.clientHeight;
+      scrollContainer.scrollTo({ top: scrollTarget });
+    }
     await videoPlayerRef.current.playCustomSequences(sequences);
   };
 
@@ -872,7 +883,7 @@ const DBStats = ({
     <>
       {/* Toolbar shown when filters are active */}
       {isFiltered && filteredStats.length > 0 && (
-        <div className={`px-4 py-3 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
+        <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
           <div className="db-toolbar flex items-center gap-3 flex-wrap">
             <button
               onClick={handlePlayFiltered}
