@@ -74,6 +74,17 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     const narrow = window.innerWidth < 768;
     return coarse && narrow;
   }, []);
+  const [isLandscape, setIsLandscape] = useState(
+    window.matchMedia("(orientation: landscape)").matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: landscape)");
+    const handleChange = (e) => setIsLandscape(e.matches);
+
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);  
   const [isAutoplayOn, setIsAutoplayOn] = useState(() => {
     const stored = getLocal("autoplay");
     if (stored === null) return true; // default ON if not set
@@ -798,7 +809,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     <text x="20" y="44" text-anchor="end" font-size="16" fill="white" font-weight="bold">${amount}</text>
   </svg>`;
   const RewindButton = ({ amount, onClick }) => {
-    if (!document.fullscreenElement && isMobile) return null;
+    if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
       <button className="w-6 h-6 cursor-pointer focus:outline-none" aria-label="Rewind" onMouseDown={onClick}>
         <div dangerouslySetInnerHTML={{ __html: rewindSVG(amount) }} />
@@ -811,7 +822,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     <text x="22" y="44" text-anchor="start" font-size="16" fill="white" font-weight="bold">${amount}</text>
   </svg>`;
   const ForwardButton = ({ amount, onClick }) => {
-    if (!document.fullscreenElement && isMobile) return null;
+    if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
       <button className="w-6 h-6 cursor-pointer focus:outline-none" aria-label="Forward" onMouseDown={onClick}>
         <div dangerouslySetInnerHTML={{ __html: forwardSVG(amount) }} />
@@ -820,7 +831,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   };
 
   const PreviousRallyButton = ({ onClick, disabled  }) => {
-    if (!document.fullscreenElement && isMobile) return null;
+    if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
       <button onMouseDown={onClick} disabled={disabled} aria-label="Previous Rally" className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}>
         <svg viewBox="0 0 48 48" fill="white" xmlns="http://www.w3.org/2000/svg">
@@ -832,7 +843,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   };
   
   const NextRallyButton = ({ onClick, disabled }) => {
-    if (!document.fullscreenElement && isMobile) return null;
+    if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
       <button onMouseDown={onClick} disabled={disabled} aria-label="Next Rally" className={`w-4 h-4 cursor-pointer focus:outline-none ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}>
         <svg viewBox="0 0 48 48" fill="white" xmlns="http://www.w3.org/2000/svg">
@@ -851,7 +862,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   );
 
   const PreviousSetButton = ({ onClick, disabled }) => {
-    if (!document.fullscreenElement && isMobile) return null;
+    if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
       <button
         onMouseDown={onClick}
@@ -869,7 +880,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   };
 
   const NextSetButton = ({ onClick, disabled }) => {
-    if (!document.fullscreenElement && isMobile) return null;
+    if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
       <button
         onMouseDown={onClick}
@@ -1019,8 +1030,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           </div>
           {/* Video Time Display */}
           <div className="ml-2 whitespace-nowrap transition-transform duration-200 group-hover:translate-x-28">
-            {formatTime(videoTime.current)} / {formatTime(videoTime.duration)} //TODO
-            {currentSet != null && currentRallyNumber != null && (!isMobile || document.fullscreenElement) && (
+            {formatTime(videoTime.current)}
+            {(!isMobile || document.fullscreenElement || isLandscape) && (
+              <> / {formatTime(videoTime.duration)}</>
+            )}
+            {currentSet != null && currentRallyNumber != null && (!isMobile || document.fullscreenElement || isLandscape) && (
               <span className="ml-2 text-sm text-gray-300">
                 Set {currentSet}, Rally {currentRallyNumber}
               </span>
@@ -1194,28 +1208,30 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
             </div>
           </div>
           {/* PiP */}
-          <div className="relative group inline-flex items-center justify-center">
-            <button onMouseDown={async () => { 
-                try {
-                  if (document.pictureInPictureElement) {
-                    await document.exitPictureInPicture();
-                  } else if (videoRef.current) {
-                    await videoRef.current.requestPictureInPicture();
-                    setShowOverlay(false);
+          {!( !document.fullscreenElement && isMobile && !isLandscape) && (          
+            <div className="relative group inline-flex items-center justify-center">
+              <button onMouseDown={async () => { 
+                  try {
+                    if (document.pictureInPictureElement) {
+                      await document.exitPictureInPicture();
+                    } else if (videoRef.current) {
+                      await videoRef.current.requestPictureInPicture();
+                      setShowOverlay(false);
+                    }
+                  } catch (err) {
+                    console.error("PiP failed:", err);
                   }
-                } catch (err) {
-                  console.error("PiP failed:", err);
-                }
-              }}
-              className="w-8 h-8 cursor-pointer focus:outline-none" aria-label="Picture-in-Picture" >
-              <svg viewBox="0 0 36 36" width="100%" height="100%" fill="white" >
-                <path d="M25,17 L17,17 L17,23 L25,23 L25,17 Z M29,25 L29,10.98 C29,9.88 28.1,9 27,9 L9,9 C7.9,9 7,9.88 7,10.98 L7,25 C7,26.1 7.9,27 9,27 L27,27 C28.1,27 29,26.1 29,25 Z M27,25.02 L9,25.02 L9,10.97 L27,10.97 L27,25.02 Z" />
-              </svg>
-            </button>
-            <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-              Pop out (p)
+                }}
+                className="w-8 h-8 cursor-pointer focus:outline-none" aria-label="Picture-in-Picture" >
+                <svg viewBox="0 0 36 36" width="100%" height="100%" fill="white" >
+                  <path d="M25,17 L17,17 L17,23 L25,23 L25,17 Z M29,25 L29,10.98 C29,9.88 28.1,9 27,9 L9,9 C7.9,9 7,9.88 7,10.98 L7,25 C7,26.1 7.9,27 9,27 L27,27 C28.1,27 29,26.1 29,25 Z M27,25.02 L9,25.02 L9,10.97 L27,10.97 L27,25.02 Z" />
+                </svg>
+              </button>
+              <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
+                Pop out (p)
+              </div>
             </div>
-          </div>
+          )}
           {/* Fullscreen */}
           <div className="relative group inline-flex items-center justify-center">
             <button onMouseDown={() => { 
@@ -1246,7 +1262,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
             </div>
           </div>
           {/* Settings Button */}
-          {!( !document.fullscreenElement && isMobile) && (
+          {!( !document.fullscreenElement && isMobile && !isLandscape) && (
             <div className="relative inline-flex items-center justify-center" ref={settingsRef}>
               <button type="button" tabIndex="0"
                 onMouseDown={() => {
