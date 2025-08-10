@@ -878,22 +878,23 @@ const DBStats = ({
       });
     }
   };
-
+  const EMPTY_MIN = 160;
   return (
     <>
       {/* Toolbar shown when filters are active */}
-      {isFiltered && filteredStats.length > 0 && (
+      {isFiltered && (
         <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
           <div className="db-toolbar flex items-center gap-3 flex-wrap">
-            <button
-              onClick={handlePlayFiltered}
-              className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
-                         bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-              aria-label="Play filtered touches"
-            >
-              Play Filtered Touches ({filteredStats.length})
-            </button>
-
+            {filteredStats.length > 0 && (
+              <button
+                onClick={handlePlayFiltered}
+                className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+                           bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+                aria-label="Play filtered touches"
+              >
+                Play Filtered Touches ({filteredStats.length})
+              </button>
+            )}
             {/* spacer pushes the next button to the right on wide screens */}
             <div className="db-toolbar-spacer flex-1" />
 
@@ -926,7 +927,17 @@ const DBStats = ({
       </div>
       <div ref={setFilterPortalEl} id="db-filter-portal" />
       {/* Body (react-window outer will scroll horizontally) */}
-      <div className="relative mb-4" style={{ height: Math.min(vh60, getTotalListHeight()), zIndex: 0 }}>
+      <div
+        className="relative mb-4"
+        style={{
+          height:
+            filteredStats.length === 0
+              ? Math.min(vh60, EMPTY_MIN)
+              : Math.max(EMPTY_MIN, getTotalListHeight()),
+          minHeight: filteredStats.length === 0 ? EMPTY_MIN : undefined,
+          zIndex: 0,
+        }}
+      >
         {filteredStats.length > 0 ? (
           <AutoSizer>
             {({ height, width }) => {

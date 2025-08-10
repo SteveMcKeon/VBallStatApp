@@ -89,7 +89,7 @@ const SortableFilterHeader = ({
     return () => cancelAnimationFrame(raf);
     }
   }, [showFilterMenu]);
-  
+  const filterBtnRef = useRef(null);
   const isFilterActive = () =>
     effectiveFilter.conditions.some(({ operator, value }) => {
       if (['blank', 'not_blank'].includes(operator)) return true;
@@ -98,19 +98,21 @@ const SortableFilterHeader = ({
       }
       return value?.toString().trim() !== '';
     }); 
+
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        wrapperRef.current && !wrapperRef.current.contains(event.target) && !event.target.closest('button')
-      ) {
+    const handlePointerDown = (event) => {
+      const onMenu = wrapperRef.current?.contains(event.target);
+      const onThisFilterBtn = filterBtnRef.current?.contains(event.target);
+      if (!onMenu && !onThisFilterBtn) {
         setShowFilterMenu(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('pointerdown', handlePointerDown, true);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
     };
   }, []);
+
   useEffect(() => {
     const handleCloseAll = () => setShowFilterMenu(false);
     window.addEventListener('closeAllFilters', handleCloseAll);
@@ -230,15 +232,16 @@ const SortableFilterHeader = ({
   const [menuFixedStyle, setMenuFixedStyle] = useState({});
   const computeFixedPos = () => {
     if (!thRef.current) return {};
-    const rect = thRef.current.getBoundingClientRect();
-    const menuWidth =
-      (wrapperRef.current && wrapperRef.current.offsetWidth) || 224;
+    const thRect = thRef.current.getBoundingClientRect();
+    const tableEl = thRef.current.closest('table');
+    const tableRect = tableEl ? tableEl.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+    const menuWidth = (wrapperRef.current && wrapperRef.current.offsetWidth) || 224;
     const gutter = 8;
-    let left = rect.left;
-    const maxLeft = window.innerWidth - menuWidth - gutter;
-    if (left > maxLeft) left = maxLeft;
-    if (left < gutter) left = gutter;
-    const top = rect.bottom + 4;
+    const wouldOverflowRight = thRect.right > menuWidth;
+    let left = wouldOverflowRight
+      ? Math.min(thRect.right - menuWidth, tableRect.right - menuWidth - gutter)
+      : Math.max(thRect.left, tableRect.left + gutter);
+    const top = thRect.bottom + 4;
     return { position: 'fixed', top, left, right: 'auto', bottom: 'auto' };
   };
 
@@ -276,6 +279,7 @@ return (
 
     {isFilterable && isFilterableType(columnType) && (
       <button
+        ref={filterBtnRef}
         onClick={() => {
           const shouldOpen = !showFilterMenu;
           window.dispatchEvent(new Event('closeAllFilters'));
