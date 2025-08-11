@@ -761,8 +761,7 @@ const MainPage = () => {
             transform-gpu will-change-transform transition-transform duration-300 ease-out
             ${showSidebar ? 'translate-x-0' : '-translate-x-[16.25rem] opacity-0 pointer-events-none'}
           `}
-          style={{ contain: 'layout paint size' }} // helps isolate paints in modern browsers
-          aria-hidden={!showSidebar}
+          style={{ contain: 'layout paint size' }} 
         >
           <div className="h-full flex flex-col">
             <div className="w-full">
