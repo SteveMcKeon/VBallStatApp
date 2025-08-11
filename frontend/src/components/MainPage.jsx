@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import supabase from '../supabaseClient';
 import '../App.css';
 import VideoPlayer from './VideoPlayer';
@@ -15,32 +15,30 @@ import SidebarFooter from './SidebarFooter';
 import StatsSummary from './StatsSummary';
 import UploadGameModal from './UploadGameModal';
 
-
 const HEADER_HOVER_ZONE_PX = 50;
 
 const MiniSidebar = ({ onExpand }) => {
   const handlePanelClick = () => onExpand();
   const stopPropagation = (e) => e.stopPropagation();
-  
+
   return (
     <div
       onClick={handlePanelClick}
-      className="h-full w-full cursor-e-resize flex flex-col items-center justify-between py-4 hover:bg-gray-100 transition"
+      className="h-full w-12 flex-shrink-0 cursor-e-resize flex flex-col items-center justify-between py-4 hover:bg-gray-100 transition-colors"
     >
-      {/* Top section: Expand button */}
+      {/* Top: Expand */}
       <div onClick={stopPropagation}>
         <button
           onClick={onExpand}
           className="p-1 hover:bg-gray-200 rounded cursor-pointer"
           aria-label="Expand sidebar"
         >
-          {/* Your SVG icon */}
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" data-rtl-flip=""><path d="M6.83496 3.99992C6.38353 4.00411 6.01421 4.0122 5.69824 4.03801C5.31232 4.06954 5.03904 4.12266 4.82227 4.20012L4.62207 4.28606C4.18264 4.50996 3.81498 4.85035 3.55859 5.26848L3.45605 5.45207C3.33013 5.69922 3.25006 6.01354 3.20801 6.52824C3.16533 7.05065 3.16504 7.71885 3.16504 8.66301V11.3271C3.16504 12.2712 3.16533 12.9394 3.20801 13.4618C3.25006 13.9766 3.33013 14.2909 3.45605 14.538L3.55859 14.7216C3.81498 15.1397 4.18266 15.4801 4.62207 15.704L4.82227 15.79C5.03904 15.8674 5.31234 15.9205 5.69824 15.9521C6.01398 15.9779 6.383 15.986 6.83398 15.9902L6.83496 3.99992ZM18.165 11.3271C18.165 12.2493 18.1653 12.9811 18.1172 13.5702C18.0745 14.0924 17.9916 14.5472 17.8125 14.9648L17.7295 15.1415C17.394 15.8 16.8834 16.3511 16.2568 16.7353L15.9814 16.8896C15.5157 17.1268 15.0069 17.2285 14.4102 17.2773C13.821 17.3254 13.0893 17.3251 12.167 17.3251H7.83301C6.91071 17.3251 6.17898 17.3254 5.58984 17.2773C5.06757 17.2346 4.61294 17.1508 4.19531 16.9716L4.01855 16.8896C3.36014 16.5541 2.80898 16.0434 2.4248 15.4169L2.27051 15.1415C2.03328 14.6758 1.93158 14.167 1.88281 13.5702C1.83468 12.9811 1.83496 12.2493 1.83496 11.3271V8.66301C1.83496 7.74072 1.83468 7.00898 1.88281 6.41985C1.93157 5.82309 2.03329 5.31432 2.27051 4.84856L2.4248 4.57317C2.80898 3.94666 3.36012 3.436 4.01855 3.10051L4.19531 3.0175C4.61285 2.83843 5.06771 2.75548 5.58984 2.71281C6.17898 2.66468 6.91071 2.66496 7.83301 2.66496H12.167C13.0893 2.66496 13.821 2.66468 14.4102 2.71281C15.0069 2.76157 15.5157 2.86329 15.9814 3.10051L16.2568 3.25481C16.8833 3.63898 17.394 4.19012 17.7295 4.84856L17.8125 5.02531C17.9916 5.44285 18.0745 5.89771 18.1172 6.41985C18.1653 7.00898 18.165 7.74072 18.165 8.66301V11.3271ZM8.16406 15.995H12.167C13.1112 15.995 13.7794 15.9947 14.3018 15.9521C14.8164 15.91 15.1308 15.8299 15.3779 15.704L15.5615 15.6015C15.9797 15.3451 16.32 14.9774 16.5439 14.538L16.6299 14.3378C16.7074 14.121 16.7605 13.8478 16.792 13.4618C16.8347 12.9394 16.835 12.2712 16.835 11.3271V8.66301C16.835 7.71885 16.8347 7.05065 16.792 6.52824C16.7605 6.14232 16.7073 5.86904 16.6299 5.65227L16.5439 5.45207C16.32 5.01264 15.9796 4.64498 15.5615 4.3886L15.3779 4.28606C15.1308 4.16013 14.8165 4.08006 14.3018 4.03801C13.7794 3.99533 13.1112 3.99504 12.167 3.99504H8.16406C8.16407 3.99667 8.16504 3.99829 8.16504 3.99992L8.16406 15.995Z"></path></svg>
         </button>
         <div className="h-px bg-gray-300 w-6 mx-auto" />
       </div>
-      
-      {/* Bottom: User icon with footer functionality */}
+
+      {/* Bottom: user icon/footer */}
       <div onClick={stopPropagation}>
         <SidebarFooter mini />
       </div>
@@ -50,6 +48,8 @@ const MiniSidebar = ({ onExpand }) => {
 
 const MainPage = () => {
   const navigate = useNavigate();
+  const sidebarRef = useRef(null);
+
   const uploadModalRef = useRef();
   const [sidebarContent, setSidebarContent] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -63,12 +63,13 @@ const MainPage = () => {
   const handleCloseUploadModal = () => {
     videoPlayerRef.current?.allowControls();
     setIsUploadModalOpen(false);
-  };  
+  };
   useEffect(() => {
     if (resumeSilently && isUploadModalOpen && uploadModalRef.current) {
       uploadModalRef.current.triggerResumeAllUploads();
     }
   }, [resumeSilently, isUploadModalOpen]);
+
   const [currentUserId, setCurrentUserId] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [showResumeBanner, setShowResumeBanner] = useState(false);
@@ -84,8 +85,8 @@ const MainPage = () => {
       setCurrentUserId(userId);
     };
     fetchSession();
-  }, [teamName]);  
-  
+  }, [teamName]);
+
   useEffect(() => {
     if (!currentUserId) return;
     const scanIncompleteUploads = () => {
@@ -109,7 +110,6 @@ const MainPage = () => {
         )[0];
         return latestUpload.metadata;
       }
-
       return null;
     };
     const checkForIncompleteUpload = async () => {
@@ -119,8 +119,8 @@ const MainPage = () => {
       }
     };
     checkForIncompleteUpload();
-  }, [currentUserId]);  
-  
+  }, [currentUserId]);
+
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
   const [gamePlayers, setGamePlayers] = useState([]);
@@ -138,7 +138,8 @@ const MainPage = () => {
       setUserRole(user?.user_metadata?.role);
     };
     fetchUserRole();
-  }, []);  
+  }, []);
+
   const handleTeamChange = async (e) => {
     const selected = e.target.value;
     setTeamName(selected);
@@ -155,7 +156,7 @@ const MainPage = () => {
     } else {
       setTeamGames(data);
     }
-  };    
+  };
   const refreshGames = async () => {
     if (!teamName) return;
     const { data, error } = await supabase
@@ -169,6 +170,7 @@ const MainPage = () => {
       setTeamGames(data);
     }
   };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -176,12 +178,12 @@ const MainPage = () => {
       }
     });
   }, [navigate]);
-  
+
   useEffect(() => {
     const savedTeam = getLocal('teamName');
     const fetchTeams = async () => {
-    const unique = await fetchTeamNames();
-    setAvailableTeams(unique);
+      const unique = await fetchTeamNames();
+      setAvailableTeams(unique);
       if (savedTeam && unique.includes(savedTeam)) {
         setLocal('teamName', savedTeam);
         (async () => {
@@ -191,39 +193,39 @@ const MainPage = () => {
         setTeamName('');
         setLocal('teamName', '');
       }
-      };
+    };
     fetchTeams();
   }, []);
-  
+
   const [teamGames, setTeamGames] = useState([]);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [textColumnFilters, setTextColumnFilters] = useState({});
-  
+
   const handleTextColumnFilterChange = (column, value) => {
-   const colType = visibleColumns[column]?.type;
-   setTextColumnFilters((prev) => {
-     const next = { ...prev };
-     const isEmpty =
-       value == null ||
-       (Array.isArray(value?.conditions) && value.conditions.length === 0);
-     if (typeof value === 'string') {
-       const operator = colType === 'text' ? 'contains' : 'equals';
-       next[column] = { conditions: [{ operator, value }] };
-     } else if (isEmpty) {
-       delete next[column];
-     } else {
-       next[column] = value;
-     }
-     return next;
-   });
-   requestAnimationFrame(() =>
-     window.dispatchEvent(new Event('db_layout_change'))
-   );
+    const colType = visibleColumns[column]?.type;
+    setTextColumnFilters((prev) => {
+      const next = { ...prev };
+      const isEmpty =
+        value == null ||
+        (Array.isArray(value?.conditions) && value.conditions.length === 0);
+      if (typeof value === 'string') {
+        const operator = colType === 'text' ? 'contains' : 'equals';
+        next[column] = { conditions: [{ operator, value }] };
+      } else if (isEmpty) {
+        delete next[column];
+      } else {
+        next[column] = value;
+      }
+      return next;
+    });
+    requestAnimationFrame(() =>
+      window.dispatchEvent(new Event('db_layout_change'))
+    );
   };
-  
-  const [containerHeight, setContainerHeight] = useState(0); 
+
+  const [containerHeight, setContainerHeight] = useState(0);
   const insertButtonParentRef = useRef(null);
-  
+
   useEffect(() => {
     const updateHeight = () => {
       if (insertButtonParentRef.current) {
@@ -233,10 +235,10 @@ const MainPage = () => {
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
-  }, []); 
-  
+  }, []);
+
   const savedVisibleColumns = getLocal('visibleColumnsMainPage');
-  const savedLayout = getLocal('layoutMode');  
+  const savedLayout = getLocal('layoutMode');
   const videoRef = useRef(null);
   const mainContentRef = useRef(null);
   const containerRef = useRef(null);
@@ -249,7 +251,7 @@ const MainPage = () => {
   const handleEditModeToggle = () => {
     toggleEditMode();
   };
-  
+
   const isFiltered =
     Object.values(textColumnFilters).some((filter) => {
       const conditions = filter?.conditions ?? [];
@@ -260,11 +262,22 @@ const MainPage = () => {
           : value?.toString().trim())
       );
     });
-    
+
   const [showOverlay, setShowOverlay] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
-  const { registerToggle } = useSidebar();  
-  
+  const { registerToggle } = useSidebar();
+  const isMobile = useMemo(() => {
+    const coarse = !window.matchMedia("(pointer: fine)").matches;
+    const narrow = window.innerWidth < 768;
+    return coarse && narrow;
+  }, []);
+  const handleMainInteract = () => {
+    if (isUploadModalOpen) return;
+    if (showSidebar && isMobile) {
+      setShowSidebar(false);
+      requestAnimationFrame(() => window.dispatchEvent(new Event('db_layout_change')));
+    }
+  };
   useEffect(() => {
     registerToggle(() => {
       setShowSidebar((prev) => {
@@ -274,19 +287,17 @@ const MainPage = () => {
       });
     });
   }, [registerToggle]);
-  
+
   const [layoutMode, setLayoutMode] = useState(() => {
     try {
-      return savedLayout
-        ? decodeURIComponent(savedLayout)
-        : 'stacked';
+      return savedLayout ? decodeURIComponent(savedLayout) : 'stacked';
     } catch {
       return 'stacked';
     }
   });
-  
+
   const [sortConfig, setSortConfig] = useState({ key: 'import_seq', direction: 'asc' });
-  
+
   const defaultColumnConfig = {
     timestamp: { visible: false, type: 'float8' },
     set: { visible: false, type: 'int2' },
@@ -336,6 +347,7 @@ const MainPage = () => {
     });
     requestAnimationFrame(() => window.dispatchEvent(new Event('db_layout_change')));
   };
+
   const lastScrollY = useRef(0);
   const suppressScrollDetection = useRef(false);
 
@@ -380,17 +392,17 @@ const MainPage = () => {
       setStats(statData);
     }
   };
-  
+
   useEffect(() => {
     loadStatsForSelectedVideo(selectedVideo);
   }, [selectedVideo]);
-  
+
   useEffect(() => {
     if (selectedGameId) {
       localStorage.setItem('selectedGameId', selectedGameId);
     }
   }, [selectedGameId]);
-  
+
   const fetchTeamNames = async () => {
     const { data, error } = await supabase
       .from('games')
@@ -404,16 +416,16 @@ const MainPage = () => {
     }
 
     return [...new Set(data.map(row => row.team_name))];
-  };  
-  
+  };
+
   useEffect(() => {
     setIsAppLoading(true);
     const savedTeam = getLocal('teamName');
     const savedGame = localStorage.getItem('selectedGameId');
 
     const fetchAndRestore = async () => {
-    const unique = await fetchTeamNames();
-    setAvailableTeams(unique);
+      const unique = await fetchTeamNames();
+      setAvailableTeams(unique);
 
       if (savedTeam && unique.includes(savedTeam)) {
         setTeamName(savedTeam);
@@ -442,25 +454,25 @@ const MainPage = () => {
 
     fetchAndRestore();
   }, []);
-  
+
   useEffect(() => {
     setLocal('visibleColumnsMainPage', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
-  
+
   const handleHeaderClick = (columnKey) => {
     setSortConfig((prev) => {
       if (prev.key === columnKey) {
         if (prev.direction === 'asc') return { key: columnKey, direction: 'desc' };
-        if (prev.direction === 'desc') return { key: 'import_seq', direction: 'asc' }; // Reset
+        if (prev.direction === 'desc') return { key: 'import_seq', direction: 'asc' };
       }
       return { key: columnKey, direction: 'asc' };
     });
-  };  
-  
+  };
+
   useEffect(() => {
     setLocal('layoutMode', layoutMode);
   }, [layoutMode]);
-  
+
   useEffect(() => {
     fetch('/api/videos')
       .then(async res => {
@@ -475,9 +487,9 @@ const MainPage = () => {
         console.error('Failed to load videos:', err.message);
       });
   }, []);
-  
+
   const refreshStats = () => loadStatsForSelectedVideo(selectedVideo);
-  
+
   const uniqueValues = (key) =>
     [...new Set(stats.map((s) => s[key]).filter((v) => v !== undefined && v !== null))];
   const filteredStats = stats
@@ -553,21 +565,21 @@ const MainPage = () => {
         };
         const isNumberType = ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(colType);
         const evaluator = isNumberType ? evaluateNumber : evaluateText;
-        let result = null; // neutral start
+        let result = null;
         for (let i = 0; i < activeConditions.length; i++) {
           const cond = activeConditions[i];
           const condResult = evaluator(cond);
           if (result === null) {
-            result = condResult; // first condition sets baseline
+            result = condResult;
           } else {
             const logic = cond.logic || 'AND';
             if (logic === 'AND') result = result && condResult;
             if (logic === 'OR') result = result || condResult;
           }
         }
-        return result ?? true; // fallback to true if no conditions
+        return result ?? true;
       })
-    )
+    );
 
   const sortedStats = [...filteredStats].sort((a, b) => {
     const { key, direction } = sortConfig;
@@ -582,9 +594,11 @@ const MainPage = () => {
     if (aVal > bVal) return direction === 'asc' ? 1 : -1;
     return 0;
   });
+
   const jumpToTime = (t) => {
     videoRef.current.currentTime = t - 1;
   };
+
   const renderCell = (field, s, idx, prevRow = null) => {
     if (!visibleColumns[field]?.visible) return null;
     let highlightClass = 'border border-black hover:bg-gray-100';
@@ -597,7 +611,7 @@ const MainPage = () => {
       <td key={field} className={highlightClass}>
         {editMode ? (
           <EditableCell
-            value={s[field]} 
+            value={s[field]}
             type={visibleColumns[field].type}
             statId={s.id}
             field={field}
@@ -611,6 +625,7 @@ const MainPage = () => {
       </td>
     );
   };
+
   const formatTimestamp = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -624,6 +639,7 @@ const MainPage = () => {
       return `${mins}:${paddedSecs}${msPart}`;
     }
   };
+
   const renderHeaderCell = (label, key) => {
     const isTextColumn = visibleColumns[key]?.type === 'text';
     return (
@@ -646,6 +662,26 @@ const MainPage = () => {
       </th>
     );
   };
+
+  // Close sidebar when tapping outside on mobile
+  useEffect(() => {
+    if (!showSidebar) return;
+    const isNarrow = () => window.matchMedia('(max-width: 768px)').matches;
+    const handlePointerDownCapture = (e) => {
+      if (!isNarrow()) return;
+      if (isUploadModalOpen) return;
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
+        setShowSidebar(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDownCapture, true);
+    document.addEventListener('touchstart', handlePointerDownCapture, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownCapture, true);
+      document.removeEventListener('touchstart', handlePointerDownCapture, true);
+    };
+  }, [showSidebar, isUploadModalOpen]);
+
   if (isAppLoading) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
@@ -653,7 +689,7 @@ const MainPage = () => {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
       </div>
     );
-  }    
+  }
   if (!isAppLoading && !teamName) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
@@ -662,7 +698,7 @@ const MainPage = () => {
           options={availableTeams.map(team => ({
             label: team,
             value: team,
-            color: 'blue', // or a color based on some logic
+            color: 'blue',
           }))}
           value={teamName}
           onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
@@ -676,44 +712,59 @@ const MainPage = () => {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
         <div className="text-lg font-semibold mb-4">Please select a game to continue</div>
-          <GameSelector
-            key={teamGames.map(g => g.id + g.hastimestamps + g.isscored).join('-')}
-            games={teamGames}
-            value={selectedGameId}
-            onChange={(selectedOption) => {
-              if (selectedOption.value === 'upload-new') {
-                handleOpenUploadModal();
-              } else {              
-                setSelectedGameId(selectedOption.value);
-                const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-                setSelectedVideo(selectedGame?.video_url || '');
-                localStorage.removeItem('videoTime');
-              }
-            }}
-            teamName={teamName}
-            currentUserId={currentUserId}
-            isUploadModalOpen={isUploadModalOpen}
-            setIsUploadModalOpen={setIsUploadModalOpen}
-            setResumeSilently={setResumeSilently}
-            resumeSilently ={resumeSilently }
-            hideUploadOption = {true}
-          />
+        <GameSelector
+          key={teamGames.map(g => g.id + g.hastimestamps + g.isscored).join('-')}
+          games={teamGames}
+          value={selectedGameId}
+          onChange={(selectedOption) => {
+            if (selectedOption.value === 'upload-new') {
+              handleOpenUploadModal();
+            } else {
+              setSelectedGameId(selectedOption.value);
+              const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+              setSelectedVideo(selectedGame?.video_url || '');
+              localStorage.removeItem('videoTime');
+            }
+          }}
+          teamName={teamName}
+          currentUserId={currentUserId}
+          isUploadModalOpen={isUploadModalOpen}
+          setIsUploadModalOpen={setIsUploadModalOpen}
+          setResumeSilently={setResumeSilently}
+          resumeSilently={resumeSilently}
+          hideUploadOption={true}
+        />
       </div>
     );
   }
+
   const selectedGame = teamGames.find(g => g.id === selectedGameId);
+
   return (
-    <div className="flex flex-col h-[100svh] overflow-hidden"> 
-      <div
-        className="flex flex-1 overflow-auto"
-      >
+    <div className="flex flex-col h-[100svh] overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
+       {/* Mini rail: spacer always present; content fades out while full sidebar is open */}
+       <div className="h-full w-12 flex-shrink-0 relative">
+         <div
+           className={`absolute inset-0 transition-opacity duration-200
+             ${showSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+         >
+           <MiniSidebar onExpand={() => setShowSidebar(true)} />
+         </div>
+       </div>
+
+        {/* Sliding full sidebar (overlay). GPU-accelerated transform only. */}
         <div
-          className={`transition-all duration-300 overflow-hidden bg-gray-100 border-r border-gray-300 h-full flex-shrink-0 ${
-            showSidebar ? 'w-64 bg-gray-100' : 'w-12 bg-white'
-          }`}
+          ref={sidebarRef}
+          className={`
+            absolute top-0 left-0 h-full w-64 bg-gray-100 border-r border-gray-300 z-20
+            transform-gpu will-change-transform transition-transform duration-300 ease-out
+            ${showSidebar ? 'translate-x-0' : '-translate-x-[16.25rem] opacity-0 pointer-events-none'}
+          `}
+          style={{ contain: 'layout paint size' }} // helps isolate paints in modern browsers
+          aria-hidden={!showSidebar}
         >
-        {showSidebar ? (
-          <div className="h-full flex flex-col">    
+          <div className="h-full flex flex-col">
             <div className="w-full">
               {/* Collapse button aligned right */}
               <div className="flex justify-end p-2">
@@ -722,165 +773,177 @@ const MainPage = () => {
                   className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                   aria-label="Collapse sidebar"
                 >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" data-rtl-flip=""><path d="M6.83496 3.99992C6.38353 4.00411 6.01421 4.0122 5.69824 4.03801C5.31232 4.06954 5.03904 4.12266 4.82227 4.20012L4.62207 4.28606C4.18264 4.50996 3.81498 4.85035 3.55859 5.26848L3.45605 5.45207C3.33013 5.69922 3.25006 6.01354 3.20801 6.52824C3.16533 7.05065 3.16504 7.71885 3.16504 8.66301V11.3271C3.16504 12.2712 3.16533 12.9394 3.20801 13.4618C3.25006 13.9766 3.33013 14.2909 3.45605 14.538L3.55859 14.7216C3.81498 15.1397 4.18266 15.4801 4.62207 15.704L4.82227 15.79C5.03904 15.8674 5.31234 15.9205 5.69824 15.9521C6.01398 15.9779 6.383 15.986 6.83398 15.9902L6.83496 3.99992ZM18.165 11.3271C18.165 12.2493 18.1653 12.9811 18.1172 13.5702C18.0745 14.0924 17.9916 14.5472 17.8125 14.9648L17.7295 15.1415C17.394 15.8 16.8834 16.3511 16.2568 16.7353L15.9814 16.8896C15.5157 17.1268 15.0069 17.2285 14.4102 17.2773C13.821 17.3254 13.0893 17.3251 12.167 17.3251H7.83301C6.91071 17.3251 6.17898 17.3254 5.58984 17.2773C5.06757 17.2346 4.61294 17.1508 4.19531 16.9716L4.01855 16.8896C3.36014 16.5541 2.80898 16.0434 2.4248 15.4169L2.27051 15.1415C2.03328 14.6758 1.93158 14.167 1.88281 13.5702C1.83468 12.9811 1.83496 12.2493 1.83496 11.3271V8.66301C1.83496 7.74072 1.83468 7.00898 1.88281 6.41985C1.93157 5.82309 2.03329 5.31432 2.27051 4.84856L2.4248 4.57317C2.80898 3.94666 3.36012 3.436 4.01855 3.10051L4.19531 3.0175C4.61285 2.83843 5.06771 2.75548 5.58984 2.71281C6.17898 2.66468 6.91071 2.66496 7.83301 2.66496H12.167C13.0893 2.66496 13.821 2.66468 14.4102 2.71281C15.0069 2.76157 15.5157 2.86329 15.9814 3.10051L16.2568 3.25481C16.8833 3.63898 17.394 4.19012 17.7295 4.84856L17.8125 5.02531C17.9916 5.44285 18.0745 5.89771 18.1172 6.41985C18.1653 7.00898 18.165 7.74072 18.165 8.66301V11.3271ZM8.16406 15.995H12.167C13.1112 15.995 13.7794 15.9947 14.3018 15.9521C14.8164 15.91 15.1308 15.8299 15.3779 15.704L15.5615 15.6015C15.9797 15.3451 16.32 14.9774 16.5439 14.538L16.6299 14.3378C16.7074 14.121 16.7605 13.8478 16.792 13.4618C16.8347 12.9394 16.835 12.2712 16.835 11.3271V8.66301C16.835 7.71885 16.8347 7.05065 16.792 6.52824C16.7605 6.14232 16.7073 5.86904 16.6299 5.65227L16.5439 5.45207C16.32 5.01264 15.9796 4.64498 15.5615 4.3886L15.3779 4.28606C15.1308 4.16013 14.8165 4.08006 14.3018 4.03801C13.7794 3.99533 13.1112 3.99504 12.167 3.99504H8.16406C8.16407 3.99667 8.16504 3.99829 8.16504 3.99992L8.16406 15.995Z"></path></svg>
-              </button>
-            </div>  
-            <div className="h-px bg-gray-300 mx-2" />  
-          </div>          
-          {sidebarContent ? (
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
-              {sidebarContent}
-            </div>
-          ) : (        
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
-              <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
-              <StyledSelect
-                options={availableTeams.map(team => ({
-                  label: team,
-                  value: team,
-                  color: 'blue',
-                }))}
-                value={teamName}
-                onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
-                placeholder="Click here to select a team"
-                showStatus={false}
-              /> 
-              <div>
-                <label className={`font-semibold block mb-1 ${!selectedGameId ? "text-blue-700" : ""}`}>
-                  {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
-                </label>
-                <GameSelector
-                  games={teamGames}
-                  value={selectedGameId}
-                  onChange={(selectedOption) => {
-                    if (selectedOption.value === 'upload-new') {
-                      handleOpenUploadModal();
-                    } else {             
-                      setSelectedGameId(selectedOption.value);
-                      const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-                      setSelectedVideo(selectedGame?.video_url || '');
-                      localStorage.removeItem('videoTime');
-                      setTimeout(() => {
-                        videoRef.current?.focus();
-                      }, 300);                
-                    }
-                  }}
-                  videoPlayerRef={videoPlayerRef}
-                  teamName={teamName}
-                  currentUserId={currentUserId}
-                  isUploadModalOpen={isUploadModalOpen}
-                  setIsUploadModalOpen={setIsUploadModalOpen}
-                  setResumeSilently={setResumeSilently}
-                  resumeSilently ={resumeSilently }
-              />     
-            </div>
-            <div>
-              <label className="font-semibold block mb-1">Display Layout:</label>
-              <StyledSelect
-                options={[
-                  { label: 'Stacked', value: 'stacked', color: 'orange' },
-                  { label: 'Side-by-Side', value: 'side-by-side', color: 'purple' },
-                ]}
-                value={layoutMode}
-                onChange={(selected) => setLayoutMode(selected.value)}
-                placeholder="Select layout"
-                showStatus={false}
-              />
-            </div>
-            <div>
-              <label className="font-semibold block mb-1">Visible Columns:</label>
-              <ColumnSelector
-                columns={[
-                { key: 'timestamp', label: 'Timestamp' },
-                { key: 'set', label: 'Set' },
-                { key: 'rally_id', label: 'Rally' },
-                { key: 'player', label: 'Player' },
-                { key: 'action_type', label: 'Action Type' },
-                { key: 'quality', label: 'Quality' },
-                { key: 'result', label: 'Result' },
-                { key: 'score', label: 'Score' },
-                { key: 'notes', label: 'Notes' },
-                ]}
-                visibleColumns={visibleColumns}
-                toggleColumn={toggleColumn}
-              />
-            </div>
-            <div className="mt-auto p-4 space-y-4">
-              {userRole  && (
-                <button
-                  onClick={handleEditModeToggle}
-                  className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform cursor-pointer transition hover:scale-[1.03] ${
-                    editMode
-                      ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
-                      : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
-                  }`}
-                >
-                  {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" data-rtl-flip=""><path d="M6.83496 3.99992C6.38353 4.00411 6.01421 4.0122 5.69824 4.03801C5.31232 4.06954 5.03904 4.12266 4.82227 4.20012L4.62207 4.28606C4.18264 4.50996 3.81498 4.85035 3.55859 5.26848L3.45605 5.45207C3.33013 5.69922 3.25006 6.01354 3.20801 6.52824C3.16533 7.05065 3.16504 7.71885 3.16504 8.66301V11.3271C3.16504 12.2712 3.16533 12.9394 3.20801 13.4618C3.25006 13.9766 3.33013 14.2909 3.45605 14.538L3.55859 14.7216C3.81498 15.1397 4.18266 15.4801 4.62207 15.704L4.82227 15.79C5.03904 15.8674 5.31234 15.9205 5.69824 15.9521C6.01398 15.9779 6.383 15.986 6.83398 15.9902L6.83496 3.99992ZM18.165 11.3271C18.165 12.2493 18.1653 12.9811 18.1172 13.5702C18.0745 14.0924 17.9916 14.5472 17.8125 14.9648L17.7295 15.1415C17.394 15.8 16.8834 16.3511 16.2568 16.7353L15.9814 16.8896C15.5157 17.1268 15.0069 17.2285 14.4102 17.2773C13.821 17.3254 13.0893 17.3251 12.167 17.3251H7.83301C6.91071 17.3251 6.17898 17.3254 5.58984 17.2773C5.06757 17.2346 4.61294 17.1508 4.19531 16.9716L4.01855 16.8896C3.36014 16.5541 2.80898 16.0434 2.4248 15.4169L2.27051 15.1415C2.03328 14.6758 1.93158 14.167 1.88281 13.5702C1.83468 12.9811 1.83496 12.2493 1.83496 11.3271V8.66301C1.83496 7.74072 1.83468 7.00898 1.88281 6.41985C1.93157 5.82309 2.03329 5.31432 2.27051 4.84856L2.4248 4.57317C2.80898 3.94666 3.36012 3.436 4.01855 3.10051L4.19531 3.0175C4.61285 2.83843 5.06771 2.75548 5.58984 2.71281C6.17898 2.66468 6.91071 2.66496 7.83301 2.66496H12.167C13.0893 2.66496 13.821 2.66468 14.4102 2.71281C15.0069 2.76157 15.5157 2.86329 15.9814 3.10051L16.2568 3.25481C16.8833 3.63898 17.394 4.19012 17.7295 4.84856L17.8125 5.02531C17.9916 5.44285 18.0745 5.89771 18.1172 6.41985C18.1653 7.00898 18.165 7.74072 18.165 8.66301V11.3271ZM8.16406 15.995H12.167C13.1112 15.995 13.7794 15.9947 14.3018 15.9521C14.8164 15.91 15.1308 15.8299 15.3779 15.704L15.5615 15.6015C15.9797 15.3451 16.32 14.9774 16.5439 14.538L16.6299 14.3378C16.7074 14.121 16.7605 13.8478 16.792 13.4618C16.8347 12.9394 16.835 12.2712 16.835 11.3271V8.66301C16.835 7.71885 16.8347 7.05065 16.792 6.52824C16.7605 6.14232 16.7073 5.86904 16.6299 5.65227L16.5439 5.45207C16.32 5.01264 15.9796 4.64498 15.5615 4.3886L15.3779 4.28606C15.1308 4.16013 14.8165 4.08006 14.3018 4.03801C13.7794 3.99533 13.1112 3.99504 12.167 3.99504H8.16406C8.16407 3.99667 8.16504 3.99829 8.16504 3.99992L8.16406 15.995Z"></path></svg>
                 </button>
-              )}
-              <button
-                onClick={() => setShowStatsView(true)}
-                className="w-full px-4 py-2 cursor-pointer rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-              >
-                Statistic Matrix
-              </button>         
-            </div>          
-          </div>
-          )}
-          <SidebarFooter />
-        </div>
-      ) : (
-        <MiniSidebar onExpand={() => setShowSidebar(true)} />
-      )}        
-    </div>
-    <div ref={mainContentRef} className={`flex-1 overflow-y-auto ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}>
-      {showStatsView ? (
-        <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
-      ) : selectedVideo ? (
-          <div className={`flex ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
-            <div className={`px-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
-              <div className="bg-white w-full ">
-                <DBStats
-                  canEdit={editMode === 'admin' || editMode === 'editor'}
-                  editMode={editMode}
-                  hastimestamps={selectedGame?.hastimestamps}
-                  isscored={selectedGame?.isscored}              
-                  stats={stats}
-                  refreshStats={refreshStats}
-                  setStats={setStats}
-                  filteredStats={sortedStats}
-                  gamePlayers={gamePlayers}
-                  visibleColumns={visibleColumns}
-                  sortConfig={sortConfig}
-                  setSortConfig={setSortConfig}
-                  textColumnFilters={textColumnFilters}
-                  handleTextColumnFilterChange={handleTextColumnFilterChange}
-                  renderCell={renderCell}
-                  insertButtonParentRef={insertButtonParentRef}
-                  authorizedFetch={authorizedFetch}
-                  layoutMode={layoutMode}
-                  jumpToTime={jumpToTime}
-                  videoRef={videoRef}
-                  videoPlayerRef={videoPlayerRef}
-                  mainContentRef={mainContentRef}
-                  containerRef={containerRef}
-                  formatTimestamp={formatTimestamp}
-                  gameId={gameId}
-                  refreshGames={refreshGames}
-                />
               </div>
+              <div className="h-px bg-gray-300 mx-2" />
             </div>
-            <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'}`}>
-              <VideoPlayer
-                ref={videoPlayerRef}
-                selectedVideo={selectedVideo}
-                videoRef={videoRef}
-                containerRef={containerRef}
-                stats={stats}
-              />
-            </div>
+
+            {sidebarContent ? (
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
+                {sidebarContent}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
+                <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
+                <StyledSelect
+                  options={availableTeams.map(team => ({
+                    label: team,
+                    value: team,
+                    color: 'blue',
+                  }))}
+                  value={teamName}
+                  onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
+                  placeholder="Click here to select a team"
+                  showStatus={false}
+                />
+                <div>
+                  <label className={`font-semibold block mb-1 ${!selectedGameId ? "text-blue-700" : ""}`}>
+                    {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
+                  </label>
+                  <GameSelector
+                    games={teamGames}
+                    value={selectedGameId}
+                    onChange={(selectedOption) => {
+                      if (selectedOption.value === 'upload-new') {
+                        handleOpenUploadModal();
+                      } else {
+                        setSelectedGameId(selectedOption.value);
+                        const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+                        setSelectedVideo(selectedGame?.video_url || '');
+                        localStorage.removeItem('videoTime');
+                        setTimeout(() => {
+                          videoRef.current?.focus();
+                        }, 300);
+                      }
+                    }}
+                    videoPlayerRef={videoPlayerRef}
+                    teamName={teamName}
+                    currentUserId={currentUserId}
+                    isUploadModalOpen={isUploadModalOpen}
+                    setIsUploadModalOpen={setIsUploadModalOpen}
+                    setResumeSilently={setResumeSilently}
+                    resumeSilently={resumeSilently}
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Display Layout:</label>
+                  <StyledSelect
+                    options={[
+                      { label: 'Stacked', value: 'stacked', color: 'orange' },
+                      { label: 'Side-by-Side', value: 'side-by-side', color: 'purple' },
+                    ]}
+                    value={layoutMode}
+                    onChange={(selected) => setLayoutMode(selected.value)}
+                    placeholder="Select layout"
+                    showStatus={false}
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Visible Columns:</label>
+                  <ColumnSelector
+                    columns={[
+                      { key: 'timestamp', label: 'Timestamp' },
+                      { key: 'set', label: 'Set' },
+                      { key: 'rally_id', label: 'Rally' },
+                      { key: 'player', label: 'Player' },
+                      { key: 'action_type', label: 'Action Type' },
+                      { key: 'quality', label: 'Quality' },
+                      { key: 'result', label: 'Result' },
+                      { key: 'score', label: 'Score' },
+                      { key: 'notes', label: 'Notes' },
+                    ]}
+                    visibleColumns={visibleColumns}
+                    toggleColumn={toggleColumn}
+                  />
+                </div>
+                <div className="mt-auto p-4 space-y-4">
+                  {userRole && (
+                    <button
+                      onClick={handleEditModeToggle}
+                      className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform cursor-pointer transition hover:scale-[1.03] ${
+                        editMode
+                          ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
+                          : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
+                      }`}
+                    >
+                      {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowStatsView(true)}
+                    className="w-full px-4 py-2 cursor-pointer rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+                  >
+                    Statistic Matrix
+                  </button>
+                </div>
+              </div>
+            )}
+            <SidebarFooter />
           </div>
-      ): null}
+        </div>
+
+        {/* Main content area (stable width because rail is constant) */}
+        <div
+          ref={mainContentRef}
+          onPointerDown={handleMainInteract}
+          onFocusCapture={handleMainInteract}
+         className={`flex-1 overflow-hidden transform-gpu will-change-transform transition-transform duration-300 ease-out
+           ${showSidebar ? 'translate-x-52' : 'translate-x-0'}   /* 52 = 13rem = 16rem - 3rem */
+           ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
+        >
+          <div className="h-full overflow-y-auto">
+            {showStatsView ? (
+              <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
+            ) : selectedVideo ? (
+              <div className={`flex ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
+                <div className={`px-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
+                  <div className="bg-white w-full">
+                    <DBStats
+                      canEdit={editMode === 'admin' || editMode === 'editor'}
+                      editMode={editMode}
+                      hastimestamps={selectedGame?.hastimestamps}
+                      isscored={selectedGame?.isscored}
+                      stats={stats}
+                      refreshStats={refreshStats}
+                      setStats={setStats}
+                      filteredStats={sortedStats}
+                      gamePlayers={gamePlayers}
+                      visibleColumns={visibleColumns}
+                      sortConfig={sortConfig}
+                      setSortConfig={setSortConfig}
+                      textColumnFilters={textColumnFilters}
+                      handleTextColumnFilterChange={handleTextColumnFilterChange}
+                      renderCell={renderCell}
+                      insertButtonParentRef={insertButtonParentRef}
+                      authorizedFetch={authorizedFetch}
+                      layoutMode={layoutMode}
+                      jumpToTime={jumpToTime}
+                      videoRef={videoRef}
+                      videoPlayerRef={videoPlayerRef}
+                      mainContentRef={mainContentRef}
+                      containerRef={containerRef}
+                      formatTimestamp={formatTimestamp}
+                      gameId={gameId}
+                      refreshGames={refreshGames}
+                    />
+                  </div>
+                </div>
+                <div className={`${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'}`}>
+                  <VideoPlayer
+                    ref={videoPlayerRef}
+                    selectedVideo={selectedVideo}
+                    videoRef={videoRef}
+                    containerRef={containerRef}
+                    stats={stats}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
       {showResumeBanner && (
         <div className="fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-900 p-3 flex justify-between items-center z-50 shadow">
           <span>You have an incomplete upload. Would you like to resume it?</span>
@@ -903,23 +966,22 @@ const MainPage = () => {
             </button>
           </div>
         </div>
-      )}      
+      )}
+
+      <UploadGameModal
+        ref={uploadModalRef}
+        isOpen={isUploadModalOpen}
+        onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setResumeSilently(false);
+        }}
+        teamName={teamName}
+        userId={currentUserId}
+        resumeSilently={resumeSilently}
+      />
     </div>
-  </div>
-  <UploadGameModal
-    ref={uploadModalRef}
-    isOpen={isUploadModalOpen}
-    onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
-    onClose={() => {
-      setIsUploadModalOpen(false);
-      setResumeSilently(false);
-    }}
-    teamName={teamName}
-    userId={currentUserId}
-    resumeSilently={resumeSilently}
-  />  
-</div>
-);
+  );
 };
 
 export default MainPage;

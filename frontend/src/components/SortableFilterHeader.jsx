@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect  } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 const TEXT_OPERATORS = [
@@ -316,7 +316,7 @@ return (
   (portalEl ? createPortal(
     <div
       ref={wrapperRef}
-      className="z-[9999] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
+      className="z-[2] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
       style={menuFixedStyle}
     >
           {effectiveFilter.conditions.map((condition, idx) => {
