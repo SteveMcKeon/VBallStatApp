@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useLayoutEffect  } from 'react';
 import * as tus from 'tus-js-client';
-import { DndContext, closestCenter } from '@dnd-kit/core';
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import FloatingLabelInput from './FloatingLabelInput';
@@ -11,61 +11,60 @@ import TooltipPortal from '../utils/tooltipPortal';
 
 const SortableItem = ({ upload, id, onRemove }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = { transform: CSS.Transform.toString(transform), transition, };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}  
-      className="flex justify-between items-center px-2 py-1 mb-1 bg-white rounded border border-gray-200 shadow-sm cursor-grab"
+      className="flex items-center justify-between px-2 py-1 mb-1 bg-white rounded border border-gray-200 shadow-sm select-none w-full"
     >
-      <div className="flex items-center min-w-0">
-        <span className="text-gray-400 text-lg mr-2 flex-shrink-0">≡</span>
-        <span className="truncate text-sm">{upload.file.name}</span>
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex items-center gap-2 flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
+        aria-label="Drag to reorder"
+      >
+        <div className="text-gray-400 text-lg flex-shrink-0" aria-hidden>≡</div>
+        <div className="text-sm flex-1 min-w-0 truncate text-left" title={upload.file.name}>{upload.file.name}</div>
+        <div className="text-sm text-gray-400">Set {upload.setNumber}</div>
       </div>
-      <div className="flex items-center flex-shrink-0 ml-2 space-x-2">
-        <span className="text-gray-500 text-xs">Set {upload.setNumber}</span>
-        <button
-          onClick={() => onRemove(upload.id)}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault();  
-          }}
-          className="w-6 h-6 flex items-center justify-center rounded-md 
-                    text-gray-500 hover:bg-red-100 transition cursor-pointer"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
+      <button
+        onClick={() => onRemove(upload.id)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();  
+        }}
+        className="w-6 h-6 flex items-center justify-center rounded-md text-gray-500 hover:bg-red-100 transition cursor-pointer"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
   );
 };
 
 const UploadOrderList = ({ uploads, setUploads, onRemove }) => {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { pressDelay: 120, pressTolerance: 5 })
+  );
   const handleDragEnd = (event) => {
     const { active, over } = event;
-    if (active.id !== over.id) {
-      const oldIndex = uploads.findIndex(u => u.id === active.id);
-      const newIndex = uploads.findIndex(u => u.id === over.id);
+    if (!over || active.id === over.id) return;
+    const oldIndex = uploads.findIndex(u => u.id === active.id);
+    const newIndex = uploads.findIndex(u => u.id === over.id);
 
-      const newUploads = arrayMove(uploads, oldIndex, newIndex).map((upload, idx) => ({
-        ...upload,
-        setNumber: idx + 1
-      }));
+    const newUploads = arrayMove(uploads, oldIndex, newIndex).map((upload, idx) => ({
+      ...upload,
+      setNumber: idx + 1
+    }));
 
-      setUploads(newUploads);
-    }
+    setUploads(newUploads);
   };
-
   return (
-    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <div className="space-y-1 mt-2">
         <SortableContext items={uploads.map(u => u.id)} strategy={verticalListSortingStrategy}>
           {uploads.map((upload) => (
@@ -181,6 +180,43 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
   };
 
   useImperativeHandle(ref, () => ({
+    cancelUploads: async () => {
+      const resumableUploads = await loadAllResumableUploads();
+      if (resumableUploads.length === 0) {
+        setToast('No resumable uploads found', 'error');
+        return;
+      }
+      const extractTusId = (url) => {
+        try {
+          if (!url) return null;
+          const u = new URL(url, window.location.origin);
+          const parts = u.pathname.split('/').filter(Boolean);
+          return parts[parts.length - 1] || null;
+        } catch {
+          return null;
+        }
+      };
+      let cancelled = 0;
+      for (const { uploadData } of resumableUploads) {
+        try {
+          const tusUrl = uploadData?.url || uploadData?.uploadUrl;
+          const tusId = extractTusId(tusUrl);
+
+          if (tusId) {
+            await cancelUpload(undefined, tusId);
+            cancelled++;
+          } else {
+            console.warn('No tus id found for resumable entry', uploadData);
+          }
+        } catch (err) {
+          console.error('Unexpected cancel failure', err);
+        }
+      }
+      if (cancelled > 0) {
+        setToast(`Cancelled ${cancelled} upload${cancelled === 1 ? '' : 's'}`, 'success');
+      }
+    },
+
     triggerResumeAllUploads: async () => {
       const resumableUploads = await loadAllResumableUploads();
       if (resumableUploads.length === 0) {
@@ -230,7 +266,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
                   }
                 ]);
               }
-              setToast(`Resumed upload for ${file.name}`, 'success');
               setTimeout(() => {
                 handleSubmit(fingerprint, file, metadata.date, metadata.players, fingerprint);
               }, 0);
@@ -249,7 +284,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         }
       }
     }
-  }));
+}));
 
   useEffect(() => {
     if (incompleteUploadData) {
@@ -425,41 +460,75 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     }
   };
 
-  const cancelUpload = async (uploadId) => {
-    const uploadIndex = uploads.findIndex(u => u.id === uploadId);
-    if (uploadIndex === -1) return;
-
-    const upload = uploads[uploadIndex];
-    if (!upload || !upload.uploadRef) return;
-
-    upload.uploadRef.abort();
-    const uploadUrl = upload.uploadRef.url;
-    if (uploadUrl) {
-      const tusUploadId = uploadUrl.split('/').pop();
+  const cancelUpload = async (uploadId, tusUploadId = null) => {
+    if (tusUploadId) {
+      const match = uploads.find(u => u.uploadRef?.url?.endsWith(`/${tusUploadId}`));
       try {
-        const res = await authorizedFetch(`/api/delete-upload/${tusUploadId}`, {
-          method: 'DELETE'
-        });
+        match?.uploadRef?.abort();
+      } catch {}
+      try {
+        const res = await authorizedFetch(`/api/delete-upload/${tusUploadId}`, { method: 'DELETE' });
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({ message: 'No response body' }));
           console.error('Failed to delete upload on server:', errorData.message || errorData);
         }
       } catch (err) {
-        console.error('Error deleting upload:', err);
+        console.error('Error deleting upload (by tusUploadId):', err);
       }
-      for (let i = 0; i < localStorage.length; i++) {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('tus::')) {
+        if (!key || !key.startsWith('tus::')) continue;
+        try {
           const data = JSON.parse(localStorage.getItem(key));
-          if (data && data.metadata?.user_id === userId && data.metadata?.filename === upload.file.name){
+          const url = data?.url || data?.uploadUrl;
+          const endsWithId =
+            typeof url === 'string' &&
+            (url.endsWith(`/${tusUploadId}`) || url.split('/').pop() === tusUploadId);
+          const sameUser = !data?.metadata?.user_id || data.metadata.user_id === userId;
+
+          if (endsWithId && sameUser) {
             localStorage.removeItem(key);
             await removeFileHandleFromIndexedDB(key);
-            break;
           }
+        } catch {
         }
       }
-      setUploads(prev => prev.filter(u => u.id !== uploadId));
+      if (match) {
+        setUploads(prev => prev.filter(u => u !== match));
+      }
+      return;
     }
+
+    const uploadIndex = uploads.findIndex(u => u.id === uploadId);
+    if (uploadIndex === -1) return;
+    const upload = uploads[uploadIndex];
+    if (!upload || !upload.uploadRef) return;
+    upload.uploadRef.abort();
+    const uploadUrl = upload.uploadRef.url;
+    if (!uploadUrl) return;
+    const tusIdFromRef = uploadUrl.split('/').pop();
+    try {
+      const res = await authorizedFetch(`/api/delete-upload/${tusIdFromRef}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'No response body' }));
+        console.error('Failed to delete upload on server:', errorData.message || errorData);
+      }
+    } catch (err) {
+      console.error('Error deleting upload:', err);
+    }
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('tus::')) continue;
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        if (data?.metadata?.user_id === userId && data?.metadata?.filename === upload.file.name) {
+          localStorage.removeItem(key);
+          await removeFileHandleFromIndexedDB(key);
+          break;
+        }
+      } catch {}
+    }
+    setUploads(prev => prev.filter(u => u.id !== uploadId));
   };
 
   const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, playersOverride = null, tusKeyOverride = null) => {

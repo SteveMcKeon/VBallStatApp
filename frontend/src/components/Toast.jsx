@@ -41,16 +41,17 @@ const Toast = ({ message, show, duration = 5000, onClose, type = 'success' }) =>
   };
 
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[1000] flex justify-center pointer-events-none">
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] flex justify-center pointer-events-none">
       <div className="w-full max-w-md p-1 text-center md:w-auto md:text-justify">
-        <div className={`px-3 py-2 rounded-lg inline-flex flex-row border text-white gap-2 pointer-events-auto ${typeStyles[type]}`} role="alert">
-          <div className="mt-1 shrink-0 grow-0">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="icon-sm">
-              {iconPath[type]}
-            </svg>
-          </div>
+        <div
+          className={`px-3 py-2 rounded-lg inline-flex flex-row border text-white gap-2 pointer-events-auto cursor-pointer select-none ${typeStyles[type]}`}
+          role="button"
+          tabIndex={0}
+          aria-label="Dismiss notification"
+          onClick={onClose}
+        >
           <div className="flex-1 justify-center gap-2">
-            <div className="text-start whitespace-pre-wrap">{message}</div>
+            <div className="text-center whitespace-pre-wrap">{message}</div>
           </div>
         </div>
       </div>

@@ -64,16 +64,28 @@ const MainPage = () => {
     videoPlayerRef.current?.allowControls();
     setIsUploadModalOpen(false);
   };
-  useEffect(() => {
-    if (resumeSilently && isUploadModalOpen && uploadModalRef.current) {
-      uploadModalRef.current.triggerResumeAllUploads();
+
+  const handleResumeAllUploadsFromBanner = () => {
+    setResumeSilently(true);
+    setIsUploadModalOpen(true);
+    uploadModalRef.current?.triggerResumeAllUploads?.();
+    setShowResumeBanner(false);
+  };
+
+  const handleCancelAllUploadsFromBanner = async () => {
+    if (uploadModalRef.current?.cancelUploads) {
+      await uploadModalRef.current.cancelUploads();
+    } else {
+      console.warn('cancelUploads() not available on UploadGameModal ref');
     }
-  }, [resumeSilently, isUploadModalOpen]);
+    setShowResumeBanner(false);
+  };
 
   const [currentUserId, setCurrentUserId] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [showStatsView, setShowStatsView] = useState(false);
+
   useEffect(() => {
     const fetchSession = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -86,40 +98,37 @@ const MainPage = () => {
     };
     fetchSession();
   }, [teamName]);
+  const [incompleteUploadCount, setIncompleteUploadCount] = useState(0);
 
   useEffect(() => {
     if (!currentUserId) return;
     const scanIncompleteUploads = () => {
-      const incompleteUploads = [];
+      const matches = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('tus::')) {
           try {
             const uploadData = JSON.parse(localStorage.getItem(key));
             if (uploadData?.metadata?.user_id === currentUserId) {
-              incompleteUploads.push({ key, ...uploadData });
+              matches.push({ key, ...uploadData });
             }
           } catch (e) {
             console.error('Error parsing tus entry:', e);
           }
         }
       }
-      if (incompleteUploads.length > 0) {
-        const latestUpload = incompleteUploads.sort((a, b) =>
-          new Date(b.creationTime) - new Date(a.creationTime)
-        )[0];
-        return latestUpload.metadata;
-      }
-      return null;
+      return matches;
     };
-    const checkForIncompleteUpload = async () => {
-      const incompleteUploadData = scanIncompleteUploads();
-      if (incompleteUploadData) {
-        setShowResumeBanner(true);
-      }
+    const checkForIncompleteUpload = () => {
+      const incomplete = scanIncompleteUploads();
+      setIncompleteUploadCount(incomplete.length);
+      setShowResumeBanner(incomplete.length > 0);
     };
     checkForIncompleteUpload();
+    window.addEventListener('storage', checkForIncompleteUpload); // updates if another tab changes it
+    return () => window.removeEventListener('storage', checkForIncompleteUpload);
   }, [currentUserId]);
+
 
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
@@ -128,6 +137,7 @@ const MainPage = () => {
   const getLocal = (key) => localStorage.getItem(key);
   const [availableTeams, setAvailableTeams] = useState([]);
   const [userRole, setUserRole] = useState(null);
+
   useEffect(() => {
     const fetchUserRole = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -157,6 +167,7 @@ const MainPage = () => {
       setTeamGames(data);
     }
   };
+
   const refreshGames = async () => {
     if (!teamName) return;
     const { data, error } = await supabase
@@ -961,24 +972,34 @@ const MainPage = () => {
       </div>
 
       {showResumeBanner && (
-        <div className="fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-900 p-3 flex justify-between items-center z-50 shadow">
-          <span>You have an incomplete upload. Would you like to resume it?</span>
-          <div className="space-x-2">
+        <div
+          className={`fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-900 p-3 z-50 shadow
+            ${isMobile ? 'flex flex-col gap-2' : 'flex items-center justify-between'}`}
+        >
+          <span className={isMobile ? 'text-center' : 'text-left'}>
+            {incompleteUploadCount > 1
+              ? `You have ${incompleteUploadCount} incomplete uploads.`
+              : 'You have an incomplete upload.'}
+          </span>
+
+          <div className={`${isMobile ? 'flex w-full justify-end gap-2' : 'flex gap-2'}`}>
             <button
-              onClick={() => {
-                setResumeSilently(true);
-                setIsUploadModalOpen(true);
-                setShowResumeBanner(false);
-              }}
+              onClick={handleResumeAllUploadsFromBanner}
               className="bg-blue-600 text-white px-3 py-1 rounded"
             >
-              Resume Upload
+              {`Resume Upload${incompleteUploadCount > 1 ? 's' : ''}`}
+            </button>
+            <button
+              onClick={handleCancelAllUploadsFromBanner}
+              className="bg-red-600 text-white px-3 py-1 rounded"
+            >
+              {`Cancel Upload${incompleteUploadCount > 1 ? 's' : ''}`}
             </button>
             <button
               onClick={() => setShowResumeBanner(false)}
               className="bg-gray-300 px-3 py-1 rounded"
             >
-              Dismiss
+              Dismiss Banner
             </button>
           </div>
         </div>
