@@ -18,6 +18,8 @@ If not timestamp editor role, still click rest of non-editbale cells to jump to 
 Create welcome page, with short video and highlights of website features.
 Stats page - have entire row highlight on hover for readability.
 Update index.html <head> info for SEO
+Ability to draw an overlay on the screen
+Play Filtered Touches should full screen on mobile. delay by a second as well.
 
 #Fixes
 REFACTOR
@@ -25,6 +27,5 @@ Sometimes seeking doesn't work on new videos. weird.
 Failed to resume file handle when upload file after something was ready for resume.
 Switching teams and the resume upload fails, or restarts.
 scrubbing seekbar doesn't work in fullscreen
-filter buttons!
 
-Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou
+Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou, Marieve

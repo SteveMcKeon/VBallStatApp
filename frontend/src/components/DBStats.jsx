@@ -6,7 +6,26 @@ import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
 import Toast from './Toast';
 
-const ROW_HEIGHT = 25; // px
+const ROW_HEIGHT = 28; // px
+
+const OuterDiv = React.forwardRef(function OuterDiv({ style, className, ...rest }, ref) {
+  return (
+    <div
+      ref={ref}
+      className={`db-list-outer ${className || ''}`}
+      style={{
+        ...style,
+        overflowX: 'auto',
+        background: 'transparent',
+        scrollbarGutter: 'stable',
+        touchAction: 'pan-x pan-y',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'auto',
+      }}
+      {...rest}
+    />
+  );
+});
 
 const IconWithTooltip = ({ children, tooltip }) => {
   const [hovered, setHovered] = useState(false);
@@ -69,7 +88,6 @@ const DBStats = ({
   const [toastType, setToastType] = useState('error');
   const [showToast, setShowToast] = useState(false);  
   const setToast = (message, type = 'error') => { setToastMessage(message); setToastType(type); setShowToast(true); };
-
   const cellRefs = useRef({});
   
   const handleClearAllFilters = () => {
@@ -151,16 +169,15 @@ const DBStats = ({
  }, []);
   const listRef = useRef(null);
 
-  const DEFAULT_ROW_H = 25;
   const rowHeightsRef = useRef(new Map());
-  const getItemSize = (index) => rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;   
+  const getItemSize = (index) => rowHeightsRef.current.get(index) ?? ROW_HEIGHT;   
 
   const getTotalListHeight = () => {
     let sum = 0;
     const map = rowHeightsRef.current;
     map.forEach((v) => (sum += v));
     const unknownCount = Math.max(0, filteredStats.length - map.size);
-    sum += unknownCount * DEFAULT_ROW_H;
+    sum += unknownCount * ROW_HEIGHT;
     return sum;
   };  
 
@@ -410,14 +427,6 @@ const DBStats = ({
     rowHeightsRef.current.clear();
     requestAnimationFrame(() => {
       listRef.current?.resetAfterIndex(0, true);
-      setListNonce(n => n + 1);
-    });
-  }, [editMode]);
-    
-  useEffect(() => {
-    rowHeightsRef.current.clear();
-    requestAnimationFrame(() => {
-      listRef.current?.resetAfterIndex(0, true);
     });
   }, [orderedKeys, gridTemplate]);
 
@@ -510,38 +519,6 @@ const DBStats = ({
     }
   };
 
-  // ===== Scroll-aware measuring (skip while touch scrolling) =====
-  const isTouchScrollingRef = useRef(false);
-  const scrollIdleTimerRef = useRef(null);
-
-  const remeasureAllRows = React.useCallback(() => {
-    rowHeightsRef.current.clear();
-    listRef.current?.resetAfterIndex(0, true);
-    requestAnimationFrame(() => {});
-  }, []);
-
-  // Listen for vertical scrolls on the list's outer element (react-window)
-  useEffect(() => {
-    const bodyEl = listOuterRef.current;
-    if (!bodyEl) return;
-
-    const onScroll = () => {
-      isTouchScrollingRef.current = true;
-      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
-      scrollIdleTimerRef.current = setTimeout(() => {
-        isTouchScrollingRef.current = false;
-        remeasureAllRows();
-      }, 160);
-    };
-
-    bodyEl.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      bodyEl.removeEventListener('scroll', onScroll);
-      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
-    };
-  }, [remeasureAllRows]);
-
-  // Imperative scroll sync: (re)bind when either DOM node changes, no state updates
   const scrollSyncRef = useRef({ header: null, body: null, onHeader: null, onBody: null });
   useLayoutEffect(() => {
     const headerEl = headerScrollRef.current;
@@ -587,17 +564,16 @@ const DBStats = ({
     useLayoutEffect(() => {
       if (!rowRef.current) return;
       const measure = () => {
-        if (isTouchScrollingRef.current) return; // skip noisy measurements mid-scroll
         const el = rowRef.current;
         if (!el) return;
 
-        let measured = DEFAULT_ROW_H;
+        let measured = ROW_HEIGHT;
         el.querySelectorAll('[role="cell"]').forEach((c) => {
-          const content = c.firstElementChild || c;
-          measured = Math.max(measured, content?.offsetHeight || DEFAULT_ROW_H);
+          const cellH = c.offsetHeight || ROW_HEIGHT;
+          measured = Math.max(measured, cellH);
         });
         const h = measured + 1;
-        const prev = rowHeightsRef.current.get(index) ?? DEFAULT_ROW_H;
+        const prev = rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
         const DIFF_THRESHOLD = 2;
         if (Math.abs(h - prev) > DIFF_THRESHOLD) {
           rowHeightsRef.current.set(index, h);
@@ -621,17 +597,17 @@ const DBStats = ({
     const s = filteredStats[index];
     const prevRow = index > 0 ? filteredStats[index - 1] : null;
     const idx = index;
-
-    const onRowClick = !canEdit ? () => {
-      const validTimestamps = stats.slice(0, idx).map((r) => r.timestamp).filter((t) => t != null);
+    const isEditing = ['admin', 'editor'].includes(editMode);
+    const onRowClick = !isEditing ? () => {
+      const validTimestamps = stats.slice(0, idx).map(r => r.timestamp).filter(Boolean);
       if (s.timestamp != null) jumpToTime(s.timestamp);
       else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);
-      if (layoutMode === 'stacked' && !document.pictureInPictureElement && mainContentRef.current && containerRef.current) {
-        const scrollContainer = mainContentRef.current;
-        const videoEl = containerRef.current;
-        const videoBottom = videoEl.offsetTop + videoEl.offsetHeight;
-        const scrollTarget = videoBottom - scrollContainer.clientHeight;
-        scrollContainer.scrollTo({ top: scrollTarget });
+      if (
+        layoutMode === 'stacked' &&
+        !document.pictureInPictureElement &&
+        mainContentRef.current
+      ) {
+        mainContentRef.current.scrollTo({ top: 0 });
       }
     } : undefined;
 
@@ -687,8 +663,8 @@ const DBStats = ({
             data-field="timestamp"
             className={`db-cell ${editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={async () => {
-              if (editMode !== 'admin') return;
+            onClick={editMode === 'admin' ? async (e) => {
+              e.stopPropagation(); 
               const currentTimestamp = videoRef.current?.currentTime ?? 0;
               try {
                 const res = await authorizedFetch('/api/update-stat', {
@@ -710,7 +686,7 @@ const DBStats = ({
                 console.error('Timestamp update error', err);
                 setToast('Error updating timestamp');
               }
-            }}
+            } : undefined}
           >
             {s.timestamp != null ? (
               <span className="leading-normal">{formatTimestamp(s.timestamp)}</span>
@@ -858,23 +834,6 @@ const DBStats = ({
     </tr>
   );
 
-  const OuterDiv = React.forwardRef(({ style, className, ...rest }, ref) => (
-    <div
-      ref={ref}
-      className={`db-list-outer ${className || ''}`}
-      style={{
-        ...style,
-        overflowX: 'auto',                // <— allow horizontal scroll on body
-        background: 'transparent',
-        scrollbarGutter: 'stable',
-        touchAction: 'pan-x pan-y',
-        WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'auto',
-      }}
-      {...rest}
-    />
-  ));
-
   const autofitColumn = (key) => {
     const th = headerTableRef.current?.querySelector(`thead th[data-key="${key}"]`);
     const current = th?.getBoundingClientRect().width ?? 0;
@@ -1012,6 +971,7 @@ const DBStats = ({
                   itemCount={filteredStats.length}
                   itemSize={getItemSize}
                   overscanCount={10}
+                  estimatedItemSize={ROW_HEIGHT} 
                   outerElementType={OuterDiv}
                   outerRef={setBodyOuterEl}
                 >

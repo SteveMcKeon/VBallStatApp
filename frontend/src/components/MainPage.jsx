@@ -924,10 +924,10 @@ const MainPage = () => {
           ref={mainContentRef}
           onPointerDown={handleMainInteract}
           onFocusCapture={handleMainInteract}
-         className={`relative flex-1 overflow-hidden transform-gpu will-change-transform transition-transform duration-300 ease-out
+         className={`relative flex-1 overflow-y-auto transform-gpu will-change-transform transition-transform duration-300 ease-out
            ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
         >
-          <div className="h-full overflow-y-auto">
+          <div className="h-full">
             {showStatsView ? (
               <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
             ) : selectedVideo ? (

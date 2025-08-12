@@ -1,0 +1,412 @@
+diff --git a/VBallAppNotes.txt b/VBallAppNotes.txt
+index ef6624e..45237a2 100644
+--- a/VBallAppNotes.txt
++++ b/VBallAppNotes.txt
+@@ -25,5 +25,6 @@ Sometimes seeking doesn't work on new videos. weird.
+ Failed to resume file handle when upload file after something was ready for resume.
+ Switching teams and the resume upload fails, or restarts.
+ scrubbing seekbar doesn't work in fullscreen
++filter buttons!
+ 
+ Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou
+\ No newline at end of file
+diff --git a/frontend/src/components/DBStats.jsx b/frontend/src/components/DBStats.jsx
+index 00a4b6e..a3cd9d4 100644
+--- a/frontend/src/components/DBStats.jsx
++++ b/frontend/src/components/DBStats.jsx
+@@ -304,41 +304,85 @@ const DBStats = ({
+     return bodyColumns.reduce((sum, { key }) => sum + widthFor(key), 0);
+   }, [bodyColumns, columnWidths, measuredColPx, flexKey]);
+ 
+-  // Build grid template; if content exceeds viewport, fix the flex col width so we can overflow horizontally.
+-  const gridTemplate = useMemo(() => {
++  const [viewportW, setViewportW] = useState(0);
++  
++  useLayoutEffect(() => {
++    const headerEl = headerScrollRef.current;
++    const bodyEl   = listOuterRef.current;
++    const containerEl = mainContentRef?.current || bodyEl || headerEl;
++    const read = () => {
++      const w = (bodyEl?.clientWidth ?? headerEl?.clientWidth ?? 0);
++      setViewportW(w);
++    };
++    read();
++    const ro = new ResizeObserver(() => {
++      read();
++    });
++    if (containerEl) ro.observe(containerEl);
++    if (headerEl && headerEl !== containerEl) ro.observe(headerEl);
++    if (bodyEl && bodyEl !== containerEl) ro.observe(bodyEl);
++    const onLayout = () => {
++      requestAnimationFrame(read);
++    };
++    window.addEventListener('resize', onLayout);
++    window.addEventListener('db_layout_change', onLayout);
++
++    return () => {
++      ro.disconnect();
++      window.removeEventListener('resize', onLayout);
++      window.removeEventListener('db_layout_change', onLayout);
++    };
++  }, [mainContentRef]);
++
++  const { gridTemplate, canFit, totalPx } = useMemo(() => {
++    const MIN_COL_PX  = 60;
++    const FLEX_MIN_PX = 160;
+     const available =
+-      headerScrollRef.current?.clientWidth ??
+       listOuterRef.current?.clientWidth ??
++      headerScrollRef.current?.clientWidth ??
+       0;
+-    const needsOverflow = totalColumnsPx > available && available > 0;
+-    const widthFor = (key) => {
++    const widthForFixed = (key) => {
+       if (key === '__insert__' || key === '__delete__') return 32;
+-      if (key === flexKey) {
+-        if (needsOverflow) {
+-          return Math.max(
+-            60,
+-            Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? 160)
+-          );
+-        }
+-        return null;
+-      }
++
+       const explicit = columnWidths[key];
+-      if (explicit) return Math.max(60, Math.floor(explicit));
++      if (explicit != null) return Math.max(MIN_COL_PX, Math.floor(explicit));
++
+       const measured = measuredColPx[key];
+-      if (measured) return Math.max(60, Math.floor(measured));
+-      if (key === 'notes' && !needsOverflow) return null;
++      if (measured != null) return Math.max(MIN_COL_PX, Math.floor(measured));
++
+       if (key === 'notes') return 200;
+       return 120;
+     };
+-    return bodyColumns.map(({ key }) => {
+-      const w = widthFor(key);
+-      return w == null ? 'minmax(160px,1fr)' : `${w}px`;
++    const fixedPx = bodyColumns.reduce((sum, { key }) => {
++      if (key === flexKey) return sum;
++      return sum + widthForFixed(key);
++    }, 0);
++    const canFitLocal = available > 0 && fixedPx + FLEX_MIN_PX <= available;
++    const pinnedFlexPx = Math.max(
++      MIN_COL_PX,
++      Math.floor(
++        columnWidths[flexKey] ??
++        measuredColPx[flexKey] ??
++        200
++      )
++    );
++    const template = bodyColumns.map(({ key }) => {
++      if (key === flexKey) {
++        if (canFitLocal) {
++          return `minmax(${FLEX_MIN_PX}px, 1fr)`;
++        }
++        return `${pinnedFlexPx}px`;
++      }
++      const w = widthForFixed(key);
++      return `${w}px`;
+     }).join(' ');
+-  }, [bodyColumns, columnWidths, measuredColPx, flexKey, totalColumnsPx]);
++    const totalPxLocal = canFitLocal ? fixedPx + FLEX_MIN_PX : fixedPx + pinnedFlexPx;
++    return { gridTemplate: template, canFit: canFitLocal, totalPx: totalPxLocal };
++  }, [bodyColumns, columnWidths, measuredColPx, flexKey, viewportW]);
+ 
+   useLayoutEffect(() => {
+     listRef.current?.resetAfterIndex(0, true);
+-  }, [gridTemplate, columnWidths]); 
++  }, [gridTemplate, columnWidths, viewportW]);
+   
+   const [isResizingCol, setIsResizingCol] = useState(false);
+   
+@@ -595,7 +639,7 @@ const DBStats = ({
+       <div
+         ref={rowRef}
+         role="row"
+-        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch', minWidth: totalColumnsPx }}
++        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch', minWidth: canFit ? 'auto' : totalPx }}
+         className={`db-row ${!canEdit ? 'hover:bg-gray-50' : ''}`}
+         onClick={onRowClick}
+       >
+@@ -868,17 +912,33 @@ const DBStats = ({
+     }
+     const MIN = 60;
+     let needed = Math.max(MIN, headerNeeded, cellsNeeded);
+-    const GROW_THRESHOLD = 3;
+-    if (needed > current + GROW_THRESHOLD) needed += 6;
+-    if (needed > (columnWidths[key] ?? 0)) {
+-      setColumnWidths((prev) => ({ ...prev, [key]: needed }));
+-      requestAnimationFrame(() => {
+-        rowHeightsRef.current.clear();
+-        listRef.current?.resetAfterIndex(0, true);
+-      });
++    if (needed > current + 5) {
++      needed += 6;
+     }
++    setColumnWidths((prev) => ({ ...prev, [key]: needed }));
++    requestAnimationFrame(() => {
++      rowHeightsRef.current.clear();
++      listRef.current?.resetAfterIndex(0, true);
++    });
+   };
+   const EMPTY_MIN = 160;
++
++  useLayoutEffect(() => {
++    didInitialAutofit.current = false;
++    setMeasuredColPx({});
++    setColumnWidths(prev => {
++      const next = { ...prev };
++      delete next[flexKey];
++      return next;
++    });
++    rowHeightsRef.current.clear?.();
++    listRef.current?.resetAfterIndex?.(0, true);
++    requestAnimationFrame(() => {
++      autofitAll();
++      listRef.current?.resetAfterIndex?.(0, true);
++    });
++  }, [layoutMode, flexKey, autofitAll]);
++
+   return (
+     <>
+       {/* Toolbar shown when filters are active */}
+@@ -921,19 +981,18 @@ const DBStats = ({
+           touchAction: 'pan-x pan-y'
+         }}
+       >
+-        <table className="w-full text-center" ref={headerTableRef} style={{ minWidth: totalColumnsPx }}>
++        <table className="w-full text-center" ref={headerTableRef} style={{ width: canFit ? '100%' : totalPx }}>
+           <thead>{renderHeader()}</thead>
+         </table>
+       </div>
+       <div ref={setFilterPortalEl} id="db-filter-portal" />
+-      {/* Body (react-window outer will scroll horizontally) */}
+       <div
+         className="relative mb-4"
+         style={{
+           height:
+             filteredStats.length === 0
+               ? Math.min(vh60, EMPTY_MIN)
+-              : Math.max(EMPTY_MIN, getTotalListHeight()),
++              : Math.max(EMPTY_MIN, vh60),
+           minHeight: filteredStats.length === 0 ? EMPTY_MIN : undefined,
+           zIndex: 0,
+         }}
+diff --git a/frontend/src/components/MainPage.jsx b/frontend/src/components/MainPage.jsx
+index 67fb001..f0af3f3 100644
+--- a/frontend/src/components/MainPage.jsx
++++ b/frontend/src/components/MainPage.jsx
+@@ -682,6 +682,25 @@ const MainPage = () => {
+     };
+   }, [showSidebar, isUploadModalOpen]);
+ 
++  const handleSidebarToggle = (value) => {
++    setShowSidebar(value);
++    const fire = (tag) => {
++      window.dispatchEvent(new Event('db_layout_change'));
++      window.dispatchEvent(new Event('resize'));
++    };
++    requestAnimationFrame(() => fire('raf-start'));
++    const el = sidebarRef.current;
++    if (!el) return;
++    const onEnd = (e) => {
++      if (['width', 'transform', 'left'].includes(e.propertyName)) {
++        requestAnimationFrame(() => fire('raf-transitionend-1'));
++        requestAnimationFrame(() => fire('raf-transitionend-2'));
++        el.removeEventListener('transitionend', onEnd);
++      }
++    };
++    el.addEventListener('transitionend', onEnd);
++  };
++
+   if (isAppLoading) {
+     return (
+       <div className="flex flex-col h-[100svh] justify-center items-center">
+@@ -743,32 +762,44 @@ const MainPage = () => {
+   return (
+     <div className="flex flex-col h-[100svh] overflow-hidden">
+       <div className="relative flex flex-1 overflow-hidden">
+-       {/* Mini rail: spacer always present; content fades out while full sidebar is open */}
+-       <div className="h-full w-12 flex-shrink-0 relative">
+-         <div
+-           className={`absolute inset-0 transition-opacity duration-200
+-             ${showSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+-         >
+-           <MiniSidebar onExpand={() => setShowSidebar(true)} />
+-         </div>
+-       </div>
++        {/* Mini rail: takes space only when big sidebar is hidden */}
++        <div
++          className={`
++            relative flex-shrink-0 overflow-hidden
++            transition-[width]
++            ${showSidebar ? isMobile ? 'w-12' : 'w-0' : 'w-12'}
++          `}
++        >
++          {!showSidebar && (
++          <MiniSidebar
++            onExpand={() => handleSidebarToggle(true)} 
++          />
++          )}
++        </div>
+ 
+         {/* Sliding full sidebar (overlay). GPU-accelerated transform only. */}
+         <div
+           ref={sidebarRef}
+           className={`
+-            absolute top-0 left-0 h-full w-64 bg-gray-100 border-r border-gray-300 z-20
+-            transform-gpu will-change-transform transition-transform duration-300 ease-out
+-            ${showSidebar ? 'translate-x-0' : '-translate-x-[16.25rem] opacity-0 pointer-events-none'}
++            bg-gray-100 border-r border-gray-300 z-20
++            transform-gpu will-change-transform transition-transform ease-out
++            ${isMobile
++              ? `absolute top-0 left-0 h-full w-64
++            transform-gpu will-change-transform transition-transform duration-300 ease-out ${
++                  showSidebar
++                    ? 'translate-x-0'
++                    : '-translate-x-[16.25rem] opacity-0 pointer-events-none'
++                }`
++              : `relative overflow-x-auto ${showSidebar ? 'w-64' : 'w-0'}`}
+           `}
+-          style={{ contain: 'layout paint size' }} 
+         >
++      
+           <div className="h-full flex flex-col">
+             <div className="w-full">
+               {/* Collapse button aligned right */}
+               <div className="flex justify-end p-2">
+                 <button
+-                  onClick={() => setShowSidebar(false)}
++                  onClick={() => handleSidebarToggle(false)}
+                   className="p-1 hover:bg-gray-200 rounded cursor-pointer"
+                   aria-label="Collapse sidebar"
+                 >
+@@ -833,7 +864,15 @@ const MainPage = () => {
+                       { label: 'Side-by-Side', value: 'side-by-side', color: 'purple' },
+                     ]}
+                     value={layoutMode}
+-                    onChange={(selected) => setLayoutMode(selected.value)}
++                    onChange={(selected) => {
++                      setLayoutMode(selected.value);
++                      const ping = () => {
++                        window.dispatchEvent(new Event('db_layout_change'));
++                        window.dispatchEvent(new Event('resize'));
++                      };
++                      requestAnimationFrame(() => requestAnimationFrame(ping));
++                      setTimeout(ping, 300);
++                    }}
+                     placeholder="Select layout"
+                     showStatus={false}
+                   />
+@@ -881,14 +920,11 @@ const MainPage = () => {
+             <SidebarFooter />
+           </div>
+         </div>
+-
+-        {/* Main content area (stable width because rail is constant) */}
+         <div
+           ref={mainContentRef}
+           onPointerDown={handleMainInteract}
+           onFocusCapture={handleMainInteract}
+-         className={`flex-1 overflow-hidden transform-gpu will-change-transform transition-transform duration-300 ease-out
+-           ${showSidebar ? 'translate-x-52' : 'translate-x-0'}   /* 52 = 13rem = 16rem - 3rem */
++         className={`relative flex-1 overflow-hidden transform-gpu will-change-transform transition-transform duration-300 ease-out
+            ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
+         >
+           <div className="h-full overflow-y-auto">
+@@ -896,7 +932,7 @@ const MainPage = () => {
+               <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
+             ) : selectedVideo ? (
+               <div className={`flex ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
+-                <div className={`px-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
++                <div className={`${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'px-4 w-full'} overflow-auto`}>
+                   <div className="bg-white w-full">
+                     <DBStats
+                       canEdit={editMode === 'admin' || editMode === 'editor'}
+@@ -983,4 +1019,4 @@ const MainPage = () => {
+   );
+ };
+ 
+-export default MainPage;
++export default MainPage;
+\ No newline at end of file
+diff --git a/frontend/src/components/SortableFilterHeader.jsx b/frontend/src/components/SortableFilterHeader.jsx
+index 053d7ba..653acb7 100644
+--- a/frontend/src/components/SortableFilterHeader.jsx
++++ b/frontend/src/components/SortableFilterHeader.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
++import React, { useState, useRef, useEffect, useLayoutEffect  } from 'react';
+ import { createPortal } from 'react-dom';
+ 
+ const TEXT_OPERATORS = [
+@@ -81,14 +81,6 @@ const SortableFilterHeader = ({
+      : { conditions: [{ operator: defaultOperator, value: '' }] };
+   }, [filterValue, defaultOperator]);
+ 
+-  useLayoutEffect(() => {
+-    if (showFilterMenu && wrapperRef.current) {
+-    const raf = requestAnimationFrame(() => {
+-      setMenuStyles(calculateMenuPosition());
+-    });
+-    return () => cancelAnimationFrame(raf);
+-    }
+-  }, [showFilterMenu]);
+   const filterBtnRef = useRef(null);
+   const isFilterActive = () =>
+     effectiveFilter.conditions.some(({ operator, value }) => {
+@@ -179,25 +171,7 @@ const SortableFilterHeader = ({
+       conditions: newConditions.length ? newConditions : [{ operator: 'contains', value: '' }]
+     });
+   };
+-  const [menuStyles, setMenuStyles] = useState({});
+-  const calculateMenuPosition = () => {
+-    const menuWidth = wrapperRef.current?.parentElement?.parentElement?.offsetWidth;
+-    const rect = wrapperRef.current.getBoundingClientRect();
+-    const overflowRight = rect.right > menuWidth;
+ 
+-    return {
+-      left: overflowRight ? 'auto' : '0',
+-      right: '0',
+-      top: '100%',
+-      bottom: 'auto',
+-    };
+-  };
+-  useLayoutEffect(() => {
+-    if (showFilterMenu && wrapperRef.current) {
+-      setMenuStyles(calculateMenuPosition());
+-    }
+-  }, [showFilterMenu]);
+-  
+   const startDrag = (e) => {
+     e.preventDefault();
+     e.stopPropagation();
+@@ -229,6 +203,7 @@ const SortableFilterHeader = ({
+   };
+ 
+   const thRef = useRef(null);
++
+   const [menuFixedStyle, setMenuFixedStyle] = useState({});
+   const computeFixedPos = () => {
+     if (!thRef.current) return {};
+@@ -316,7 +291,7 @@ return (
+   (portalEl ? createPortal(
+     <div
+       ref={wrapperRef}
+-      className="z-[2] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
++      className="z-[9999] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
+       style={menuFixedStyle}
+     >
+           {effectiveFilter.conditions.map((condition, idx) => {
+@@ -426,7 +401,7 @@ return (
+             Clear Filter
+           </button>
+         </div>,
+-        portalEl || document.body
++        document.body
+       ) : null)
+       )}
+     </th>
