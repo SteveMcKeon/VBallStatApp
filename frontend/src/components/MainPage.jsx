@@ -663,25 +663,6 @@ const MainPage = () => {
     );
   };
 
-  // Close sidebar when tapping outside on mobile
-  useEffect(() => {
-    if (!showSidebar) return;
-    const isNarrow = () => window.matchMedia('(max-width: 768px)').matches;
-    const handlePointerDownCapture = (e) => {
-      if (!isNarrow()) return;
-      if (isUploadModalOpen) return;
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
-        setShowSidebar(false);
-      }
-    };
-    document.addEventListener('pointerdown', handlePointerDownCapture, true);
-    document.addEventListener('touchstart', handlePointerDownCapture, true);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDownCapture, true);
-      document.removeEventListener('touchstart', handlePointerDownCapture, true);
-    };
-  }, [showSidebar, isUploadModalOpen]);
-
   const handleSidebarToggle = (value) => {
     setShowSidebar(value);
     const fire = (tag) => {
