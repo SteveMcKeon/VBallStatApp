@@ -15,6 +15,14 @@ export const selectStyles = {
     whiteSpace: 'nowrap',
     overflow: 'visible',
   }),
+  placeholder: (base) => ({
+    ...base,
+    fontStyle: 'italic',
+    color: '#6b7280',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  }),
   singleValue: (base) => ({
     ...base,
     overflow: 'visible',

@@ -52,7 +52,7 @@ const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, curren
         options={options}
         value={value}
         onChange={handleChange}
-        placeholder="Click here to select a game"
+        placeholder="Select a game..."
         showStatus
         showTooltip
       />

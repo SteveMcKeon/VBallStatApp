@@ -149,13 +149,20 @@ const MainPage = () => {
     };
     fetchUserRole();
   }, []);
-
+  const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
   const handleTeamChange = async (e) => {
     const selected = e.target.value;
     setTeamName(selected);
     setLocal('teamName', selected);
+    setSelectedGameId(null);
+    localStorage.removeItem('selectedGameId');
     setSelectedVideo('');
-    setSelectedGameId('');
+    setStats([]);
+    setGamePlayers([]);
+    setGameId(null);
+    requestAnimationFrame(() =>
+    window.dispatchEvent(new Event('db_layout_change'))
+  );
     const { data, error } = await supabase
       .from('games')
       .select('id, title, date, video_url, hastimestamps, isscored, processed')
@@ -719,7 +726,7 @@ const MainPage = () => {
       </div>
     );
   }
-  if (!isAppLoading && !selectedVideo) {
+  if (!isAppLoading && !selectedVideo && showCenteredGamePicker) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
         <div className="text-lg font-semibold mb-4">Please select a game to continue</div>
@@ -735,6 +742,7 @@ const MainPage = () => {
               const selectedGame = teamGames.find(g => g.id === selectedOption.value);
               setSelectedVideo(selectedGame?.video_url || '');
               localStorage.removeItem('videoTime');
+              setShowCenteredGamePicker(false);
             }
           }}
           teamName={teamName}
@@ -824,6 +832,7 @@ const MainPage = () => {
                     {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
                   </label>
                   <GameSelector
+                    key={teamName}
                     games={teamGames}
                     value={selectedGameId}
                     onChange={(selectedOption) => {

@@ -942,11 +942,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
                 e.currentTarget.blur();
               }}
               onMouseMove={(e) => {
-                const seekBarRect = e.currentTarget.getBoundingClientRect();
-                const relativeX = e.clientX - seekBarRect.left;
-                const percent = Math.min(Math.max(relativeX / seekBarRect.width, 0), 1);
+                const rect = e.currentTarget.getBoundingClientRect();
+                const relativeX = e.clientX - rect.left;
+                const percent = Math.max(0, Math.min(1, relativeX / rect.width));
                 const hoverTime = percent * (videoRef.current?.duration || 0);
-                setHoverTimeTooltip({ x: e.clientX, y: e.clientY, time: hoverTime });
+                setHoverTimeTooltip({ percent, time: hoverTime });
               }}
               onMouseLeave={() => setHoverTimeTooltip(null)}              
               disabled={isCustomPlayback}
@@ -955,20 +955,13 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
               }`}
             />
             {hoverTimeTooltip && (
-              <TooltipPortal>
-                <div
-                  className="fixed px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap"
-                  style={{
-                    top: `${hoverTimeTooltip.y - 30}px`,
-                    left: `${hoverTimeTooltip.x}px`,
-                    transform: 'translateX(-50%)',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  {formatTime(hoverTimeTooltip.time)}
-                </div>
-              </TooltipPortal>
-            )}          
+              <div
+                className="absolute -top-7 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap pointer-events-none"
+                style={{ left: `${hoverTimeTooltip.percent * 100}%`, transform: 'translateX(-50%)' }}
+              >
+                {formatTime(hoverTimeTooltip.time)}
+              </div>
+            )}        
           </div>
         </div>
         <div className="absolute bottom-2 left-0 right-0 px-4 flex items-center justify-between bg-black/50 text-white rounded-lg py-2 text-sm z-50">
