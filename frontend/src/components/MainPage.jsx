@@ -682,6 +682,25 @@ const MainPage = () => {
     };
   }, [showSidebar, isUploadModalOpen]);
 
+  const handleSidebarToggle = (value) => {
+    setShowSidebar(value);
+    const fire = (tag) => {
+      window.dispatchEvent(new Event('db_layout_change'));
+      window.dispatchEvent(new Event('resize'));
+    };
+    requestAnimationFrame(() => fire('raf-start'));
+    const el = sidebarRef.current;
+    if (!el) return;
+    const onEnd = (e) => {
+      if (['width', 'transform', 'left'].includes(e.propertyName)) {
+        requestAnimationFrame(() => fire('raf-transitionend-1'));
+        requestAnimationFrame(() => fire('raf-transitionend-2'));
+        el.removeEventListener('transitionend', onEnd);
+      }
+    };
+    el.addEventListener('transitionend', onEnd);
+  };
+
   if (isAppLoading) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
@@ -743,32 +762,44 @@ const MainPage = () => {
   return (
     <div className="flex flex-col h-[100svh] overflow-hidden">
       <div className="relative flex flex-1 overflow-hidden">
-       {/* Mini rail: spacer always present; content fades out while full sidebar is open */}
-       <div className="h-full w-12 flex-shrink-0 relative">
-         <div
-           className={`absolute inset-0 transition-opacity duration-200
-             ${showSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-         >
-           <MiniSidebar onExpand={() => setShowSidebar(true)} />
-         </div>
-       </div>
+        {/* Mini rail: takes space only when big sidebar is hidden */}
+        <div
+          className={`
+            relative flex-shrink-0 overflow-hidden
+            transition-[width]
+            ${showSidebar ? isMobile ? 'w-12' : 'w-0' : 'w-12'}
+          `}
+        >
+          {!showSidebar && (
+          <MiniSidebar
+            onExpand={() => handleSidebarToggle(true)} 
+          />
+          )}
+        </div>
 
         {/* Sliding full sidebar (overlay). GPU-accelerated transform only. */}
         <div
           ref={sidebarRef}
           className={`
-            absolute top-0 left-0 h-full w-64 bg-gray-100 border-r border-gray-300 z-20
-            transform-gpu will-change-transform transition-transform duration-300 ease-out
-            ${showSidebar ? 'translate-x-0' : '-translate-x-[16.25rem] opacity-0 pointer-events-none'}
+            bg-gray-100 border-r border-gray-300 z-20
+            transform-gpu will-change-transform transition-transform ease-out
+            ${isMobile
+              ? `absolute top-0 left-0 h-full w-64
+            transform-gpu will-change-transform transition-transform duration-300 ease-out ${
+                  showSidebar
+                    ? 'translate-x-0'
+                    : '-translate-x-[16.25rem] opacity-0 pointer-events-none'
+                }`
+              : `relative overflow-x-auto ${showSidebar ? 'w-64' : 'w-0'}`}
           `}
-          style={{ contain: 'layout paint size' }} 
         >
+      
           <div className="h-full flex flex-col">
             <div className="w-full">
               {/* Collapse button aligned right */}
               <div className="flex justify-end p-2">
                 <button
-                  onClick={() => setShowSidebar(false)}
+                  onClick={() => handleSidebarToggle(false)}
                   className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                   aria-label="Collapse sidebar"
                 >
@@ -833,7 +864,15 @@ const MainPage = () => {
                       { label: 'Side-by-Side', value: 'side-by-side', color: 'purple' },
                     ]}
                     value={layoutMode}
-                    onChange={(selected) => setLayoutMode(selected.value)}
+                    onChange={(selected) => {
+                      setLayoutMode(selected.value);
+                      const ping = () => {
+                        window.dispatchEvent(new Event('db_layout_change'));
+                        window.dispatchEvent(new Event('resize'));
+                      };
+                      requestAnimationFrame(() => requestAnimationFrame(ping));
+                      setTimeout(ping, 300);
+                    }}
                     placeholder="Select layout"
                     showStatus={false}
                   />
@@ -881,14 +920,11 @@ const MainPage = () => {
             <SidebarFooter />
           </div>
         </div>
-
-        {/* Main content area (stable width because rail is constant) */}
         <div
           ref={mainContentRef}
           onPointerDown={handleMainInteract}
           onFocusCapture={handleMainInteract}
-         className={`flex-1 overflow-hidden transform-gpu will-change-transform transition-transform duration-300 ease-out
-           ${showSidebar ? 'translate-x-52' : 'translate-x-0'}   /* 52 = 13rem = 16rem - 3rem */
+         className={`relative flex-1 overflow-hidden transform-gpu will-change-transform transition-transform duration-300 ease-out
            ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
         >
           <div className="h-full overflow-y-auto">
@@ -896,7 +932,7 @@ const MainPage = () => {
               <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
             ) : selectedVideo ? (
               <div className={`flex ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
-                <div className={`px-4 ${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'w-full'} overflow-auto`}>
+                <div className={`${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'px-4 w-full'} overflow-auto`}>
                   <div className="bg-white w-full">
                     <DBStats
                       canEdit={editMode === 'admin' || editMode === 'editor'}

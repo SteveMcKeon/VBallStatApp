@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect  } from 'react';
 import { createPortal } from 'react-dom';
 
 const TEXT_OPERATORS = [
@@ -81,14 +81,6 @@ const SortableFilterHeader = ({
      : { conditions: [{ operator: defaultOperator, value: '' }] };
   }, [filterValue, defaultOperator]);
 
-  useLayoutEffect(() => {
-    if (showFilterMenu && wrapperRef.current) {
-    const raf = requestAnimationFrame(() => {
-      setMenuStyles(calculateMenuPosition());
-    });
-    return () => cancelAnimationFrame(raf);
-    }
-  }, [showFilterMenu]);
   const filterBtnRef = useRef(null);
   const isFilterActive = () =>
     effectiveFilter.conditions.some(({ operator, value }) => {
@@ -179,25 +171,7 @@ const SortableFilterHeader = ({
       conditions: newConditions.length ? newConditions : [{ operator: 'contains', value: '' }]
     });
   };
-  const [menuStyles, setMenuStyles] = useState({});
-  const calculateMenuPosition = () => {
-    const menuWidth = wrapperRef.current?.parentElement?.parentElement?.offsetWidth;
-    const rect = wrapperRef.current.getBoundingClientRect();
-    const overflowRight = rect.right > menuWidth;
 
-    return {
-      left: overflowRight ? 'auto' : '0',
-      right: '0',
-      top: '100%',
-      bottom: 'auto',
-    };
-  };
-  useLayoutEffect(() => {
-    if (showFilterMenu && wrapperRef.current) {
-      setMenuStyles(calculateMenuPosition());
-    }
-  }, [showFilterMenu]);
-  
   const startDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -229,6 +203,7 @@ const SortableFilterHeader = ({
   };
 
   const thRef = useRef(null);
+
   const [menuFixedStyle, setMenuFixedStyle] = useState({});
   const computeFixedPos = () => {
     if (!thRef.current) return {};
@@ -316,7 +291,7 @@ return (
   (portalEl ? createPortal(
     <div
       ref={wrapperRef}
-      className="z-[2] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
+      className="z-[9999] bg-white border border-gray-300 shadow-lg rounded-md p-2 w-56 space-y-2 max-h-96 overflow-y-auto"
       style={menuFixedStyle}
     >
           {effectiveFilter.conditions.map((condition, idx) => {
@@ -426,7 +401,7 @@ return (
             Clear Filter
           </button>
         </div>,
-        portalEl || document.body
+        document.body
       ) : null)
       )}
     </th>

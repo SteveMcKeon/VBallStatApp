@@ -304,41 +304,85 @@ const DBStats = ({
     return bodyColumns.reduce((sum, { key }) => sum + widthFor(key), 0);
   }, [bodyColumns, columnWidths, measuredColPx, flexKey]);
 
-  // Build grid template; if content exceeds viewport, fix the flex col width so we can overflow horizontally.
-  const gridTemplate = useMemo(() => {
+  const [viewportW, setViewportW] = useState(0);
+  
+  useLayoutEffect(() => {
+    const headerEl = headerScrollRef.current;
+    const bodyEl   = listOuterRef.current;
+    const containerEl = mainContentRef?.current || bodyEl || headerEl;
+    const read = () => {
+      const w = (bodyEl?.clientWidth ?? headerEl?.clientWidth ?? 0);
+      setViewportW(w);
+    };
+    read();
+    const ro = new ResizeObserver(() => {
+      read();
+    });
+    if (containerEl) ro.observe(containerEl);
+    if (headerEl && headerEl !== containerEl) ro.observe(headerEl);
+    if (bodyEl && bodyEl !== containerEl) ro.observe(bodyEl);
+    const onLayout = () => {
+      requestAnimationFrame(read);
+    };
+    window.addEventListener('resize', onLayout);
+    window.addEventListener('db_layout_change', onLayout);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', onLayout);
+      window.removeEventListener('db_layout_change', onLayout);
+    };
+  }, [mainContentRef]);
+
+  const { gridTemplate, canFit, totalPx } = useMemo(() => {
+    const MIN_COL_PX  = 60;
+    const FLEX_MIN_PX = 160;
     const available =
-      headerScrollRef.current?.clientWidth ??
       listOuterRef.current?.clientWidth ??
+      headerScrollRef.current?.clientWidth ??
       0;
-    const needsOverflow = totalColumnsPx > available && available > 0;
-    const widthFor = (key) => {
+    const widthForFixed = (key) => {
       if (key === '__insert__' || key === '__delete__') return 32;
-      if (key === flexKey) {
-        if (needsOverflow) {
-          return Math.max(
-            60,
-            Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? 160)
-          );
-        }
-        return null;
-      }
+
       const explicit = columnWidths[key];
-      if (explicit) return Math.max(60, Math.floor(explicit));
+      if (explicit != null) return Math.max(MIN_COL_PX, Math.floor(explicit));
+
       const measured = measuredColPx[key];
-      if (measured) return Math.max(60, Math.floor(measured));
-      if (key === 'notes' && !needsOverflow) return null;
+      if (measured != null) return Math.max(MIN_COL_PX, Math.floor(measured));
+
       if (key === 'notes') return 200;
       return 120;
     };
-    return bodyColumns.map(({ key }) => {
-      const w = widthFor(key);
-      return w == null ? 'minmax(160px,1fr)' : `${w}px`;
+    const fixedPx = bodyColumns.reduce((sum, { key }) => {
+      if (key === flexKey) return sum;
+      return sum + widthForFixed(key);
+    }, 0);
+    const canFitLocal = available > 0 && fixedPx + FLEX_MIN_PX <= available;
+    const pinnedFlexPx = Math.max(
+      MIN_COL_PX,
+      Math.floor(
+        columnWidths[flexKey] ??
+        measuredColPx[flexKey] ??
+        200
+      )
+    );
+    const template = bodyColumns.map(({ key }) => {
+      if (key === flexKey) {
+        if (canFitLocal) {
+          return `minmax(${FLEX_MIN_PX}px, 1fr)`;
+        }
+        return `${pinnedFlexPx}px`;
+      }
+      const w = widthForFixed(key);
+      return `${w}px`;
     }).join(' ');
-  }, [bodyColumns, columnWidths, measuredColPx, flexKey, totalColumnsPx]);
+    const totalPxLocal = canFitLocal ? fixedPx + FLEX_MIN_PX : fixedPx + pinnedFlexPx;
+    return { gridTemplate: template, canFit: canFitLocal, totalPx: totalPxLocal };
+  }, [bodyColumns, columnWidths, measuredColPx, flexKey, viewportW]);
 
   useLayoutEffect(() => {
     listRef.current?.resetAfterIndex(0, true);
-  }, [gridTemplate, columnWidths]); 
+  }, [gridTemplate, columnWidths, viewportW]);
   
   const [isResizingCol, setIsResizingCol] = useState(false);
   
@@ -595,7 +639,7 @@ const DBStats = ({
       <div
         ref={rowRef}
         role="row"
-        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch', minWidth: totalColumnsPx }}
+        style={{ ...style, display: 'grid', gridTemplateColumns: gridTemplate, alignItems: 'stretch', minWidth: canFit ? 'auto' : totalPx }}
         className={`db-row ${!canEdit ? 'hover:bg-gray-50' : ''}`}
         onClick={onRowClick}
       >
@@ -868,17 +912,33 @@ const DBStats = ({
     }
     const MIN = 60;
     let needed = Math.max(MIN, headerNeeded, cellsNeeded);
-    const GROW_THRESHOLD = 3;
-    if (needed > current + GROW_THRESHOLD) needed += 6;
-    if (needed > (columnWidths[key] ?? 0)) {
-      setColumnWidths((prev) => ({ ...prev, [key]: needed }));
-      requestAnimationFrame(() => {
-        rowHeightsRef.current.clear();
-        listRef.current?.resetAfterIndex(0, true);
-      });
+    if (needed > current + 5) {
+      needed += 6;
     }
+    setColumnWidths((prev) => ({ ...prev, [key]: needed }));
+    requestAnimationFrame(() => {
+      rowHeightsRef.current.clear();
+      listRef.current?.resetAfterIndex(0, true);
+    });
   };
   const EMPTY_MIN = 160;
+
+  useLayoutEffect(() => {
+    didInitialAutofit.current = false;
+    setMeasuredColPx({});
+    setColumnWidths(prev => {
+      const next = { ...prev };
+      delete next[flexKey];
+      return next;
+    });
+    rowHeightsRef.current.clear?.();
+    listRef.current?.resetAfterIndex?.(0, true);
+    requestAnimationFrame(() => {
+      autofitAll();
+      listRef.current?.resetAfterIndex?.(0, true);
+    });
+  }, [layoutMode, flexKey, autofitAll]);
+
   return (
     <>
       {/* Toolbar shown when filters are active */}
@@ -921,19 +981,18 @@ const DBStats = ({
           touchAction: 'pan-x pan-y'
         }}
       >
-        <table className="w-full text-center" ref={headerTableRef} style={{ minWidth: totalColumnsPx }}>
+        <table className="w-full text-center" ref={headerTableRef} style={{ width: canFit ? '100%' : totalPx }}>
           <thead>{renderHeader()}</thead>
         </table>
       </div>
       <div ref={setFilterPortalEl} id="db-filter-portal" />
-      {/* Body (react-window outer will scroll horizontally) */}
       <div
         className="relative mb-4"
         style={{
           height:
             filteredStats.length === 0
               ? Math.min(vh60, EMPTY_MIN)
-              : Math.max(EMPTY_MIN, getTotalListHeight()),
+              : Math.max(EMPTY_MIN, vh60),
           minHeight: filteredStats.length === 0 ? EMPTY_MIN : undefined,
           zIndex: 0,
         }}

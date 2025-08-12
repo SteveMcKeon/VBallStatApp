@@ -25,5 +25,6 @@ Sometimes seeking doesn't work on new videos. weird.
 Failed to resume file handle when upload file after something was ready for resume.
 Switching teams and the resume upload fails, or restarts.
 scrubbing seekbar doesn't work in fullscreen
+filter buttons!
 
 Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou
