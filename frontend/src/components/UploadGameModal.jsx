@@ -166,6 +166,22 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
   const pickerSessionRef = useRef({ active: false, changed: false });
   const onFocusListenerRef = useRef(null);
   const resolveOnFocusTimeoutRef = useRef(null);
+  const dismissUpload = (id) => setUploads(prev => prev.filter(u => u.id !== id));
+
+  async function verifyTusCompletion(url, expectedSize) {
+    try {
+      const res = await fetch(url, {
+        method: 'HEAD',
+        headers: { 'Tus-Resumable': '1.0.0' }
+      });
+      if (!res.ok) return false;
+      const offset = parseInt(res.headers.get('Upload-Offset') || '0', 10);
+      const length = parseInt(res.headers.get('Upload-Length') || String(expectedSize), 10);
+      return offset === length;
+    } catch {
+      return false;
+    }
+  }
 
   const waitForUserActivation = () =>
     new Promise((resolve) => {
@@ -768,7 +784,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     }
 
     let fileHandleSaved = false;
-
+    let hit100 = false;
     const upload = new tus.Upload(fileToUpload, {
       endpoint: '/api/upload-game',
       retryDelays: [0, 1000, 3000, 5000],
@@ -783,15 +799,10 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         setNumber: uploadItem?.setNumber?.toString() || '1'
       },
       fingerprint: customFingerprint,
-      onError: (error) => {
-        console.error('Upload failed:', error);
-        setUploads(prev => prev.map(u => u.id === uploadId ? { ...u, status: 'error' } : u));
-        setToast('Upload failed');
-      },
       onProgress: async (bytesUploaded, bytesTotal) => {
         const percentage = Math.floor((bytesUploaded / bytesTotal) * 100);
+        if (percentage >= 100) hit100 = true;
         setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, progress: percentage } : u)));
-
         if (!fileHandleSaved && uploadItem?.fileHandle) {
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -823,7 +834,29 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
             }
           }
         }
-      }
+      },
+      onError: async (error) => {
+        console.error('Upload failed:', error);
+        if (hit100 && upload.url && await verifyTusCompletion(upload.url, fileToUpload.size)) {
+          setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, status: 'success', progress: 100 } : u)));
+          setToast('Game uploaded successfully!', 'success');
+          setTimeout(() => dismissUpload(uploadId), 5000);
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('tus::')) {
+              const data = JSON.parse(localStorage.getItem(key));
+              if (data && data.metadata?.user_id === userId && data.metadata?.filename === fileToUpload.name) {
+                localStorage.removeItem(key);
+                await removeFileHandleFromIndexedDB(key);
+                break;
+              }
+            }
+          }
+          return;
+        }
+        setUploads(prev => prev.map(u => u.id === uploadId ? { ...u, status: 'error' } : u));
+        setToast(`Upload failed${error?.message ? `: ${error.message}` : ''}`);
+      },
     });
 
     setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, uploadRef: upload, status: 'uploading' } : u)));
@@ -1073,32 +1106,59 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
                   {upload.status === 'cancelled' && 'Cancelled'}
                   {(upload.status === 'uploading' || upload.status === 'paused') && `${upload.paused ? 'Paused' : 'Uploading'}... ${upload.progress}%`}
                 </span>
-                {(upload.status === 'uploading' || upload.status === 'paused') && (
+                {(upload.status === 'uploading' || upload.status === 'paused' || upload.status === 'error' || upload.status === 'cancelled') && (
                   <>
-                    <button
-                      onClick={() => togglePauseResume(upload.id)}
-                      className="w-6 h-6 mr-1 cursor-pointer rounded-md hover:bg-gray-100"
-                    >
-                      {upload.paused ? (
-                        <svg viewBox="0 0 36 36" width="100%" height="100%" fill="black">
-                          <path d="M 12,10 L 25,18 L 12,26 Z" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 36 36" width="100%" height="100%" fill="black">
-                          <path d="M 12,10 L 16,10 L 16,26 L 12,26 Z M 20,10 L 24,10 L 24,26 L 20,26 Z" />
-                        </svg>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => cancelUpload(upload.id)}
-                      className="w-6 h-6 flex items-center justify-center rounded-md 
-                                text-gray-500 
-                                hover:bg-red-100 transition cursor-pointer"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    {(upload.status === 'uploading' || upload.status === 'paused') && (
+                      <>
+                        <button
+                          onClick={() => togglePauseResume(upload.id)}
+                          className="w-6 h-6 mr-1 cursor-pointer rounded-md hover:bg-gray-100"
+                        >
+                          {upload.paused ? (
+                            <svg viewBox="0 0 36 36" width="100%" height="100%" fill="black">
+                              <path d="M 12,10 L 25,18 L 12,26 Z" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 36 36" width="100%" height="100%" fill="black">
+                              <path d="M 12,10 L 16,10 L 16,26 L 12,26 Z M 20,10 L 24,10 L 24,26 L 20,26 Z" />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => cancelUpload(upload.id)}
+                          className="w-6 h-6 flex items-center justify-center rounded-md 
+                                    text-gray-500 
+                                    hover:bg-red-100 transition cursor-pointer"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                        {(upload.status === 'error' || upload.status === 'cancelled') && (
+                          <>
+                            <button
+                              onClick={() => handleSubmit(upload.id)}
+                              className="w-6 h-6 mr-1 cursor-pointer rounded-md hover:bg-gray-100"
+                              title="Retry"
+                            >
+                              {/* simple retry icon */}
+                              <svg viewBox="0 0 24 24" width="100%" height="100%" fill="black">
+                                <path d="M12 5v2a5 5 0 1 1-4.9 6h2.1a3 3 0 1 0 2.8-4H9l3-3z"/>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => dismissUpload(upload.id)}
+                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100"
+                              title="Dismiss"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
               </div>
