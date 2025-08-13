@@ -137,9 +137,9 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     }
     return null;
   };  
+
   const scanIncompleteUploads = () => {
     const incompleteUploads = [];
-
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('tus::')) {
@@ -155,6 +155,107 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     }
     return incompleteUploads;
   };
+
+  useEffect(() => {
+    if (!isOpen) endPickerSession();
+  }, [isOpen]);
+
+  const pickerRunIdRef = useRef(0);
+  const reselectQueueRef = useRef([]);
+  const pickerResolveRef = useRef(null);
+  const pickerSessionRef = useRef({ active: false, changed: false });
+  const onFocusListenerRef = useRef(null);
+  const resolveOnFocusTimeoutRef = useRef(null);
+
+  const waitForUserActivation = () =>
+    new Promise((resolve) => {
+      if (navigator.userActivation?.isActive) return resolve();
+      const onActivate = () => {
+        cleanup();
+        resolve();
+      };
+      const cleanup = () => {
+        document.removeEventListener('pointerdown', onActivate, true);
+        document.removeEventListener('keydown', onActivate, true);
+      };
+
+      document.addEventListener('pointerdown', onActivate, true);
+      document.addEventListener('keydown', onActivate, true);
+    });
+
+    const endPickerSession = () => {
+      if (onFocusListenerRef.current) {
+        window.removeEventListener('focus', onFocusListenerRef.current, true);
+        onFocusListenerRef.current = null;
+      }
+      if (resolveOnFocusTimeoutRef.current) {
+        clearTimeout(resolveOnFocusTimeoutRef.current);
+        resolveOnFocusTimeoutRef.current = null;
+      }
+      if (fallbackFileInputRef.current && pickerSessionRef.current) {
+        fallbackFileInputRef.current.multiple = pickerSessionRef.current.wasMultiple ?? true;
+      }
+      if (pickerSessionRef.current) {
+        pickerSessionRef.current.active = false;
+        pickerSessionRef.current.finished = true;
+      }
+      pickerResolveRef.current = null;
+    };
+
+  const spawnPickerAndWait = () =>
+    new Promise((resolve) => {
+      if (resolveOnFocusTimeoutRef.current) {
+        clearTimeout(resolveOnFocusTimeoutRef.current);
+        resolveOnFocusTimeoutRef.current = null;
+      }
+      const runId = ++pickerRunIdRef.current;
+      const now = performance.now();
+      pickerSessionRef.current = {
+        active: true,
+        changed: false,
+        finished: false,
+        runId,
+        armedAt: now,
+        wasMultiple: fallbackFileInputRef.current?.multiple ?? true
+      };
+      pickerResolveRef.current = (result) => {
+        if (pickerSessionRef.current?.finished) return;
+        pickerSessionRef.current.finished = true;
+        try { 
+          resolve(result); 
+        } finally { 
+          endPickerSession(); 
+        }
+      };
+      if (fallbackFileInputRef.current) {
+        fallbackFileInputRef.current.multiple = false;
+      }
+      const onFocus = () => {
+        const sess = pickerSessionRef.current;
+        if (!sess || sess.runId !== runId) return;
+        if (performance.now() - sess.armedAt < 200) return;
+
+        resolveOnFocusTimeoutRef.current = setTimeout(() => {
+          if (sess.active && !sess.changed && !sess.finished) {
+            sess.active = false;
+            pickerResolveRef.current?.({ cancelled: true });
+          }
+          window.removeEventListener('focus', onFocus, true);
+          onFocusListenerRef.current = null;
+          resolveOnFocusTimeoutRef.current = null;
+        }, 350);
+      };
+      onFocusListenerRef.current = onFocus;
+      window.addEventListener('focus', onFocus, true);
+      (async () => {
+        try {
+          await waitForUserActivation();
+          fallbackFileInputRef.current?.click();
+        } catch {
+          // no-op
+        }
+      })();
+    });
 
   const loadAllResumableUploads = async () => {
     const incompleteUploads = scanIncompleteUploads();
@@ -180,9 +281,23 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
   };
 
   useImperativeHandle(ref, () => ({
+    probeResumableState: async () => {
+      const pending = scanIncompleteUploads(); 
+      let withHandle = 0;
+      let withoutHandle = 0;
+      for (const entry of pending) {
+        try {
+          const fh = await getFileHandleFromIndexedDB(entry.key);
+          if (fh) withHandle++; else withoutHandle++;
+        } catch {
+          withoutHandle++;
+        }
+      }
+      return { total: pending.length, withHandle, withoutHandle };
+    },
     cancelUploads: async () => {
-      const resumableUploads = await loadAllResumableUploads();
-      if (resumableUploads.length === 0) {
+      const pending = scanIncompleteUploads();
+      if (pending.length === 0) {
         setToast('No resumable uploads found', 'error');
         return;
       }
@@ -192,22 +307,19 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
           const u = new URL(url, window.location.origin);
           const parts = u.pathname.split('/').filter(Boolean);
           return parts[parts.length - 1] || null;
-        } catch {
-          return null;
-        }
+        } catch { return null; }
       };
       let cancelled = 0;
-      for (const { uploadData } of resumableUploads) {
+      for (const entry of pending) {
         try {
-          const tusUrl = uploadData?.url || uploadData?.uploadUrl;
+          const tusUrl = entry?.url || entry?.uploadUrl;
           const tusId = extractTusId(tusUrl);
-
           if (tusId) {
             await cancelUpload(undefined, tusId);
             cancelled++;
-          } else {
-            console.warn('No tus id found for resumable entry', uploadData);
           }
+          try { await removeFileHandleFromIndexedDB(entry.key); } catch {}
+          localStorage.removeItem(entry.key);
         } catch (err) {
           console.error('Unexpected cancel failure', err);
         }
@@ -216,75 +328,181 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         setToast(`Cancelled ${cancelled} upload${cancelled === 1 ? '' : 's'}`, 'success');
       }
     },
-
     triggerResumeAllUploads: async () => {
-      const resumableUploads = await loadAllResumableUploads();
-      if (resumableUploads.length === 0) {
+      const pending = scanIncompleteUploads(); // all tus::* for this user
+      if (pending.length === 0) {
         setToast('No resumable uploads found', 'error');
         return;
       }
-      for (const { key, uploadData, fileHandle } of resumableUploads) {
+      const withHandles = [];
+      const withoutHandles = [];
+      for (const entry of pending) {
+        const fh = await getFileHandleFromIndexedDB(entry.key);
+        if (fh) withHandles.push({ entry, fileHandle: fh });
+        else withoutHandles.push(entry);
+      }
+      for (const { entry, fileHandle } of withHandles) {
         try {
-          if (!fileHandle || typeof fileHandle.requestPermission !== 'function') {
-            console.error('Invalid file handle structure', fileHandle);
-            setToast(`Failed to resume ${uploadData.metadata.filename}`, 'error');
-            await removeFileHandleFromIndexedDB(key);
-            localStorage.removeItem(key);
+          if (typeof fileHandle.requestPermission !== 'function') {
             continue;
           }
           const permission = await fileHandle.requestPermission();
-          if (permission === 'granted') {
-            try {
-              const file = await fileHandle.getFile();
-              const metadata = uploadData.metadata;
-              if (metadata.date) {
-                setDate(metadata.date);
-                setAutofillDate(true);
-              }
-              if (metadata.players) {
-                setPlayers(metadata.players);
-                setAutofillPlayers(true);
-              }            
-              const fingerprint = await customFingerprint(file, {
-                endpoint: '/api/upload-game',
-                metadata
-              });              
-              const alreadyExists = uploads.some(u => u.id === fingerprint);
-              if (!alreadyExists) {
-                setUploads(prev => [
-                  ...prev,
-                  {
-                    file,
-                    progress: 0,
-                    status: 'pending',
-                    paused: false,
-                    uploadRef: null,
-                    fileHandle,
-                    id: fingerprint,
-                    setNumber: parseInt(uploadData.metadata.setNumber, 10),
-                    metadata
-                  }
-                ]);
-              }
-              setTimeout(() => {
-                handleSubmit(fingerprint, file, metadata.date, metadata.players, fingerprint);
-              }, 0);
-            } catch (fileError) {
-              console.error('Failed to get file from handle', fileError);
-              setToast(`Could not access file ${uploadData.metadata.filename}. Try again later.`, 'error');
-            }
-          } else {
-            setToast(`Permission denied for ${uploadData.metadata.filename}`, 'error');
-            await removeFileHandleFromIndexedDB(key);
-            localStorage.removeItem(key);
+          if (permission !== 'granted') {
+            setToast(`Permission denied for ${entry.metadata.filename}`, 'error');
+            continue;
           }
+          const file = await fileHandle.getFile();
+          const metadata = entry.metadata;
+          if (metadata?.date) { setDate(metadata.date); setAutofillDate(true); }
+          if (metadata?.players) { setPlayers(metadata.players); setAutofillPlayers(true); }
+          const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata });
+          const exists = uploads.some(u => u.id === fingerprint);
+          if (!exists) {
+            setUploads(prev => [...prev, {
+              file, progress: 0, status: 'pending', paused: false, uploadRef: null,
+              fileHandle, id: fingerprint, setNumber: parseInt(metadata.setNumber, 10), metadata
+            }]);
+          }
+          setTimeout(() => handleSubmit(fingerprint, file, metadata.date, metadata.players, fingerprint), 0);
         } catch (err) {
-          console.error('Unexpected resume failure', err);
-          setToast(`Unexpected failure while resuming ${uploadData.metadata.filename}`, 'error');
+          setToast(`Could not access file ${entry.metadata?.filename}.`, 'error');
         }
       }
+      reselectQueueRef.current = withoutHandles;
+      while (reselectQueueRef.current.length > 0) {
+        const entry = reselectQueueRef.current[0];
+        const m = entry.metadata || {};
+        setDate(m.date || ''); setPlayers(m.players || '');
+        setAutofillDate(!!m.date); setAutofillPlayers(!!m.players);
+        const needsActivation = !(navigator.userActivation?.isActive);
+        setToast(
+          `${needsActivation ? 'Tap/click to continue. ' : ''}Please re-select ${m.filename || 'the same file'} to resume.`,
+          'neutral',
+          10000
+        );
+        const {file, cancelled } = await spawnPickerAndWait();
+        if (cancelled) {
+          await cancelOneResumable(entry);
+          reselectQueueRef.current.shift();
+          continue;
+        }
+        if (!file) continue;
+        if (m.filename && file.name !== m.filename) {
+          setToast(`Selected "${file.name}" but expected "${m.filename}". Please re-select.`, 'error', 8000);
+          continue;
+        }
+        const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata: m });
+        const exists = uploads.some(u => u.id === fingerprint);
+        if (!exists) {
+          setUploads(prev => [...prev, {
+            file,
+            progress: 0,
+            status: 'pending',
+            paused: false,
+            uploadRef: null,
+            fileHandle: null,
+            id: fingerprint,
+            setNumber: parseInt(m.setNumber, 10),
+            metadata: m
+          }]);
+        }
+        setTimeout(() => handleSubmit(fingerprint, file, m.date, m.players, fingerprint), 0);
+        reselectQueueRef.current.shift();
+      }
     }
-}));
+  }));
+
+  const cancelOneResumable = async (entry) => {
+    const extractTusId = (url) => {
+      try {
+        if (!url) return null;
+        const u = new URL(url, window.location.origin);
+        const parts = u.pathname.split('/').filter(Boolean);
+        return parts[parts.length - 1] || null;
+      } catch { return null; }
+    };
+    const tusUrl = entry?.url || entry?.uploadUrl;
+    const tusId = extractTusId(tusUrl);
+    if (tusId) {
+      await cancelUpload(undefined, tusId);
+    }
+    try { await removeFileHandleFromIndexedDB(entry.key); } catch {}
+    localStorage.removeItem(entry.key);
+  };
+
+  const fallbackFileInputRef = useRef(null);
+  const handleFallbackFileInputChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (pickerResolveRef.current) {
+      pickerSessionRef.current.changed = true;
+      if (onFocusListenerRef.current) {
+        window.removeEventListener('focus', onFocusListenerRef.current, true);
+        onFocusListenerRef.current = null;
+      }
+      if (resolveOnFocusTimeoutRef.current) {
+        clearTimeout(resolveOnFocusTimeoutRef.current);
+        resolveOnFocusTimeoutRef.current = null;
+      }
+      if (fallbackFileInputRef.current) {
+        fallbackFileInputRef.current.multiple = pickerSessionRef.current?.wasMultiple ?? true;
+      }
+      const resolve = pickerResolveRef.current;
+      pickerResolveRef.current = null;
+      const file = files[0] || null;
+      e.target.value = '';
+      resolve({ file, cancelled: false });
+      return;
+    }
+    const validFiles = [];
+    let invalidCount = 0;
+    for (const file of files) {
+      if (file.type === 'video/mp4') {
+        const metadata = {
+          filename: file.name,
+          filetype: file.type,
+          date,
+          players,
+          team_name: teamName,
+          user_id: userId,
+          game_group_id: gameGroupId,
+          setNumber: (uploads.length + validFiles.length + 1).toString(),
+        };
+        const fingerprint = await customFingerprint(file, {
+          endpoint: '/api/upload-game',
+          metadata,
+        });
+        if (
+          uploads.some(u => u.file.name === file.name) ||
+          validFiles.some(u => u.file.name === file.name)
+        ) continue;
+        validFiles.push({
+          file,
+          progress: 0,
+          status: 'pending',
+          paused: false,
+          uploadRef: null,
+          fileHandle: null,
+          id: fingerprint,
+          setNumber: getNextSetNumberForGroup([...uploads, ...validFiles], metadata.game_group_id),
+          metadata,
+        });
+      } else {
+        invalidCount++;
+      }
+    }
+    if (invalidCount > 0) {
+      setToast(`${invalidCount} invalid file(s) skipped (only MP4 allowed)`);
+    }
+    const remainingSlots = 5 - uploads.length;
+    const uploadsToAdd = validFiles.slice(0, remainingSlots);
+    if (uploadsToAdd.length > 0) {
+      setUploads(prev => [...prev, ...uploadsToAdd]);
+    }
+    if (uploadsToAdd.length < validFiles.length) {
+      setToast('Only 5 files allowed. Some were not added.');
+    }
+    e.target.value = '';
+  };
 
   useEffect(() => {
     if (incompleteUploadData) {
@@ -306,7 +524,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
       return;
     }    
     if (!window.showOpenFilePicker) {
-      setToast('Your browser does not support persistent file access', 'error');
+      fallbackFileInputRef.current?.click();
       return;
     }
 
@@ -353,7 +571,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         });
       }
       if (invalidCount > 0) {
-        setToast(`${invalidCount} invalid file(s) skipped (only MP4 allowed)`, 'error');
+        setToast(`${invalidCount} invalid file(s) skipped (only MP4 allowed)`);
       }
       if (newUploads.length === 0) {
         if (duplicateCount === 0 && invalidCount > 0) {
@@ -366,7 +584,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
       setUploads(prev => [...prev, ...uploadsToAdd]);
 
       if (uploadsToAdd.length < newUploads.length) {
-        setToast('Only 5 files allowed. Some were not added.', 'error');
+        setToast('Only 5 files allowed. Some were not added.');
       }
     } catch (err) {
     }
@@ -655,6 +873,14 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
 
   return (
     <>
+    <input
+      ref={fallbackFileInputRef}
+      type="file"
+      accept="video/mp4"
+      multiple
+      onChange={handleFallbackFileInputChange}
+      style={{ display: 'none' }}
+    />
     {!resumeSilently && (    
       <Modal isOpen={isOpen} onClose={onClose}>
         <div className="text-center">

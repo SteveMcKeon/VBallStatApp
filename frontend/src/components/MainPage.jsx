@@ -1017,6 +1017,7 @@ const MainPage = () => {
       <UploadGameModal
         ref={uploadModalRef}
         isOpen={isUploadModalOpen}
+        setIsUploadModalOpen={setIsUploadModalOpen}
         onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
         onClose={() => {
           setIsUploadModalOpen(false);
