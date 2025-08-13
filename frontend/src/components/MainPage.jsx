@@ -150,8 +150,11 @@ const MainPage = () => {
     fetchUserRole();
   }, []);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
-  const handleTeamChange = async (e) => {
+  const handleTeamChange = async (e, { force = false } = {}) => {
     const selected = e.target.value;
+    if (!force && String(selected) === String(teamName)) {
+      return { data: teamGames, error: null, skipped: true };
+    }
     setTeamName(selected);
     setLocal('teamName', selected);
     setSelectedGameId(null);
@@ -173,6 +176,7 @@ const MainPage = () => {
     } else {
       setTeamGames(data);
     }
+    return { data, error };
   };
 
   const refreshGames = async () => {
@@ -439,37 +443,28 @@ const MainPage = () => {
   useEffect(() => {
     setIsAppLoading(true);
     const savedTeam = getLocal('teamName');
-    const savedGame = localStorage.getItem('selectedGameId');
-
+    const savedGame = getLocal('selectedGameId');
     const fetchAndRestore = async () => {
       const unique = await fetchTeamNames();
       setAvailableTeams(unique);
-
       if (savedTeam && unique.includes(savedTeam)) {
-        setTeamName(savedTeam);
-        await handleTeamChange({ target: { value: savedTeam } });
-        const { data: gamesData, error: gamesError } = await supabase
-          .from('games')
-          .select('id, title, date, video_url, hastimestamps, isscored, processed')
-          .eq('team_name', savedTeam)
-          .order('date', { ascending: false });
-
-        if (!gamesError && gamesData) {
-          setTeamGames(gamesData);
-          if (savedGame && gamesData.some(g => g.id === savedGame)) {
-            const selectedGame = gamesData.find(g => g.id === savedGame);
-            setSelectedGameId(savedGame);
-            setSelectedVideo(selectedGame?.video_url || '');
-          }
-        }
+       const { data: gamesData, error: gamesError } =
+         await handleTeamChange({ target: { value: savedTeam } });
+       if (!gamesError && gamesData) {
+         const byId = (g) => String(g.id) === String(savedGame);
+         if (savedGame && gamesData.some(byId)) {
+           const selectedGame = gamesData.find(byId);
+           setSelectedGameId(savedGame);
+           setSelectedVideo(selectedGame?.video_url || '');
+           setShowCenteredGamePicker(false);
+         }
+       }
       } else {
         setTeamName('');
         setLocal('teamName', '');
       }
-
       setIsAppLoading(false);
     };
-
     fetchAndRestore();
   }, []);
 
@@ -843,6 +838,7 @@ const MainPage = () => {
                         const selectedGame = teamGames.find(g => g.id === selectedOption.value);
                         setSelectedVideo(selectedGame?.video_url || '');
                         localStorage.removeItem('videoTime');
+                        setShowCenteredGamePicker(false);
                         setTimeout(() => {
                           videoRef.current?.focus();
                         }, 300);

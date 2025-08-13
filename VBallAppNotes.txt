@@ -8,7 +8,6 @@ Add tooltip intro for new users to introduce features.
 Add resize video option (drag) in side-by-side mode.
 	Shift + -> and <- for seek to set.
 	Shift + n for next video (by date).
-Resize table columns button?
 Add contact / bug report / suggestions email?
 Register team, invite other users to team.
 Add comments instead of notes.
@@ -16,7 +15,7 @@ team tactics or certain rotation options - by each team captain (Ask Tamir)
 tracking sets with trajectory overlay
 If not timestamp editor role, still click rest of non-editbale cells to jump to time.
 Create welcome page, with short video and highlights of website features.
-Stats page - have entire row highlight on hover for readability.
+Stats page - have entire row highlight on hover for readability or sticky row headers.
 Update index.html <head> info for SEO
 Ability to draw an overlay on the screen
 Play Filtered Touches should full screen on mobile. delay by a second as well.
@@ -26,5 +25,3 @@ Encode videos like youtube
 REFACTOR
 
 Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou, Marieve
-
-
