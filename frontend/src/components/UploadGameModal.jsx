@@ -1146,31 +1146,31 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
-                        {(upload.status === 'error' || upload.status === 'cancelled') && (
-                          <>
-                            <button
-                              onClick={() => handleSubmit(upload.id)}
-                              className="w-6 h-6 mr-1 cursor-pointer rounded-md hover:bg-gray-100"
-                              title="Retry"
-                            >
-                              {/* simple retry icon */}
-                              <svg viewBox="0 0 24 24" width="100%" height="100%" fill="black">
-                                <path d="M12 5v2a5 5 0 1 1-4.9 6h2.1a3 3 0 1 0 2.8-4H9l3-3z"/>
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => dismissUpload(upload.id)}
-                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100"
-                              title="Dismiss"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </>
-                        )}
                       </>
                     )}
+                    {(upload.status === 'error' || upload.status === 'cancelled') && (
+                      <>
+                        <button
+                          onClick={() => handleSubmit(upload.id)}
+                          className="w-6 h-6 mr-1 cursor-pointer rounded-md hover:bg-gray-100"
+                          title="Retry"
+                        >
+                          {/* simple retry icon */}
+                          <svg viewBox="0 0 24 24" width="100%" height="100%" fill="black">
+                            <path d="M12 5v2a5 5 0 1 1-4.9 6h2.1a3 3 0 1 0 2.8-4H9l3-3z"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => dismissUpload(upload.id)}
+                          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100"
+                          title="Dismiss"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </>
+                    )}                    
                   </>
                 )}
               </div>

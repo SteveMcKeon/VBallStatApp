@@ -26,7 +26,7 @@ const tusServer = new Server({
     const originalFilename = metadata.filename || 'unnamed';
     const setnumber = metadata.setNumber || 'unnamed';
     const ext = path.extname(originalFilename) || '.mp4';
-    const finalFileName = `${gameGroupId}_SET-${setnumber}_READY${ext}`;
+    const finalFileName = `${gameGroupId}_SET-${setnumber}_READY`;
     console.log(`Saving upload as: ${finalFileName}`);
     return finalFileName;
   },
