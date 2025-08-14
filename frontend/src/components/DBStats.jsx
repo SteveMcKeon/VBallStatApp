@@ -70,7 +70,6 @@ const DBStats = ({
   handleTextColumnFilterChange,
   renderCell,
   insertButtonParentRef,
-  authorizedFetch,
   layoutMode,
   jumpToTime,
   videoRef,
@@ -80,6 +79,7 @@ const DBStats = ({
   formatTimestamp,
   gameId,
   refreshGames,
+  supabase,
 }) => { 
   const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
@@ -471,31 +471,33 @@ const DBStats = ({
   const toggleGameField = async (field, value) => {
     if (!gameId) return;
     try {
-      const res = await authorizedFetch(`/api/update-game/${gameId}`, { method: 'PATCH', body: { updates: { [field]: value } } });
-      const result = await res.json();
-      if (result.success) { refreshStats(); if (refreshGames) refreshGames(); }
-      else { setToast(`Failed to update ${field}: ${result.message}`); }
-    } catch (err) { setToast(`Error updating ${field}`); }
+      const { error } = await supabase
+        .from('games')
+        .update({ [field]: value })
+        .eq('id', gameId);
+      if (error) {
+        setToast(`Failed to update ${field}: ${error.message}`);
+        return;
+      }
+      refreshStats();
+      if (refreshGames) refreshGames();
+    } catch (err) {
+      setToast(`Error updating ${field}`);
+    }
   };
 
   const navigateToEditableCell = ({ idx, field, direction }) => {
-    const keys = Object.keys(visibleColumns).filter(
-      (k) => visibleColumns[k]?.visible && k !== 'timestamp' && k !== 'score'
-    );
-
+    const keys = orderedKeys.filter((k) => k !== 'timestamp' && k !== 'score');
     const isEditable = (fieldName) => {
       if (editMode === 'admin') return true;
       const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
       return editableFieldsInEditorMode.includes(fieldName);
     };
-
     let newIdx = idx;
     let colIndex = keys.indexOf(field);
-
     const MAX_ROWS = filteredStats.length;
     const MAX_COLS = keys.length;
     let guard = 0;
-
     while (guard++ < MAX_ROWS * MAX_COLS) {
       if (direction === 'next') {
         colIndex++;
@@ -505,9 +507,7 @@ const DBStats = ({
         if (colIndex < 0) { colIndex = MAX_COLS - 1; newIdx--; }
       } else if (direction === 'down') { newIdx++; }
       else if (direction === 'up') { newIdx--; }
-
       if (newIdx < 0 || newIdx >= MAX_ROWS) break;
-
       const nextField = keys[colIndex];
       if (isEditable(nextField)) {
         requestAnimationFrame(() => {
@@ -523,14 +523,12 @@ const DBStats = ({
   useLayoutEffect(() => {
     const headerEl = headerScrollRef.current;
     const bodyEl   = listOuterRef.current;
-
     const prev = scrollSyncRef.current;
     const headerChanged = prev.header !== headerEl;
     const bodyChanged   = prev.body   !== bodyEl;
     if (!headerChanged && !bodyChanged) return;
     if (prev.header && prev.onHeader) prev.header.removeEventListener('scroll', prev.onHeader);
     if (prev.body   && prev.onBody)   prev.body.removeEventListener('scroll',   prev.onBody);
-
     if (!headerEl || !bodyEl) {
       scrollSyncRef.current = { header: headerEl, body: bodyEl, onHeader: null, onBody: null };
       return;
@@ -632,19 +630,22 @@ const DBStats = ({
                   our_score: s.our_score,
                   opp_score: s.opp_score,
                   set: s.set,
+                  team_id: s.team_id,
                 };
-                try {
-                  const res = await authorizedFetch('/api/save-stats', { body: { rows: [newRow] } });
-                  const result = await res.json();
-                  if (result.success && result.insertedRows?.length) {
-                    const inserted = result.insertedRows[0];
-                    const index = stats.findIndex(row => row.id === s.id);
-                    const updated = [...stats];
-                    updated.splice(index + 1, 0, inserted);
-                    setStats(updated);
-                    setToast('Added row.', 'success');                        
-                  } else { setToast('Failed to insert row.'); }
-                } catch (err) { console.error('Insert failed', err); setToast('Insert failed'); }
+                const { data, error } = await supabase
+                  .from('stats')
+                  .insert([newRow])
+                  .select('*');
+                if (!error && data?.length) {
+                  const inserted = data[0];
+                  const index = stats.findIndex(row => row.id === s.id);
+                  const updated = [...stats];
+                  updated.splice(index + 1, 0, inserted);
+                  setStats(updated);
+                  setToast('Added row.', 'success');
+                } else {
+                  setToast('Failed to insert row' + (error ? `: ${error.message}` : ''));
+                }
               }}
             >
               <IconWithTooltip tooltip="Add row below">
@@ -666,25 +667,20 @@ const DBStats = ({
             onClick={editMode === 'admin' ? async (e) => {
               e.stopPropagation(); 
               const currentTimestamp = videoRef.current?.currentTime ?? 0;
-              try {
-                const res = await authorizedFetch('/api/update-stat', {
-                  body: { statId: s.id, updates: { timestamp: currentTimestamp } }
-                });
-                const result = await res.json();
-                if (result.success) {
-                  const statIndex = stats.findIndex(row => row.id === s.id);
-                  if (statIndex !== -1) {
-                    const newStats = [...stats];
-                    newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp };
-                    setStats(newStats);
-                  }
-                } else {
-                  console.error('Timestamp update failed:', result.message);
-                  setToast('Failed to update timestamp: ' + result.message);
+              const { error } = await supabase
+                .from('stats')
+                .update({ timestamp: currentTimestamp })
+                .eq('id', s.id);
+
+              if (!error) {
+                const statIndex = stats.findIndex(row => row.id === s.id);
+                if (statIndex !== -1) {
+                  const newStats = [...stats];
+                  newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp };
+                  setStats(newStats);
                 }
-              } catch (err) {
-                console.error('Timestamp update error', err);
-                setToast('Error updating timestamp');
+              } else {
+                setToast('Failed to update timestamp: ' + error.message);
               }
             } : undefined}
           >
@@ -721,6 +717,7 @@ const DBStats = ({
                   gamePlayers={gamePlayers}
                   setEditingCell={navigateToEditableCell}
                   setToast={setToast}
+                  supabase={supabase}
                 />
               ) : (
                 s[field] ?? ''
@@ -735,20 +732,16 @@ const DBStats = ({
               className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
               onClick={async (e) => {
                 e.stopPropagation();
-                try {
-                  const res = await authorizedFetch(`/api/delete-stat/${s.id}`, { method: 'DELETE' });
-                  const result = await res.json();
-                  if (result.success) {
-                    const updated = stats.filter(row => row.id !== s.id);
-                    setStats(updated);
-                    setToast('Deleted row');                  
-                  } else {
-                    console.error('Delete failed:', result.message);
-                    setToast('Delete failed: ' + result.message);
-                  }
-                } catch (err) {
-                  console.error('Delete failed', err);
-                  setToast('Delete failed');
+                const { error } = await supabase
+                  .from('stats')
+                  .delete()
+                  .eq('id', s.id);
+                if (!error) {
+                  const updated = stats.filter(row => row.id !== s.id);
+                  setStats(updated);
+                  setToast('Deleted row');
+                } else {
+                  setToast('Delete failed: ' + error.message);
                 }
               }}
             >
@@ -1001,16 +994,19 @@ const DBStats = ({
                   our_score: lastRow?.our_score,
                   opp_score: lastRow?.opp_score,
                   set: lastRow?.set,
+                  team_id: lastRow?.team_id,
                 }));
+                const { data, error } = await supabase
+                  .from('stats')
+                  .insert(newRows)
+                  .select('*');
 
-                try {
-                  const res = await authorizedFetch('/api/save-stats', { body: { rows: newRows } });
-                  const result = await res.json();
-                  if (result.success && result.insertedRows?.length) {
-                    setStats([...stats, ...result.insertedRows]);
-                    setToast('Added 10 rows to bottom', 'success');
-                  } else { setToast('Failed to add rows'); }
-                } catch (err) { console.error('Add 10 rows failed', err); setToast('Add 10 rows failed'); }
+                if (!error && data?.length) {
+                  setStats([...stats, ...data]);
+                  setToast('Added 10 rows to bottom', 'success');
+                } else {
+                  setToast('Failed to add rows' + (error ? `: ${error.message}` : ''));
+                }
               }}
             >
               ➕ Add 10 Rows to Bottom

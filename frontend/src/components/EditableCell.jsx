@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } from 'react';
-import EditMode from './EditMode';
 
-const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast }, ref) => {
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase }, ref) => {
+  const RALLY_FIELD = 'rally_id';
+  const RALLY_START = 1;
   const RESULT_OPTIONS = ['Won Point', 'Lost Point'];
   const ACTION_TYPE_OPTIONS = [
     'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free', 'Taylor Dump'
@@ -14,7 +15,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   const [tempValue, setTempValue] = useState(value ?? '');
   const inputRef = useRef(null);
   const wrapperRef = useRef(null); 
-  const { authorizedFetch } = EditMode();
   const [cellHeight, setCellHeight] = useState(null);
   const [cellWidth, setCellWidth] = useState(null);  
   const displayRef = useRef(null);
@@ -75,97 +75,144 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       inputRef.current?.select();
     },
     clickToEdit: () => {
-      wrapperRef.current?.click();
+      setEditing(true);
     },
     element: inputRef.current || wrapperRef.current
   }));
-  
-  const handleBlur = async () => {
-    if (!editing) return;
-    setEditing(false);
-    let parsed;
+
+  const patchRowsRef = useRef(null);
+  const normalizeResult = (res) => {
+    const s = (res ?? '').toString().trim().toLowerCase();
+    if (!s) return null;
+    if (s === 'w' || s === 'win' || s.startsWith('won')) return 'Won Point';
+    if (s === 'l' || s === 'loss' || s.startsWith('lost')) return 'Lost Point';
+    return null;
+  };
+  const commitEdit = async (rawNext) => {
+    let parsed = rawNext;
     const isBlank =
-      ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(type)
-        ? tempValue.trim?.() === ''
-        : tempValue === '';
-    if (['int2', 'int4', 'int8'].includes(type)) {
-      parsed = isBlank ? null : parseInt(tempValue);
-    } else if (['float4', 'float8', 'numeric'].includes(type)) {
-      parsed = isBlank ? null : parseFloat(tempValue);
-    } else {
-      parsed = isBlank ? null : tempValue;
-    }
-    if ((field === 'player' || field === 'result' || field === 'action_type') && suggestions.length === 1) {
-      parsed = suggestions[0];
-      setTempValue(suggestions[0]);
-    }
-    const isValid =
-      (['int2', 'int4', 'int8'].includes(type) && (parsed === null || (!isNaN(parsed) && Number.isInteger(parsed)))) ||
-      (['float4', 'float8', 'numeric'].includes(type) && (parsed === null || !isNaN(parsed))) ||
-      (type === 'text' && (typeof parsed === 'string' || parsed === null));
-    if (!isValid) {
-      setToast(`Invalid value for type ${type}`);
-      setTempValue(value ?? '');
+      ['int2','int4','int8','float4','float8','numeric'].includes(type)
+        ? rawNext?.trim?.() === '' : rawNext === '';
+    if (['int2','int4','int8'].includes(type)) parsed = isBlank ? null : parseInt(rawNext);
+    else if (['float4','float8','numeric'].includes(type)) parsed = isBlank ? null : parseFloat(rawNext);
+    else parsed = isBlank ? null : rawNext;
+    if (field === 'result') parsed = normalizeResult(parsed);
+    const toNum = v => (v === null || v === undefined || v === '' ? null : Number(v));
+    const prevComparable =
+      field === 'result' ? normalizeResult(value)
+      : (field === 'our_score' || field === 'opp_score') ? toNum(value)
+      : (value ?? '');
+    const nextComparable =
+      field === 'result' ? normalizeResult(parsed)
+      : (field === 'our_score' || field === 'opp_score') ? toNum(parsed)
+      : (parsed ?? '');
+    if (prevComparable === nextComparable) return;
+    patchRowsRef.current = null;
+    setStats(prev => {
+      const next = [...prev];
+      const idxInAll = next.findIndex(r => r.id === statId);
+      if (idxInAll === -1) return prev;
+      next[idxInAll] = { ...next[idxInAll], [field]: parsed };
+      if (field === 'result') {
+        let our = idxInAll > 0 ? Number(next[idxInAll - 1].our_score) || 0 : 0;
+        let opp = idxInAll > 0 ? Number(next[idxInAll - 1].opp_score) || 0 : 0;
+        let rally =
+          idxInAll > 0
+            ? (Number(next[idxInAll - 1][RALLY_FIELD]) || RALLY_START)
+            : RALLY_START;
+        const prevRes = idxInAll > 0 ? normalizeResult(next[idxInAll - 1].result) : null;
+        if (prevRes === 'Won Point' || prevRes === 'Lost Point') {
+          rally += 1;
+        }
+        for (let j = idxInAll; j < next.length; j++) {
+          const res = j === idxInAll ? parsed : normalizeResult(next[j].result);
+          const rallyForThisRow = rally;
+          if (res === 'Won Point') our += 1;
+          else if (res === 'Lost Point') opp += 1;
+          next[j] = {
+            ...next[j],
+            our_score: our,
+            opp_score: opp,
+            [RALLY_FIELD]: rallyForThisRow,
+          };
+          if (res === 'Won Point' || res === 'Lost Point') {
+            rally += 1;
+          }
+        }
+        patchRowsRef.current = next.slice(idxInAll).map(r => ({
+          id: r.id,
+          our_score: r.our_score,
+          opp_score: r.opp_score,
+          [RALLY_FIELD]: r[RALLY_FIELD],
+        }));
+      } else if (field === 'our_score' || field === 'opp_score') {
+        const editKey = field;
+        const incOn = field === 'our_score' ? 'Won Point' : 'Lost Point';
+        const prevOur = idxInAll > 0 ? Number(next[idxInAll - 1].our_score) || 0 : 0;
+        const prevOpp = idxInAll > 0 ? Number(next[idxInAll - 1].opp_score) || 0 : 0;
+        let editedVal = toNum(parsed) ?? 0;
+        if (editKey === 'our_score') {
+          next[idxInAll] = { ...next[idxInAll], our_score: editedVal };
+        } else {
+          next[idxInAll] = { ...next[idxInAll], opp_score: editedVal };
+        }
+        for (let j = idxInAll + 1; j < next.length; j++) {
+          const res = normalizeResult(next[j].result);
+          if (res === incOn) editedVal += 1;
+          next[j] = {
+            ...next[j],
+            ...(editKey === 'our_score' ? { our_score: editedVal } : { opp_score: editedVal }),
+          };
+        }
+        patchRowsRef.current = next.slice(idxInAll).map(r => ({
+          id: r.id,
+          [editKey]: r[editKey],
+        }));
+      }
+      return next;
+    });
+    const { error: updErr } = await supabase
+      .from('stats')
+      .update({ [field]: parsed })
+      .eq('id', statId)
+      .select('id')
+      .maybeSingle();
+    if (updErr) {
+      setToast('Failed to update: ' + (updErr.message ?? ''));
+      setStats(prev => {
+        const next = [...prev];
+        const i = next.findIndex(r => r.id === statId);
+        if (i !== -1) next[i] = { ...next[i], [field]: value ?? null };
+        return next;
+      });
       return;
     }
-    if ((value ?? '') === (parsed ?? '')) return;
-    setStats(prevStats => {
-      const newStats = [...prevStats];
-      const statIndex = newStats.findIndex(row => row.id === statId);
-      if (statIndex !== -1) {
-        newStats[statIndex] = { ...newStats[statIndex], [field]: parsed };
-      }
-      return newStats;
-    });    
-    try {
-      const res = await authorizedFetch('/api/update-stat', {
-        body: { statId, updates: { [field]: parsed } },
-      });
-      const result = await res.json();
-
-      if (result.success) {
-        const statIndex = stats.findIndex(row => row.id === statId);
-        if (statIndex !== -1) {
-          const newStats = stats.map((row, i) => 
-            i === statIndex ? { ...row, [field]: parsed } : row
+    const patchRows = patchRowsRef.current || [];
+    if (patchRows.length) {
+      const batch = async (rows, size = 15) => {
+        for (let i = 0; i < rows.length; i += size) {
+          const chunk = rows.slice(i, i + size);
+          await Promise.all(
+            chunk.map(({ id, ...payload }) =>
+              supabase.from('stats').update(payload).eq('id', id)
+            )
           );
-          if (field === 'result' && (parsed === 'Won Point' || parsed === 'Lost Point')) {
-            const isWon = parsed === 'Won Point';
-            const updatedScore = isWon
-              ? { our_score: (newStats[statIndex].our_score ?? 0) + 1 }
-              : { opp_score: (newStats[statIndex].opp_score ?? 0) + 1 };
-
-            newStats[statIndex] = { ...newStats[statIndex], ...updatedScore };
-
-            for (let i = statIndex + 1; i < newStats.length; i++) {
-              newStats[i] = {
-                ...newStats[i],
-                our_score: newStats[i - 1].our_score,
-                opp_score: newStats[i - 1].opp_score,
-              };
-            }
-            await authorizedFetch('/api/save-stats', {
-              body: { rows: newStats.slice(statIndex) },
-            });
-          }
-          setStats(newStats);
-          setTimeout(() => setEditing(false), 0);
-          return;          
-        } else {
-          setToast('Stat not found by id.');
-          setTempValue(value ?? '');
         }
-      } else {
-        setToast('Failed to update: ' + result.message);
-        setTempValue(value ?? '');
-      }
-    } catch (err) {
-      console.error('Error during update:', err);
-      setTempValue(value ?? '');
+      };
+      await batch(patchRows);
     }
   };
+  
+  const handleBlur = async (e) => {
+    if (!editing) return;
+    if (e?.relatedTarget && wrapperRef.current?.contains(e.relatedTarget)) return;
+    setTimeout(() => {
+      setEditing(false);
+      commitEdit(tempValue);
+    }, 0);
+  };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = async (e) => {
     e.stopPropagation();
     const key = e.key;
     if (key === 'Escape') {
@@ -208,36 +255,20 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
         }
         return;
       }
-      if ((key === 'Enter' || key === 'Tab') && suggestions.length > 0) {
+      if ((key === 'Enter' || key === 'Tab') && showSuggestions && suggestions.length > 0) {
         e.preventDefault();
         const selected = suggestions[selectedSuggestionIndex];
-        setTempValue(selected);
         setShowSuggestions(false);
-        setStats(prevStats => {
-          const newStats = [...prevStats];
-          const statIndex = newStats.findIndex(row => row.id === statId);
-          if (statIndex !== -1) {
-            newStats[statIndex] = { ...newStats[statIndex], [field]: selected };
-          }
-          return newStats;
-        });        
-        authorizedFetch('/api/update-stat', {
-          body: { statId, updates: { [field]: selected } },
-        }).then(res => res.json())
-          .then(result => {
-            if (!result.success) setToast('Failed to update: ' + result.message);
-          }).catch(err => {
-            console.error('Error during update:', err);
-            setToast('Update failed.');
-          });
+        setTempValue(selected);
+        setEditing(false);
+        setTimeout(() => commitEdit(selected), 0);
+
         if (setEditingCell) {
           setTimeout(() => {
             setEditingCell({
               idx,
               field,
-              direction: key === 'Tab'
-                ? (e.shiftKey ? 'prev' : 'next')
-                : (e.shiftKey ? 'up' : 'down'),
+              direction: key === 'Tab' ? (e.shiftKey ? 'prev' : 'next') : (e.shiftKey ? 'up' : 'down'),
             });
           }, 0);
         }
@@ -287,7 +318,8 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       const direction = key === 'Tab'
         ? (e.shiftKey ? 'prev' : 'next')
         : (e.shiftKey ? 'up' : 'down');
-      handleBlur();
+      setEditing(false);
+      setTimeout(() => commitEdit(tempValue), 0);
       if (setEditingCell) {
         setTimeout(() => {
           setEditingCell({ idx, field, direction });
@@ -364,9 +396,11 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
                   setSelectedSuggestionIndex(i);
                 }
               }}
-              onMouseDown={() => {
-                setTempValue(sug);
+              onMouseDown={async (e) => {
+                e.preventDefault();
                 setShowSuggestions(false);
+                setTempValue(sug);
+                await commitEdit(sug);
                 setTimeout(() => inputRef.current?.focus(), 0);
               }}
             >

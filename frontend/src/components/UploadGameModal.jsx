@@ -6,9 +6,15 @@ import { CSS } from '@dnd-kit/utilities';
 import FloatingLabelInput from './FloatingLabelInput';
 import Modal from './Modal';
 import Toast from './Toast'; 
-import authorizedFetch from '../utils/authorizedFetch';
 import TooltipPortal from '../utils/tooltipPortal';
 
+const TUS_ENDPOINT = '/api/upload-game';
+const getAuthHeaders = async (supabase) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+  } catch { return {}; }
+};
 const SortableItem = ({ upload, id, onRemove }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, };
@@ -76,7 +82,7 @@ const UploadOrderList = ({ uploads, setUploads, onRemove }) => {
   );
 };
 
-const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, onUpload, userId, resumeSilently }, ref) => {
+const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onUpload, userId, resumeSilently, availableTeams, supabase }, ref) => {
   const [gameGroupId, setGameGroupId] = useState(() => crypto.randomUUID());
   const [uploads, setUploads] = useState([]);
   const [autofillDate, setAutofillDate] = useState(false);
@@ -371,7 +377,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
           const metadata = entry.metadata;
           if (metadata?.date) { setDate(metadata.date); setAutofillDate(true); }
           if (metadata?.players) { setPlayers(metadata.players); setAutofillPlayers(true); }
-          const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata });
+          const fingerprint = await customFingerprint(file, { endpoint: TUS_ENDPOINT, metadata });
           const exists = uploads.some(u => u.id === fingerprint);
           if (!exists) {
             setUploads(prev => [...prev, {
@@ -407,7 +413,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
           setToast(`Selected "${file.name}" but expected "${m.filename}". Please re-select.`, 'error', 8000);
           continue;
         }
-        const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata: m });
+        const fingerprint = await customFingerprint(file, { endpoint: TUS_ENDPOINT, metadata: m });
         const exists = uploads.some(u => u.id === fingerprint);
         if (!exists) {
           setUploads(prev => [...prev, {
@@ -478,13 +484,13 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
           filetype: file.type,
           date,
           players,
-          team_name: teamName,
+          team_id: teamId,
           user_id: userId,
           game_group_id: gameGroupId,
           setNumber: (uploads.length + validFiles.length + 1).toString(),
         };
         const fingerprint = await customFingerprint(file, {
-          endpoint: '/api/upload-game',
+          endpoint: TUS_ENDPOINT,
           metadata,
         });
         if (
@@ -564,12 +570,12 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
           filetype: file.type,
           date,
           players,
-          team_name: teamName,
+          team_id: teamId,
           user_id: userId,
           game_group_id: gameGroupId,
           setNumber: (uploads.length + 1).toString()
         };
-        const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata });            
+        const fingerprint = await customFingerprint(file, { endpoint: TUS_ENDPOINT, metadata });            
         if (uploads.some(u => u.file.name === file.name) || newUploads.some(u => u.file.name === file.name)) {
           duplicateCount++;
           continue;
@@ -701,10 +707,13 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         match?.uploadRef?.abort();
       } catch {}
       try {
-        const res = await authorizedFetch(`/api/delete-upload/${tusUploadId}`, { method: 'DELETE' });
+        const headers = await getAuthHeaders(supabase);
+        const res = await fetch(`/api/delete-upload/${tusUploadId}`, {
+          method: 'DELETE',
+          headers
+        });
         if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ message: 'No response body' }));
-          console.error('Failed to delete upload on server:', errorData.message || errorData);
+          console.error('Failed to delete upload on server:', await res.text().catch(() => '(no body)'));
         }
       } catch (err) {
         console.error('Error deleting upload (by tusUploadId):', err);
@@ -742,10 +751,13 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     if (!uploadUrl) return;
     const tusIdFromRef = uploadUrl.split('/').pop();
     try {
-      const res = await authorizedFetch(`/api/delete-upload/${tusIdFromRef}`, { method: 'DELETE' });
+      const headers = await getAuthHeaders(supabase);
+      const res = await fetch(`/api/delete-upload/${tusIdFromRef}`, {
+        method: 'DELETE',
+        headers
+      });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: 'No response body' }));
-        console.error('Failed to delete upload on server:', errorData.message || errorData);
+        console.error('Failed to delete upload on server:', await res.text().catch(() => '(no body)'));
       }
     } catch (err) {
       console.error('Error deleting upload:', err);
@@ -786,14 +798,14 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
     let fileHandleSaved = false;
     let hit100 = false;
     const upload = new tus.Upload(fileToUpload, {
-      endpoint: '/api/upload-game',
+      endpoint: TUS_ENDPOINT,
       retryDelays: [0, 1000, 3000, 5000],
       metadata: {
         filename: fileToUpload.name,
         filetype: fileToUpload.type,
         date: dateToUse,
         players: playersToUse,
-        team_name: teamName,
+        team_id: teamId,
         user_id: userId,
         game_group_id: gameGroupId,
         setNumber: uploadItem?.setNumber?.toString() || '1'
@@ -984,12 +996,12 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
                   filetype: file.type,
                   date,
                   players,
-                  team_name: teamName,
+                  team_id: teamId,
                   user_id: userId,
                   game_group_id: gameGroupId,
                   setNumber: (uploads.length + validFiles.length + 1).toString()
                 };
-                const fingerprint = await customFingerprint(file, { endpoint: '/api/upload-game', metadata });
+                const fingerprint = await customFingerprint(file, { endpoint: TUS_ENDPOINT, metadata });
 
                 validFiles.push({
                   file,
@@ -1187,7 +1199,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamName, o
         {(() => {
           const hovered = uploads.find(u => u.id === isProgressHovering);
           const fileName = hovered?.file?.name || 'Unknown file';
-          const teamName = hovered?.metadata?.team_name || 'Unknown team';
+          const teamName = availableTeams?.find(t => String(t.id) === String(hovered?.metadata?.team_id))?.name ?? 'Unknown team';
           return (
             <>
               <div>Uploading {fileName}</div>

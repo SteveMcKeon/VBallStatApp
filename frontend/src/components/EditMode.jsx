@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import supabase from '../supabaseClient';
-import authorizedFetch from '../utils/authorizedFetch';
 
 const EditMode = () => {
   const [editMode, setEditMode] = useState(null);
@@ -26,7 +25,6 @@ const EditMode = () => {
 
   return {
     editMode,
-    authorizedFetch,
     toggleEditMode, 
   };
 };

@@ -83,6 +83,7 @@ const MainPage = () => {
 
   const [currentUserId, setCurrentUserId] = useState(false);
   const [teamName, setTeamName] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [showStatsView, setShowStatsView] = useState(false);
 
@@ -125,10 +126,9 @@ const MainPage = () => {
       setShowResumeBanner(incomplete.length > 0);
     };
     checkForIncompleteUpload();
-    window.addEventListener('storage', checkForIncompleteUpload); // updates if another tab changes it
+    window.addEventListener('storage', checkForIncompleteUpload);
     return () => window.removeEventListener('storage', checkForIncompleteUpload);
   }, [currentUserId]);
-
 
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
@@ -150,13 +150,18 @@ const MainPage = () => {
     fetchUserRole();
   }, []);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
+
   const handleTeamChange = async (e, { force = false } = {}) => {
-    const selected = e.target.value;
-    if (!force && String(selected) === String(teamName)) {
+    const selectedId = e.target.value;
+    if (!force && String(selectedId) === String(teamId)) {
       return { data: teamGames, error: null, skipped: true };
     }
-    setTeamName(selected);
-    setLocal('teamName', selected);
+    setTeamId(selectedId);
+    setLocal('teamId', selectedId);
+    const t = availableTeams.find(tt => String(tt.id) === String(selectedId));
+
+    setTeamName(t?.name ?? '');
+    setLocal('teamName', t?.name ?? '');
     setSelectedGameId(null);
     localStorage.removeItem('selectedGameId');
     setSelectedVideo('');
@@ -164,33 +169,33 @@ const MainPage = () => {
     setGamePlayers([]);
     setGameId(null);
     requestAnimationFrame(() =>
-    window.dispatchEvent(new Event('db_layout_change'))
-  );
+      window.dispatchEvent(new Event('db_layout_change'))
+    );
+    const { data, error } = await refreshGames(selectedId);
+    if (!error && Array.isArray(data) && data.length === 1) {
+      const only = data[0];
+      setSelectedGameId(only.id);
+      setSelectedVideo(only.video_url || '');
+      setShowCenteredGamePicker(false);
+      localStorage.setItem('selectedGameId', only.id);
+      localStorage.removeItem('videoTime');
+    }
+    return await refreshGames(selectedId);
+  };
+
+  const refreshGames = async (id = teamId) => {
+    if (!id) return { data: [], error: null };
     const { data, error } = await supabase
       .from('games')
       .select('id, title, date, video_url, hastimestamps, isscored, processed')
-      .eq('team_name', selected)
+      .eq('team_id', id)
       .order('date', { ascending: false });
     if (error) {
-      console.error("Error fetching games:", error);
+      console.error('Error refreshing games:', error);
     } else {
       setTeamGames(data);
     }
     return { data, error };
-  };
-
-  const refreshGames = async () => {
-    if (!teamName) return;
-    const { data, error } = await supabase
-      .from('games')
-      .select('id, title, date, video_url, hastimestamps, isscored, processed')
-      .eq('team_name', teamName)
-      .order('date', { ascending: false });
-    if (error) {
-      console.error("Error refreshing games:", error);
-    } else {
-      setTeamGames(data);
-    }
   };
 
   useEffect(() => {
@@ -200,24 +205,6 @@ const MainPage = () => {
       }
     });
   }, [navigate]);
-
-  useEffect(() => {
-    const savedTeam = getLocal('teamName');
-    const fetchTeams = async () => {
-      const unique = await fetchTeamNames();
-      setAvailableTeams(unique);
-      if (savedTeam && unique.includes(savedTeam)) {
-        setLocal('teamName', savedTeam);
-        (async () => {
-          await handleTeamChange({ target: { value: savedTeam } });
-        })();
-      } else {
-        setTeamName('');
-        setLocal('teamName', '');
-      }
-    };
-    fetchTeams();
-  }, []);
 
   const [teamGames, setTeamGames] = useState([]);
   const [selectedGameId, setSelectedGameId] = useState('');
@@ -268,7 +255,7 @@ const MainPage = () => {
   const [videoList, setVideoList] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
-  const { editMode, toggleEditMode, authorizedFetch } = EditMode();
+  const { editMode, toggleEditMode } = EditMode();
 
   const handleEditModeToggle = () => {
     toggleEditMode();
@@ -382,7 +369,7 @@ const MainPage = () => {
       .from('games')
       .select('id')
       .eq('video_url', videoUrl)
-      .single();
+      .maybeSingle();
     if (existingError || !existing?.id) {
       console.error('Error checking for game:', existingError);
       setStats([]);
@@ -427,45 +414,56 @@ const MainPage = () => {
 
   const fetchTeamNames = async () => {
     const { data, error } = await supabase
-      .from('games')
-      .select('team_name')
-      .neq('team_name', '')
-      .order('team_name', { ascending: true });
+      .from('teams')
+      .select('id, name')
+      .order('name', { ascending: true });
 
     if (error) {
-      console.error("Error fetching teams:", error);
+      console.error('Error fetching teams:', error);
       return [];
     }
-
-    return [...new Set(data.map(row => row.team_name))];
+    return data ?? [];
   };
 
   useEffect(() => {
     setIsAppLoading(true);
-    const savedTeam = getLocal('teamName');
-    const savedGame = getLocal('selectedGameId');
-    const fetchAndRestore = async () => {
-      const unique = await fetchTeamNames();
-      setAvailableTeams(unique);
-      if (savedTeam && unique.includes(savedTeam)) {
-       const { data: gamesData, error: gamesError } =
-         await handleTeamChange({ target: { value: savedTeam } });
-       if (!gamesError && gamesData) {
-         const byId = (g) => String(g.id) === String(savedGame);
-         if (savedGame && gamesData.some(byId)) {
-           const selectedGame = gamesData.find(byId);
-           setSelectedGameId(savedGame);
-           setSelectedVideo(selectedGame?.video_url || '');
-           setShowCenteredGamePicker(false);
-         }
-       }
+    const savedTeamId = getLocal('teamId');
+    const savedGame   = getLocal('selectedGameId');
+    (async () => {
+      const teams = await fetchTeamNames();
+      setAvailableTeams(teams);
+      if (savedTeamId && teams.some(t => String(t.id) === String(savedTeamId))) {
+        const t = teams.find(tt => String(tt.id) === String(savedTeamId));
+        setTeamId(savedTeamId);
+        setTeamName(t?.name ?? '');
+        setLocal('teamId', savedTeamId);
+        setLocal('teamName', t?.name ?? '');
+        const { data: gamesData, error: gamesError } =
+          await handleTeamChange({ target: { value: savedTeamId } , force: true });
+        if (!gamesError && gamesData) {
+          const byId = (g) => String(g.id) === String(savedGame);
+          if (savedGame && gamesData.some(byId)) {
+            const selectedGame = gamesData.find(byId);
+            setSelectedGameId(savedGame);
+            setSelectedVideo(selectedGame?.video_url || '');
+            setShowCenteredGamePicker(false);
+          } else if (gamesData.length === 1) {
+            const only = gamesData[0];
+            setSelectedGameId(only.id);
+            setSelectedVideo(only.video_url || '');
+            setShowCenteredGamePicker(false);
+            localStorage.setItem('selectedGameId', only.id);
+            localStorage.removeItem('videoTime');
+          }
+        }
       } else {
+        setTeamId('');
         setTeamName('');
+        setLocal('teamId', '');
         setLocal('teamName', '');
       }
       setIsAppLoading(false);
-    };
-    fetchAndRestore();
+    })();
   }, []);
 
   useEffect(() => {
@@ -703,21 +701,23 @@ const MainPage = () => {
       </div>
     );
   }
-  if (!isAppLoading && !teamName) {
+  if (!isAppLoading && !teamId) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
         <div className="text-lg font-semibold mb-4">Please select your team to begin</div>
-        <StyledSelect
-          options={availableTeams.map(team => ({
-            label: team,
-            value: team,
-            color: 'blue',
-          }))}
-          value={teamName}
-          onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
-          placeholder="Click here to select a team"
-          showStatus={false}
-        />
+          <StyledSelect
+            options={availableTeams.map(t => ({
+              label: t.name,
+              value: t.id,
+              color: 'blue',
+            }))}
+            value={teamId}
+            onChange={(selected) =>
+              handleTeamChange({ target: { value: selected.value } })
+            }
+            placeholder="Click here to select a team"
+            showStatus={false}
+          />
       </div>
     );
   }
@@ -811,17 +811,17 @@ const MainPage = () => {
             ) : (
               <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
                 <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
-                <StyledSelect
-                  options={availableTeams.map(team => ({
-                    label: team,
-                    value: team,
-                    color: 'blue',
-                  }))}
-                  value={teamName}
-                  onChange={(selected) => handleTeamChange({ target: { value: selected.value } })}
-                  placeholder="Click here to select a team"
-                  showStatus={false}
-                />
+                  <StyledSelect
+                    options={availableTeams.map(t => ({
+                      label: t.name,
+                      value: t.id,
+                      color: 'blue',
+                    }))}
+                    value={teamId}
+                    onChange={(opt) => handleTeamChange({ target: { value: opt.value } })}
+                    placeholder="Click here to select a team"
+                    showStatus={false}
+                  />
                 <div>
                   <label className={`font-semibold block mb-1 ${!selectedGameId ? "text-blue-700" : ""}`}>
                     {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
@@ -948,7 +948,6 @@ const MainPage = () => {
                       handleTextColumnFilterChange={handleTextColumnFilterChange}
                       renderCell={renderCell}
                       insertButtonParentRef={insertButtonParentRef}
-                      authorizedFetch={authorizedFetch}
                       layoutMode={layoutMode}
                       jumpToTime={jumpToTime}
                       videoRef={videoRef}
@@ -958,6 +957,7 @@ const MainPage = () => {
                       formatTimestamp={formatTimestamp}
                       gameId={gameId}
                       refreshGames={refreshGames}
+                      supabase={supabase}
                     />
                   </div>
                 </div>
@@ -1019,9 +1019,11 @@ const MainPage = () => {
           setIsUploadModalOpen(false);
           setResumeSilently(false);
         }}
-        teamName={teamName}
+        teamId={teamId}
         userId={currentUserId}
         resumeSilently={resumeSilently}
+        availableTeams={availableTeams}
+        supabase={supabase}
       />
     </div>
   );

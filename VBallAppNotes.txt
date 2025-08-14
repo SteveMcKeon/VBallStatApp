@@ -24,4 +24,5 @@ Encode videos like youtube
 #Fixes
 REFACTOR
 
-Conrad, Liz, Natacha, Tamir, Taylor, Yuzhou, Marieve
+Delete team_name from games table
+If only one team, auto select. same for games.
