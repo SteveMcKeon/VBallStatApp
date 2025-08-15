@@ -723,32 +723,47 @@ const MainPage = () => {
   }
   if (!isAppLoading && !selectedVideo && showCenteredGamePicker) {
     return (
-      <div className="flex flex-col h-[100svh] justify-center items-center">
-        <div className="text-lg font-semibold mb-4">Please select a game to continue</div>
-        <GameSelector
-          key={teamGames.map(g => g.id + g.hastimestamps + g.isscored).join('-')}
-          games={teamGames}
-          value={selectedGameId}
-          onChange={(selectedOption) => {
-            if (selectedOption.value === 'upload-new') {
-              handleOpenUploadModal();
-            } else {
-              setSelectedGameId(selectedOption.value);
-              const selectedGame = teamGames.find(g => g.id === selectedOption.value);
-              setSelectedVideo(selectedGame?.video_url || '');
-              localStorage.removeItem('videoTime');
-              setShowCenteredGamePicker(false);
-            }
-          }}
-          teamName={teamName}
-          currentUserId={currentUserId}
-          isUploadModalOpen={isUploadModalOpen}
+      <>
+        <div className="flex flex-col h-[100svh] justify-center items-center">
+          <div className="text-lg font-semibold mb-4">Please select a game to continue</div>
+          <GameSelector
+            key={teamGames.map(g => g.id + g.hastimestamps + g.isscored).join('-')}
+            games={teamGames}
+            value={selectedGameId}
+            onChange={(selectedOption) => {
+              if (selectedOption.value === 'upload-new') {
+                setResumeSilently(false);
+                handleOpenUploadModal();
+              } else {
+                setSelectedGameId(selectedOption.value);
+                const selectedGame = teamGames.find(g => g.id === selectedOption.value);
+                setSelectedVideo(selectedGame?.video_url || '');
+                localStorage.removeItem('videoTime');
+                setShowCenteredGamePicker(false);
+              }
+            }}
+            teamName={teamName}
+            currentUserId={currentUserId}
+            isUploadModalOpen={isUploadModalOpen}
+            setIsUploadModalOpen={setIsUploadModalOpen}
+            setResumeSilently={setResumeSilently}
+            resumeSilently={resumeSilently}
+            hideUploadOption={teamGames.length > 0}
+          />
+        </div>
+        <UploadGameModal
+          ref={uploadModalRef}
+          isOpen={isUploadModalOpen}
           setIsUploadModalOpen={setIsUploadModalOpen}
-          setResumeSilently={setResumeSilently}
+          onBeforeOpen={() => videoPlayerRef?.current?.closeControlsOverlay?.()}
+          onClose={() => { setIsUploadModalOpen(false); setResumeSilently(false); }}
+          teamId={teamId}
+          userId={currentUserId}
           resumeSilently={resumeSilently}
-          hideUploadOption={true}
+          availableTeams={availableTeams}
+          supabase={supabase}
         />
-      </div>
+      </>
     );
   }
 

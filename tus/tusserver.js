@@ -25,14 +25,12 @@ const tusServer = new Server({
     const gameGroupId = metadata.game_group_id || 'unknown-group';
     const originalFilename = metadata.filename || 'unnamed';
     const setnumber = metadata.setNumber || 'unnamed';
-    const ext = path.extname(originalFilename) || '.mp4';
-    const finalFileName = `${gameGroupId}_SET-${setnumber}_READY`;
+    const finalFileName = `${gameGroupId}_SET-${setnumber}`;
     console.log(`Saving upload as: ${finalFileName}`);
     return finalFileName;
   },
   async onUploadFinish(req, res, upload) {
     console.log(`✅ Upload finished and saved as: ${upload.id}`);
-    // You can add Supabase DB operations here if needed.
     return { status_code: 204 };
   }
 });

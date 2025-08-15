@@ -83,6 +83,67 @@ const UploadOrderList = ({ uploads, setUploads, onRemove }) => {
 };
 
 const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onUpload, userId, resumeSilently, availableTeams, supabase }, ref) => {
+  const parseGameNumFromTitle = (t = "") => {
+    const m = /game\s*(\d+)/i.exec(t);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  const parsePlayers = (value) =>
+    (value || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  async function ensureNextGameRow(supabase, { teamId, date, players }) {
+    const { data, error } = await supabase
+      .from("games")
+      .select("id,title")
+      .eq("team_id", teamId)
+      .eq("date", date);
+    if (error) {
+      console.error("ensureNextGameRow select error:", error);
+      throw new Error("Could not check existing games");
+    }
+    let max = 0;
+    for (const row of data || []) {
+      const n = parseGameNumFromTitle(row.title);
+      if (n > max) max = n;
+    }
+    const nextN = max + 1;
+    const title = `${date} Game ${nextN}`;
+    const video_url = `${date}_Game${nextN}_h.264.mp4`;
+    const { data: existing, error: checkErr } = await supabase
+      .from("games")
+      .select("id")
+      .eq("team_id", teamId)
+      .eq("date", date)
+      .eq("title", title)
+      .maybeSingle();
+    if (checkErr) {
+      console.error("ensureNextGameRow check error:", checkErr);
+      throw new Error("Could not verify game row");
+    }
+    if (existing?.id) {
+      return { id: existing.id, gameNumber: nextN, title, video_url };
+    }
+    const payload = {
+      team_id: teamId,
+      date,
+      title,
+      video_url,
+      players: parsePlayers(players),
+    };
+    const { data: inserted, error: insErr } = await supabase
+      .from("games")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (insErr) {
+      console.error("ensureNextGameRow insert error:", insErr);
+      throw new Error(insErr.message || "Failed to create game row");
+    }
+    return { id: inserted.id, gameNumber: nextN, title, video_url };
+  }
+  
   const [gameGroupId, setGameGroupId] = useState(() => crypto.randomUUID());
   const [uploads, setUploads] = useState([]);
   const [autofillDate, setAutofillDate] = useState(false);
@@ -143,7 +204,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
     }
     return null;
   };  
-
   const scanIncompleteUploads = () => {
     const incompleteUploads = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -274,7 +334,6 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
           await waitForUserActivation();
           fallbackFileInputRef.current?.click();
         } catch {
-          // no-op
         }
       })();
     });
@@ -777,7 +836,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
     setUploads(prev => prev.filter(u => u.id !== uploadId));
   };
 
-  const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, playersOverride = null, tusKeyOverride = null) => {
+  const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, playersOverride = null, tusKeyOverride = null, metaOverride = null) => {
     const uploadItem = uploads.find(u => u.id === uploadId);
     if (!uploadItem && !fileOverride) {
       setToast('No file selected for upload');
@@ -786,30 +845,32 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
     const fileToUpload = fileOverride || uploadItem.file;
     const dateToUse = dateOverride || date;
     const playersToUse = playersOverride || players;
-    if (!/\d{4}-\d{2}-\d{2}/.test(dateToUse)) {
-      setToast('Date format should be YYYY-MM-DD');
-      return 'validation-error';
-    }
-    if (!playersToUse.trim()) {
-      setToast('Please enter players (comma-separated)');
-      return 'validation-error';
-    }
-
     let fileHandleSaved = false;
     let hit100 = false;
+    const baseMeta = {
+      filename: fileToUpload.name,
+      filetype: fileToUpload.type,
+      date: dateToUse,
+      players: playersToUse,
+      team_id: teamId,
+      user_id: userId,
+      game_group_id: uploadItem?.metadata?.game_group_id || gameGroupId,
+      setNumber: (uploadItem?.setNumber ?? 1).toString(),
+      total_sets:
+        uploadItem?.metadata?.total_sets ||
+        String(
+          uploads.filter(u =>
+            u.metadata?.game_group_id === (uploadItem?.metadata?.game_group_id || gameGroupId)
+          ).length || 1
+        ),
+      game_number: uploadItem?.metadata?.game_number || '1',
+    };
+    const finalMeta = { ...baseMeta, ...(metaOverride || {}) };
+    setUploads(prev => prev.map(u => u.id === uploadId ? { ...u, metadata: { ...u.metadata, ...finalMeta } } : u));        
     const upload = new tus.Upload(fileToUpload, {
       endpoint: TUS_ENDPOINT,
       retryDelays: [0, 1000, 3000, 5000],
-      metadata: {
-        filename: fileToUpload.name,
-        filetype: fileToUpload.type,
-        date: dateToUse,
-        players: playersToUse,
-        team_id: teamId,
-        user_id: userId,
-        game_group_id: gameGroupId,
-        setNumber: uploadItem?.setNumber?.toString() || '1'
-      },
+      metadata: finalMeta,
       fingerprint: customFingerprint,
       onProgress: async (bytesUploaded, bytesTotal) => {
         const percentage = Math.floor((bytesUploaded / bytesTotal) * 100);
@@ -830,6 +891,42 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
         }
       },
       onSuccess: async () => {
+        const extractTusId = (url) => {
+          try {
+            if (!url) return null;
+            const u = new URL(url, window.location.origin);
+            const parts = u.pathname.split('/').filter(Boolean);
+            return parts[parts.length - 1] || null;
+          } catch { return null; }
+        };
+        async function finalizeOnServer(tusId) {
+          const headers = await getAuthHeaders(supabase);
+          headers['Content-Type'] = 'application/json';
+          let delay = 400;
+          for (let attempt = 1; attempt <= 8; attempt++) {
+            const res = await fetch('/api/finalize-upload', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ id: tusId }),
+            });
+            if (res.ok) return true;
+            if (res.status === 409) {
+              await new Promise(r => setTimeout(r, delay));
+              delay = Math.min(delay * 1.7, 4000);
+              continue;
+            }
+            if (res.status === 404) return true;
+            return false;
+          }
+          return false;
+        }
+        const tusId = extractTusId(upload.url);
+        if (tusId) {
+          const ok = await finalizeOnServer(tusId);
+          if (!ok) {
+            setToast('Uploaded, but finalizing on server failed. It will retry shortly.', 'error', 6000);
+          }
+        }
         setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, status: 'success' } : u)));
         setToast('Game uploaded successfully!', 'success');
         setTimeout(() => {
@@ -1051,21 +1148,37 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
         <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100">Cancel</button>
         <button
           onClick={async () => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+              setToast('Date format should be YYYY-MM-DD', 'error');
+              return;
+            }
+            if (!players.trim()) {
+              setToast('Please enter players (comma-separated)', 'error');
+              return;
+            }
+            const pending = uploads.filter(u => u.status === 'pending');
+            if (pending.length === 0) return;
+            let rowInfo;
+            try {
+              rowInfo = await ensureNextGameRow(supabase, { teamId, date, players });
+            } catch (e) {
+              console.error(e);
+              setToast('Could not create game row. Are you a team captain?', 'error');
+              return;
+            }
+            const { id: gameId, gameNumber } = rowInfo;
+            const totalSets = String(pending.length);
+            // Start uploads without relying on setState to carry metadata
             let hasValidationErrors = false;
-
-            for (let index = 0; index < uploads.length; index++) {
-              const upload = uploads[index];
-              if (upload.status === 'pending') {
-                const result = await handleSubmit(upload.id);
-                if (result === 'validation-error') {
-                  hasValidationErrors = true;
-                }
-              }
+            for (const u of pending) {
+              const res = await handleSubmit(
+                u.id,
+                null, null, null, null,
+                { game_group_id: gameId, total_sets: totalSets, game_number: String(gameNumber) }
+              );
+              if (res === 'validation-error') hasValidationErrors = true;
             }
-
-            if (!hasValidationErrors) {
-              onClose();
-            }
+            if (!hasValidationErrors) onClose();
           }}
           className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
         >

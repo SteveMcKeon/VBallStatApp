@@ -19,6 +19,8 @@ services:
   backend:
     build:
       context: ./backend
+    ports:
+      - "3001:3001"      
     volumes:
       - ./backend:/app
       - node_modules_backend:/app/node_modules
