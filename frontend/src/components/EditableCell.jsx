@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } 
 
 const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase }, ref) => {
   const RALLY_FIELD = 'rally_id';
+  const SET_FIELD = 'set';  
   const RALLY_START = 1;
   const RESULT_OPTIONS = ['Won Point', 'Lost Point'];
   const ACTION_TYPE_OPTIONS = [
-    'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free', 'Taylor Dump'
+    'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free'
   ];  
   const [interactionMode, setInteractionMode] = useState('keyboard');
   const [suggestions, setSuggestions] = useState([]);
@@ -167,6 +168,16 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
         patchRowsRef.current = next.slice(idxInAll).map(r => ({
           id: r.id,
           [editKey]: r[editKey],
+        }));
+      } else if (field === 'set') {
+        const setVal = toNum(parsed);
+        next[idxInAll] = { ...next[idxInAll], set: setVal };
+        for (let j = idxInAll + 1; j < next.length; j++) {
+          next[j] = { ...next[j], set: setVal };
+        }
+        patchRowsRef.current = next.slice(idxInAll).map(r => ({
+          id: r.id,
+          set: r.set,
         }));
       }
       return next;

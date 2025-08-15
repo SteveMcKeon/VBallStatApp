@@ -973,6 +973,7 @@ const MainPage = () => {
                       gameId={gameId}
                       refreshGames={refreshGames}
                       supabase={supabase}
+                      teamId={teamId}
                     />
                   </div>
                 </div>

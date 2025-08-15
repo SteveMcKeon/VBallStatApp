@@ -80,6 +80,7 @@ const DBStats = ({
   gameId,
   refreshGames,
   supabase,
+  teamId,
 }) => { 
   const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
@@ -354,10 +355,7 @@ const DBStats = ({
   const { gridTemplate, canFit, totalPx } = useMemo(() => {
     const MIN_COL_PX  = 60;
     const FLEX_MIN_PX = 160;
-    const available =
-      listOuterRef.current?.clientWidth ??
-      headerScrollRef.current?.clientWidth ??
-      0;
+    const available = viewportW;
     const widthForFixed = (key) => {
       if (key === '__insert__' || key === '__delete__') return 32;
 
@@ -929,20 +927,19 @@ const DBStats = ({
 
               return (
                 <List
-                  key={filteredKey}
+                  key={listRef}
                   ref={listRef}
                   height={listHeight}
                   width={width}
                   itemCount={filteredStats.length}
                   itemSize={getItemSize}
+
                   overscanCount={10}
                   estimatedItemSize={ROW_HEIGHT} 
                   outerElementType={OuterDiv}
                   outerRef={setBodyOuterEl}
                 >
-                  {({ index, style }) => (
-                    <Row index={index} style={{ ...style, minWidth: totalColumnsPx }} />
-                  )}
+                  {({ index, style }) => <Row index={index} style={style} />}
                 </List>
               );
             }}
@@ -955,24 +952,43 @@ const DBStats = ({
       {['admin', 'editor'].includes(editMode) && (
         <div className={`flex justify-between items-start pt-4 px-4 gap-6 ${editMode ? 'bg-yellow-50 transition-colors pb-4 rounded' : ''}`}>
           {editMode === 'admin' && (
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
+          <button
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
               onClick={async () => {
-                const lastRow = stats[stats.length - 1];
+                const lastWithData = [...stats].reverse().find(r =>
+                  r &&
+                  (r.game_id != null ||
+                   r.rally_id != null ||
+                   r.import_seq != null ||
+                   r.our_score != null ||
+                   r.opp_score != null ||
+                   r.set != null ||
+                   r.team_id != null)
+                );
+                const resolvedGameId = lastWithData?.game_id ?? gameId;
+                const resolvedTeamId = lastWithData?.team_id ?? teamId;             
+                if (!resolvedGameId || !resolvedTeamId) {
+                  setToast('Missing game or team context. Please select a game and team first.');
+                  return;
+                }
+                const lastSeq = lastWithData?.import_seq != null ? Number(lastWithData.import_seq) : null;
+                const startSeq = lastSeq != null ? lastSeq + 1 : 1;
+                const base = {
+                  game_id: resolvedGameId,
+                  rally_id: lastWithData?.rally_id ?? 1,
+                  our_score: lastWithData?.our_score ?? 0,
+                  opp_score: lastWithData?.opp_score ?? 0,
+                  set: lastWithData?.set ?? 1,
+                  team_id: resolvedTeamId,
+                };
                 const newRows = Array.from({ length: 10 }, (_, i) => ({
-                  game_id: lastRow?.game_id,
-                  rally_id: lastRow?.rally_id,
-                  import_seq: (lastRow?.import_seq || 0) + 0.01 + i * 0.01,
-                  our_score: lastRow?.our_score,
-                  opp_score: lastRow?.opp_score,
-                  set: lastRow?.set,
-                  team_id: lastRow?.team_id,
+                  ...base,
+                  import_seq: Number((startSeq + i).toFixed(2)),
                 }));
                 const { data, error } = await supabase
                   .from('stats')
                   .insert(newRows)
                   .select('*');
-
                 if (!error && data?.length) {
                   setStats([...stats, ...data]);
                   setToast('Added 10 rows to bottom', 'success');
