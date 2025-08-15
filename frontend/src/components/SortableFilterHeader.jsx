@@ -175,7 +175,7 @@ const SortableFilterHeader = ({
   const startDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    window.dispatchEvent(new Event('db_col_resize_start')); // ← add
+    window.dispatchEvent(new Event('db_col_resize_start'));
 
     const startX = e.clientX;
     const th = e.currentTarget.closest('th');
@@ -196,7 +196,7 @@ const SortableFilterHeader = ({
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      window.dispatchEvent(new Event('db_col_resize_end')); // ← add
+      window.dispatchEvent(new Event('db_col_resize_end'));
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -282,7 +282,26 @@ return (
   {!isLastColumn && (
     <div
       onMouseDown={startDrag}
-      onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); onAutoFit?.(); }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const th = e.currentTarget.closest('th');
+        const before = Math.round(th.getBoundingClientRect().width);
+        window.dispatchEvent(new Event('db_col_resize_start'));
+        onAutoFit?.();
+        const waitUntilWidthChanges = (tries = 16) => {
+          if (tries <= 0) return window.dispatchEvent(new Event('db_col_resize_end'));
+          requestAnimationFrame(() => {
+            const now = Math.round(th.getBoundingClientRect().width);
+            if (now !== before) {
+              window.dispatchEvent(new Event('db_col_resize_end'));
+            } else {
+              waitUntilWidthChanges(tries - 1);
+            }
+          });
+        };
+        waitUntilWidthChanges();
+      }}
       className="absolute top-0 right-0 h-full w-1 cursor-col-resize select-none bg-gray-300/70 hover:bg-gray-400"
       title="Drag to resize"
     />

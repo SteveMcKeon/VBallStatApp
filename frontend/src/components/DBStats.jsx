@@ -430,33 +430,6 @@ const DBStats = ({
     });
   }, [orderedKeys, gridTemplate]);
 
-  const autofitAll = React.useCallback(() => {
-    if (!headerTableRef.current || !listOuterRef.current) return;
-    const keys = bodyColumns
-      .map(c => c.key)
-      .filter(k => k !== '__insert__' && k !== '__delete__' && k !== flexKey);
-    keys.forEach(k => autofitColumn(k));
-  }, [bodyColumns, flexKey]);
-  
-  useEffect(() => {
-    let raf = requestAnimationFrame(() => autofitAll());
-    return () => cancelAnimationFrame(raf);
-  }, [textColumnFilters, sortConfig, visibleColumns, autofitAll]);
-
-  useEffect(() => {
-    const alignScroll = () => {
-      if (headerScrollRef.current && listOuterRef.current) {
-        headerScrollRef.current.scrollLeft = listOuterRef.current.scrollLeft;
-      }
-    };
-    const schedule = () => requestAnimationFrame(() => { autofitAll(); alignScroll(); });
-    window.addEventListener('resize', schedule);
-    window.addEventListener('db_layout_change', schedule);
-    return () => {
-      window.removeEventListener('resize', schedule);
-      window.removeEventListener('db_layout_change', schedule);
-    };
-  }, [autofitAll]);
   
   const filteredKey = React.useMemo(
     () => filteredStats.map(r => r.id).join('|'),
@@ -565,17 +538,17 @@ const DBStats = ({
         const el = rowRef.current;
         if (!el) return;
 
-        let measured = ROW_HEIGHT;
-        el.querySelectorAll('[role="cell"]').forEach((c) => {
-          const cellH = c.offsetHeight || ROW_HEIGHT;
-          measured = Math.max(measured, cellH);
-        });
-        const h = measured + 1;
+    const prevInline = el.style.height;
+    el.style.height = 'auto';
+    const natural = Math.ceil(el.getBoundingClientRect().height);
+    el.style.height = prevInline;
+    const h = Math.max(ROW_HEIGHT, natural) + 1;
         const prev = rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
         const DIFF_THRESHOLD = 2;
         if (Math.abs(h - prev) > DIFF_THRESHOLD) {
           rowHeightsRef.current.set(index, h);
-          listRef.current?.resetAfterIndex(index, false);
+      const shrinking = h < prev;
+      listRef.current?.resetAfterIndex(index, shrinking);
         }
       };
 
@@ -886,10 +859,9 @@ const DBStats = ({
     rowHeightsRef.current.clear?.();
     listRef.current?.resetAfterIndex?.(0, true);
     requestAnimationFrame(() => {
-      autofitAll();
       listRef.current?.resetAfterIndex?.(0, true);
     });
-  }, [layoutMode, flexKey, autofitAll]);
+  }, [layoutMode, flexKey]);
 
   return (
     <>
@@ -957,7 +929,7 @@ const DBStats = ({
 
               return (
                 <List
-                  key={listNonce}
+                  key={filteredKey}
                   ref={listRef}
                   height={listHeight}
                   width={width}
