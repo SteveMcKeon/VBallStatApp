@@ -17,7 +17,7 @@ import UploadGameModal from './UploadGameModal';
 
 const HEADER_HOVER_ZONE_PX = 50;
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
-const MiniSidebar = ({ onExpand }) => {
+const MiniSidebar = ({ onExpand, teamId }) => {
   const handlePanelClick = () => onExpand();
   const stopPropagation = (e) => e.stopPropagation();
 
@@ -40,7 +40,7 @@ const MiniSidebar = ({ onExpand }) => {
 
       {/* Bottom: user icon/footer */}
       <div onClick={stopPropagation}>
-        <SidebarFooter mini />
+        <SidebarFooter mini  teamId={teamId}/>
       </div>
     </div>
   );
@@ -786,6 +786,7 @@ const MainPage = () => {
           {!showSidebar && (
           <MiniSidebar
             onExpand={() => handleSidebarToggle(true)} 
+            teamId={teamId}
           />
           )}
         </div>

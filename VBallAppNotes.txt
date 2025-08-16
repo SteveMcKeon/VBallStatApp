@@ -1,9 +1,6 @@
 #New Features
 add "export highlights" (for player / action type) functionality, ffmpeg
-Add functionailty for users to add stats so I don't have to do it all myself (this will require automating the rally/seq/touch/score, perhaps even timestamp numbering).
 Add video player settings option to change settings such as "jump forward/backward" timings, delay after end of rally before skipping to next rally during autoplay
-Add video upload functionaility
-	-Automate encoding pipeline.
 Add tooltip intro for new users to introduce features.
 Add resize video option (drag) in side-by-side mode.
 	Shift + -> and <- for seek to set.
@@ -20,10 +17,12 @@ Update index.html <head> info for SEO
 Ability to draw an overlay on the screen
 Play Filtered Touches should full screen on mobile. delay by a second as well.
 Encode videos like youtube
+combine two docker environments.
+let camera work when not fullscreen.
+add buttons to minisidebar
+add subscription to stats table on game_id to support concurrent users.
+switch to IDE
 
 #Fixes
 REFACTOR
 
-combine two docker environments.
-make Demo table "non-commital" so users can explore without committing changes
-Add all new users automatically as Captains to the Demo team

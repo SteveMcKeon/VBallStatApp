@@ -37,7 +37,6 @@ const options = {
   key: fs.readFileSync('./cert/key.pem'),
   cert: fs.readFileSync('./cert/cert.pem'),
 };
-
 async function readSidecar(id) {
   for (const sfx of ['.json', '.info']) {
     const p = path.join(TUS_DIR, id + sfx);
@@ -48,13 +47,11 @@ async function readSidecar(id) {
   }
   return null;
 }
-
 function extFromFilename(name, fallback = '.mp4') {
   const ext = path.extname(name || '');
   return ext || fallback;
 }
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 const readJsonSafe = async (p) => {
   try { return JSON.parse(await fsp.readFile(p, "utf8")); }
   catch { return null; }
@@ -78,7 +75,6 @@ async function findTusBasesForGame(gameId) {
   }
   return [...bases];
 }
-
 async function deleteTusBase(base, extHint = ".mp4") {
   const candidates = [
     path.join(TUS_DIR, base),
@@ -90,7 +86,6 @@ async function deleteTusBase(base, extHint = ".mp4") {
     try { await fsp.unlink(p); } catch {}
   }
 }
-
 async function userCanDeleteGame(userId, teamId) {
   if (!teamId) return false;
   let memberOK = false;
@@ -111,6 +106,124 @@ async function userCanDeleteGame(userId, teamId) {
     .maybeSingle();
   return !teamErr && team?.captain_id === userId;
 }
+async function userCanManageTeam(userId, teamId) {
+  if (!teamId || !userId) return false;
+  try {
+    const { data: team, error: teamErr } = await supabase
+      .from('teams')
+      .select('captain_id')
+      .eq('id', teamId)
+      .maybeSingle();
+    if (!teamErr && team?.captain_id === userId) return true;
+  } catch (_) {}
+  return false;
+}
+async function userCanManageTeam(userId, teamId) {
+  if (!teamId || !userId) return false;
+  try {
+    const { data: team, error } = await supabase
+      .from('teams')
+      .select('captain_id')
+      .eq('id', teamId)
+      .maybeSingle();
+    if (!error && team?.captain_id === userId) return true;
+  } catch {}
+  return false;
+}
+
+app.get('/api/team-members', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const requesterId = decoded?.sub;
+    if (!requesterId) return res.status(403).json({ error: 'Unauthorized' });
+    const teamId = String(req.query.team_id || '').trim();
+    if (!teamId) return res.status(400).json({ error: 'Missing team_id' });
+    const allowed = await userCanManageTeam(requesterId, teamId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows, error } = await supabase
+      .from('team_members')
+      .select('user_id, role')
+      .eq('team_id', teamId);
+    if (error) return res.status(500).json({ error: 'Failed to load members' });
+    const enriched = await Promise.all((rows || []).map(async (m) => {
+      try {
+        const userRes = await supabase.auth.admin.getUserById(m.user_id);
+        const user = userRes.user || userRes.data?.user || null;
+        return {
+          user_id: m.user_id,
+          role: m.role,
+          email: user?.email || null,
+          full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
+          display_name: user?.user_metadata?.display_name || null,
+        };
+      } catch {
+        return { user_id: m.user_id, role: m.role, email: null, full_name: null, display_name: null };
+      }
+    }));
+    enriched.sort((a, b) => {
+      const r = String(a.role).localeCompare(String(b.role));
+      if (r !== 0) return r;
+      const an = (a.full_name || a.display_name || a.email || a.user_id || '').toLowerCase();
+      const bn = (b.full_name || b.display_name || b.email || b.user_id || '').toLowerCase();
+      return an.localeCompare(bn);
+    });
+    return res.json({ members: enriched });
+  } catch (e) {
+    console.error('❌ /api/team-members failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
+
+app.get('/api/search-users', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const userId = decoded?.sub;
+    if (!userId) return res.status(403).json({ error: 'Unauthorized' });
+    const q = String(req.query.q || '').trim();
+    const teamId = String(req.query.team_id || '').trim();
+    if (q.length < 2) return res.json({ users: [] });
+    const allowed = await userCanManageTeam(userId, teamId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    const qLower = q.toLowerCase();
+    const limit = 8;
+    const perPage = 1000;
+    let page = 1;
+    const matches = [];
+    while (matches.length < limit) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+      if (error) {
+        console.error('listUsers error:', error);
+        break;
+      }
+      const users = data?.users || [];
+      if (!users.length) break;
+      for (const u of users) {
+        const email = (u.email || '').toLowerCase();
+        const full  = (u.user_metadata?.full_name || u.user_metadata?.name || '').toLowerCase();
+        const disp  = (u.user_metadata?.display_name || '').toLowerCase();
+        if (email.includes(qLower) || full.includes(qLower) || disp.includes(qLower)) {
+          matches.push({
+            id: u.id,
+            email: u.email,
+            full_name: u.user_metadata?.full_name || u.user_metadata?.name || '',
+            display_name: u.user_metadata?.display_name || ''
+          });
+          if (matches.length >= limit) break;
+        }
+      }
+      if (users.length < perPage) break;
+      page += 1;
+    }
+    return res.json({ users: matches.slice(0, limit) });
+  } catch (e) {
+    console.error('❌ /api/search-users failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
 
 app.delete("/api/delete-game/:gameId", async (req, res) => {
   try {

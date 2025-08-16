@@ -934,7 +934,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
       )}
     {showControls && (
       <>
-        <div className="absolute bottom-[58px] left-0 right-0 px-4 z-30 mb-2">
+        <div className="absolute bottom-[58px] left-0 right-0 px-4 z-40 mb-2">
           <div className="relative w-full h-4">
             {/* Seekbar*/}
             <input
@@ -971,7 +971,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
             />
             {hoverTimeTooltip && (
               <div
-                className="absolute -top-7 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap pointer-events-none"
+                className="absolute -top-7 px-2 z-40 py-1 bg-black text-white text-xs rounded whitespace-nowrap pointer-events-none"
                 style={{ left: `${hoverTimeTooltip.percent * 100}%`, transform: 'translateX(-50%)' }}
               >
                 {formatTime(hoverTimeTooltip.time)}
@@ -1201,7 +1201,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
               />
             </button>
             <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-              {isCustomPlayback ? "Stop Highlight Reel (s)" : "Toggle Autoplay (a)"}
+              {isCustomPlayback
+                ? <>Stop Highlight Reel <Key combo="s" /></>
+                : <>Toggle Autoplay <Key combo="a" /></>}
             </div>
           </div>            
           {/* Toggle Overlay */}
@@ -1212,7 +1214,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
               </svg>
             </button>
             <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-              Toggle Overlay (c)
+              Toggle Overlay <Key combo="c" />
             </div>
           </div>
           {/* PiP */}
@@ -1236,7 +1238,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
                 </svg>
               </button>
               <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-                Pop out (p)
+                Pop Out <Key combo="p" />
               </div>
             </div>
           )}
@@ -1266,7 +1268,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
               </svg>
             </button>
             <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-              Full screen (f)
+              Full Screen <Key combo="f" />
             </div>
           </div>
           {/* Settings Button */}

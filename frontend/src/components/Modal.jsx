@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 const Modal = ({
   isOpen,
@@ -8,31 +9,30 @@ const Modal = ({
   closeOnEsc = true,
 }) => {
   const overlayRef = useRef(null);
+
   useEffect(() => {
     if (!isOpen || !closeOnEsc) return;
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (typeof e.stopImmediatePropagation === 'function') {
-          e.stopImmediatePropagation();
-        }
+        e.stopImmediatePropagation?.();
         onClose?.();
       }
     };
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [isOpen, closeOnEsc, onClose]);
+
   if (!isOpen) return null;
+
   const handleBackdropPointerDown = (e) => {
     if (!closeOnBackdrop) return;
-    if (e.target === overlayRef.current) {
-      onClose?.();
-    }
+    if (e.target === overlayRef.current) onClose?.();
   };
 
-  return (
+  const modal = (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-9999 flex items-center justify-center backdrop-blur-md bg-black/10"
+      className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-md bg-black/10"
       role="dialog"
       aria-modal="true"
       onPointerDown={handleBackdropPointerDown}
@@ -52,6 +52,7 @@ const Modal = ({
       </div>
     </div>
   );
+  return createPortal(modal, document.body);
 };
 
 export default Modal;
