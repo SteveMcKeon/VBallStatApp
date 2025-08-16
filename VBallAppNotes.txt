@@ -24,6 +24,6 @@ Encode videos like youtube
 #Fixes
 REFACTOR
 
-remove user roles from metadata, its now in team_members table
 combine two docker environments.
-draggable col widths on mobile
+make Demo table "non-commital" so users can explore without committing changes
+Add all new users automatically as Captains to the Demo team

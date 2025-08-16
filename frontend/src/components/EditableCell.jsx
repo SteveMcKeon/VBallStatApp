@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect  } from 'react';
 
-const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase }, ref) => {
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase, practiceMode = false, parentHasHighlight = false }, ref) => {
   const RALLY_FIELD = 'rally_id';
   const SET_FIELD = 'set';  
   const RALLY_START = 1;
   const RESULT_OPTIONS = ['Won Point', 'Lost Point'];
+  const POSITION_OPTIONS = ['Power', 'Middle', 'Opposite', 'Backrow'];
   const ACTION_TYPE_OPTIONS = [
     'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free'
   ];  
@@ -20,87 +21,48 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   const [cellWidth, setCellWidth] = useState(null);  
   const displayRef = useRef(null);
   const ghostRef = useRef(null);
-  
+  const lastAnnouncedH = useRef(0);  
   const isValidValue = () => {
-    if (value == null || value === '') return true;
-    
+    if ((value == null || value === '') && field !== 'set_to_position' && field !== 'set_to_player') return true;
+    if (field === 'set_to_player') {
+      const idxInAll = stats.findIndex(r => r.id === statId);
+      const curRow = idxInAll >= 0 ? stats[idxInAll] : null;
+      const curIsSet = (curRow?.action_type ?? '').toString().toLowerCase() === 'set';
+      if (value == null || value === '') {
+        return !curIsSet;
+      }
+      return gamePlayers.includes(value);
+    }
     if (field === 'player') {
       return gamePlayers.includes(value);
     }
-    
     if (field === 'action_type') {
       return ACTION_TYPE_OPTIONS.includes(value);
     }
-    
-    return true; 
+    if (field === 'set_to_position') {
+      const allowed = new Set(POSITION_OPTIONS.map(s => s.toLowerCase()));
+      const typed = (value ?? '').toString().trim().toLowerCase();
+      if (typed === '') {
+        const idxInAll = stats.findIndex(r => r.id === statId);
+        const curRow = idxInAll >= 0 ? stats[idxInAll] : null;
+        const curIsSet = (curRow?.action_type ?? '').toString().toLowerCase() === 'set';
+        return !curIsSet;
+      }
+      return allowed.has(typed);
+    }
+    return true;
   };
-  const highlightClass = !editing && !isValidValue() ? 'bg-yellow-200 hover:bg-yellow-300' : 'hover:bg-gray-100';
-  const lastAnnouncedH = useRef(0);
-
+  const highlightClass = !editing && !isValidValue() ? 'bg-yellow-200 hover:bg-yellow-300' : (parentHasHighlight ? '' : 'hover:bg-gray-100');
   const measureGhost = () => {
     const gh = ghostRef.current?.getBoundingClientRect().height || 0;
     const h = Math.ceil(gh);
     if (h && h !== cellHeight) setCellHeight(h);
-    // Only tell the table if the height actually changed
     if (h && h !== lastAnnouncedH.current) {
       lastAnnouncedH.current = h;
-      // idx: the row index prop you're already passing into EditableCell
       window.dispatchEvent(new CustomEvent('db_row_maybe_grow', { detail: { index: idx, height: h } }));
     }
     return h;
   };
-
-  useLayoutEffect(() => {
-    if (!editing) return;
-    measureGhost();
-  }, [editing, tempValue]);
-
-  useEffect(() => {
-    if (!editing) return;
-
-    let options = [];
-    if (field === 'player') {
-      options = gamePlayers;
-    } else if (field === 'result') {
-      options = RESULT_OPTIONS;
-    } else if (field === 'action_type') {
-      options = ACTION_TYPE_OPTIONS;
-    }
-
-    const trimmedInput = (tempValue ?? '').toString().trim().toLowerCase();
-
-    const filtered = trimmedInput.length > 0
-      ? options.filter(opt => opt.toLowerCase().startsWith(trimmedInput))
-      : [];
-
-    setSuggestions(filtered.sort());
-    setInteractionMode('keyboard');
-    setSelectedSuggestionIndex(0);
-    setShowSuggestions(filtered.length > 0);
-  }, [editing, field, gamePlayers, tempValue]);
-
-  useEffect(() => {
-    setTempValue(value ?? '');
-  }, [value]);
-  
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      const el = inputRef.current;
-      el.select();
-    }
-  }, [editing]);
-
-  useImperativeHandle(ref, () => ({
-    focusInput: () => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    },
-    clickToEdit: () => {
-      setEditing(true);
-    },
-    element: inputRef.current || wrapperRef.current
-  }));
-
   const patchRowsRef = useRef(null);
   const normalizeResult = (res) => {
     const s = (res ?? '').toString().trim().toLowerCase();
@@ -109,7 +71,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     if (s === 'l' || s === 'loss' || s.startsWith('lost')) return 'Lost Point';
     return null;
   };
-  const commitEdit = async (rawNext) => {
+  const commitEdit = async (rawNext) => {   
     let parsed = rawNext;
     const isBlank =
       ['int2','int4','int8','float4','float8','numeric'].includes(type)
@@ -202,6 +164,9 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       }
       return next;
     });
+    if (practiceMode) {
+      return;
+    }    
     const { error: updErr } = await supabase
       .from('stats')
       .update({ [field]: parsed })
@@ -253,7 +218,11 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       return;
     }
     const suggestionNavKeys = ['ArrowUp', 'ArrowDown', 'Enter', 'Tab'];
-    const isNavigatingSuggestions = ['player', 'result', 'action_type'].includes(field) && showSuggestions && suggestionNavKeys.includes(key);
+    const isNavigatingSuggestions =
+      ['player', 'set_to_player', 'result', 'action_type', 'set_to_position']
+        .includes(field) &&
+      showSuggestions &&
+      suggestionNavKeys.includes(key);
     if (isNavigatingSuggestions) {
       e.preventDefault();
       if (key === 'ArrowDown') {
@@ -359,6 +328,53 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       return;
     }
   };
+  
+  useImperativeHandle(ref, () => ({
+    focusInput: () => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    },
+    clickToEdit: () => {
+      setEditing(true);
+    },
+    element: inputRef.current || wrapperRef.current
+  }));
+  
+  useLayoutEffect(() => {
+    if (!editing) return;
+    measureGhost();
+  }, [editing, tempValue]);
+  
+  useEffect(() => {
+    if (!editing) return;
+    let options = [];
+    if (field === 'player' || field === 'set_to_player') {
+      options = gamePlayers;
+    } else if (field === 'result') {
+      options = RESULT_OPTIONS;
+    } else if (field === 'action_type') {
+      options = ACTION_TYPE_OPTIONS;
+    } else if (field === 'set_to_position') {  
+      options = POSITION_OPTIONS;
+    }
+    const trimmedInput = (tempValue ?? '').toString().trim().toLowerCase();
+    const filtered = trimmedInput.length > 0
+      ? options.filter(opt => opt.toLowerCase().startsWith(trimmedInput))
+      : [];
+    setSuggestions(filtered.sort());
+    setInteractionMode('keyboard');
+    setSelectedSuggestionIndex(0);
+    setShowSuggestions(filtered.length > 0);
+  }, [editing, field, gamePlayers, tempValue]);
+  useEffect(() => {
+    setTempValue(value ?? '');
+  }, [value]);
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      const el = inputRef.current;
+      el.select();
+    }
+  }, [editing]);
 
   return (
     editing ? (

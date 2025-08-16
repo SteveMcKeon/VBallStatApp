@@ -1,14 +1,50 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
-const Modal = ({ isOpen, onClose, children }) => {
+const Modal = ({
+  isOpen,
+  onClose,
+  children,
+  closeOnBackdrop = true,
+  closeOnEsc = true,
+}) => {
+  const overlayRef = useRef(null);
+  useEffect(() => {
+    if (!isOpen || !closeOnEsc) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (typeof e.stopImmediatePropagation === 'function') {
+          e.stopImmediatePropagation();
+        }
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [isOpen, closeOnEsc, onClose]);
   if (!isOpen) return null;
+  const handleBackdropPointerDown = (e) => {
+    if (!closeOnBackdrop) return;
+    if (e.target === overlayRef.current) {
+      onClose?.();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-9999 flex items-center justify-center backdrop-blur-md bg-black/10">
-      <div className="bg-white rounded-xl shadow-xl p-6 relative w-full max-w-lg">
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-9999 flex items-center justify-center backdrop-blur-md bg-black/10"
+      role="dialog"
+      aria-modal="true"
+      onPointerDown={handleBackdropPointerDown}
+    >
+      <div
+        className="bg-white rounded-xl shadow-xl p-6 relative w-full max-w-lg"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-3 right-3 rounded-md hover:bg-gray-200 transition-colors w-8 h-8 flex items-center justify-center"
+          aria-label="Close"
         >
           <span className="text-gray-500 hover:text-black">✕</span>
         </button>

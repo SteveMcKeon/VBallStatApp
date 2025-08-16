@@ -32,26 +32,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   const NavToHome = () => {
     if (typeof onBack === 'function') onBack();
   };  
-  useEffect(() => {
-    const fetchActions = async () => {
-      const { data, error } = await supabase
-        .from('stats')
-        .select('action_type', { count: 'exact' })
-        .neq('action_type', null);
-
-      if (!error && data) {
-        const uniqueActions = Array.from(
-          new Set(data.map((s) => s.action_type))
-        ).sort((a, b) => a.localeCompare(b));
-
-        setActions(uniqueActions);
-      } else {
-        console.error('Error fetching actions:', error);
-      }
-    };
-
-    fetchActions();
-  }, []);
   
   useEffect(() => {
     const savedTeamId = getLocal('teamId');
@@ -80,6 +60,26 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
     };
     fetchTeams();
   }, []);  
+  
+  useEffect(() => {
+    const fetchActions = async () => {
+      if (!teamId) { setActions([]); return; }
+      const { data, error } = await supabase
+        .from('stats')
+        .select('action_type')
+        .eq('team_id', teamId)
+        .not('action_type', 'is', null);
+      if (error) {
+        console.error('Error fetching actions:', error);
+        return;
+      }
+      const uniqueActions = Array.from(
+        new Set((data || []).map(r => r.action_type).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b));
+      setActions(uniqueActions);
+    };
+    fetchActions();
+  }, [teamId]);  
   
   useEffect(() => {
     const fetchGames = async () => {
@@ -196,7 +196,7 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   useEffect(() => {
     if (allColumns.length === 0) return;
     setVisibleColumns(prev => {
-      const defaultHidden = ['Success', 'Fail', 'Taylor Dump', 'Pass', 'Dig'];
+      const defaultHidden = ['Success', 'Fail', 'Pass', 'Dig'];
       const updated = { ...prev };
       allColumns.forEach(col => {
         if (updated[col.key] === undefined) {

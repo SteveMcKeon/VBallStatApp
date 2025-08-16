@@ -7,9 +7,10 @@ import TooltipPortal from '../utils/tooltipPortal';
 import Toast from './Toast';
 
 const ROW_HEIGHT = 28;
-const MIN_COL_PX  = 5;
+const MIN_COL_PX  = 60;
 const FLEX_MIN_PX = 400;
-
+const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
+const HSCROLL_PX = 10;
 const OuterDiv = React.forwardRef(function OuterDiv({ style, className, ...rest }, ref) {
   return (
     <div
@@ -28,7 +29,9 @@ const OuterDiv = React.forwardRef(function OuterDiv({ style, className, ...rest 
     />
   );
 });
-
+const InnerDiv = React.forwardRef(function InnerDiv({ style, ...rest }, ref) {
+  return <div ref={ref} style={style} {...rest} />;
+});
 const IconWithTooltip = ({ children, tooltip }) => {
   const [hovered, setHovered] = useState(false);
   const ref = useRef(null);
@@ -85,6 +88,7 @@ const DBStats = ({
   teamId,
   isMobile,
 }) => { 
+  const practiceMode = teamId === DEMO_TEAM_ID;
   const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
@@ -174,7 +178,11 @@ const DBStats = ({
   const listRef = useRef(null);
 
   const rowHeightsRef = useRef(new Map());
-  const getItemSize = (index) => rowHeightsRef.current.get(index) ?? ROW_HEIGHT;   
+  const getItemSize = (index) => {
+    const hasSpacer = totalPx > viewportW;
+    if (hasSpacer && index === filteredStats.length) return HSCROLL_PX;
+    return rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
+  };
 
   const getTotalListHeight = () => {
     let sum = 0;
@@ -450,7 +458,15 @@ const DBStats = ({
     const keys = orderedKeys.filter((k) => k !== 'timestamp' && k !== 'score');
     const isEditable = (fieldName) => {
       if (editMode === 'admin') return true;
-      const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
+      const editableFieldsInEditorMode = [
+        'player',
+        'action_type',
+        'quality',
+        'notes',
+        'result',
+        'set_to_player',
+        'set_to_position',
+      ];
       return editableFieldsInEditorMode.includes(fieldName);
     };
     let newIdx = idx;
@@ -518,6 +534,9 @@ const DBStats = ({
   }, []);
 
   const Row = ({ index, style }) => {
+    if (totalPx > viewportW && index === filteredStats.length) {
+      return <div style={{ ...style, height: HSCROLL_PX }} />;
+    }    
     const rowRef = useRef(null);
     const measureAndCommit = useCallback(() => {
       const el = rowRef.current;
@@ -525,13 +544,11 @@ const DBStats = ({
       const prev = rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
       const prevInline = el.style.height;
       el.style.height = 'auto';
-      // keep the small +1 you use elsewhere to avoid off-by-one jitters
       const next = Math.max(ROW_HEIGHT, Math.ceil(el.getBoundingClientRect().height)) + 1;
       el.style.height = prevInline || `${prev}px`;
       if (next !== prev) {
         rowHeightsRef.current.set(index, next);
         requestAnimationFrame(() => {
-          // force update so the list re-renders immediately
           listRef.current?.resetAfterIndex(index, true);
         });
       }
@@ -608,7 +625,7 @@ const DBStats = ({
             <button
               className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
               onClick={async (e) => {
-                e.stopPropagation();
+                e.stopPropagation();            
                 const newRow = {
                   game_id: s.game_id,
                   rally_id: s.rally_id,
@@ -618,6 +635,17 @@ const DBStats = ({
                   set: s.set,
                   team_id: s.team_id,
                 };
+                if (practiceMode) {
+                  const inserted = {
+                    id: `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    ...newRow,
+                  };
+                  const i = stats.findIndex(row => row.id === s.id);
+                  const updated = [...stats];
+                  updated.splice(i + 1, 0, inserted);
+                  setStats(updated);
+                  return;
+                }                
                 const { data, error } = await supabase
                   .from('stats')
                   .insert([newRow])
@@ -653,12 +681,7 @@ const DBStats = ({
             onClick={editMode === 'admin' ? async (e) => {
               e.stopPropagation(); 
               const currentTimestamp = videoRef.current?.currentTime ?? 0;
-              const { error } = await supabase
-                .from('stats')
-                .update({ timestamp: currentTimestamp })
-                .eq('id', s.id);
-
-              if (!error) {
+              if (practiceMode) {
                 const statIndex = stats.findIndex(row => row.id === s.id);
                 if (statIndex !== -1) {
                   const newStats = [...stats];
@@ -666,7 +689,20 @@ const DBStats = ({
                   setStats(newStats);
                 }
               } else {
-                setToast('Failed to update timestamp: ' + error.message);
+                const { error } = await supabase
+                  .from('stats')
+                  .update({ timestamp: currentTimestamp })
+                  .eq('id', s.id);
+                if (!error) {
+                  const statIndex = stats.findIndex(row => row.id === s.id);
+                  if (statIndex !== -1) {
+                    const newStats = [...stats];
+                    newStats[statIndex] = { ...stats[statIndex], timestamp: currentTimestamp };
+                    setStats(newStats);
+                  }
+                } else {
+                  setToast('Failed to update timestamp: ' + error.message);
+                }
               }
             } : undefined}
           >
@@ -682,11 +718,19 @@ const DBStats = ({
           if (!visibleColumns[field]?.visible || field === 'score' || field === 'timestamp') return null;
           const highlightClass =
             field === 'our_score' && prevRow && s[field] > prevRow[field]
-              ? 'bg-green-100 text-green-800'
+              ? 'bg-green-100 hover:bg-green-200 text-green-800'
               : field === 'opp_score' && prevRow && s[field] > prevRow[field]
-              ? 'bg-red-100 text-red-800'
+              ? 'bg-red-100 hover:bg-red-200 text-red-800'
               : '';
-          const editableFieldsInEditorMode = ['player', 'action_type', 'quality', 'notes'];
+          const editableFieldsInEditorMode = [
+            'player',
+            'action_type',
+            'quality',
+            'notes',
+            'result',
+            'set_to_player',
+            'set_to_position',
+          ];
           const shouldRenderEditableCell = editMode === 'admin' || (editMode === 'editor' && editableFieldsInEditorMode.includes(field));
           return (
             <div key={field} role="cell" data-field={field} className={`db-cell ${highlightClass} ${shouldRenderEditableCell ? '' : 'cursor-default'}`}>
@@ -704,6 +748,8 @@ const DBStats = ({
                   setEditingCell={navigateToEditableCell}
                   setToast={setToast}
                   supabase={supabase}
+                  practiceMode={practiceMode}
+                  parentHasHighlight={!!highlightClass}
                 />
               ) : (
                 s[field] ?? ''
@@ -718,6 +764,11 @@ const DBStats = ({
               className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform "
               onClick={async (e) => {
                 e.stopPropagation();
+                if (practiceMode) {
+                  const updated = stats.filter(row => row.id !== s.id);
+                  setStats(updated);
+                  return;
+                }             
                 const { error } = await supabase
                   .from('stats')
                   .delete()
@@ -768,8 +819,8 @@ const DBStats = ({
                 onResize={(w) => setColumnWidths(p => ({ ...p, our_score: w }))}
                 onAutoFit={() => autofitColumn('our_score')}
                 isLastColumn={key === flexKey}
-                minFlexWidth={240}
-                minWidth={key === flexKey ? 240 : 60}
+                minFlexWidth={FLEX_MIN_PX}
+                minWidth={key === flexKey ? FLEX_MIN_PX : MIN_COL_PX}
                 portalEl={filterPortalEl}
               />
               <SortableFilterHeader
@@ -784,8 +835,8 @@ const DBStats = ({
                 onResize={(w) => setColumnWidths(p => ({ ...p, opp_score: w }))}
                 onAutoFit={() => autofitColumn('opp_score')}
                 isLastColumn={'opp_score' === flexKey}
-                minFlexWidth={240}
-                minWidth={key === flexKey ? 240 : 60}
+                minFlexWidth={FLEX_MIN_PX}
+                minWidth={key === flexKey ? FLEX_MIN_PX : MIN_COL_PX}
                 portalEl={filterPortalEl}
               />
             </React.Fragment>
@@ -931,20 +982,20 @@ const DBStats = ({
         style={
           layoutMode === 'side-by-side'
             ? { zIndex: 0 }
-            : {
-                height:
-                  filteredStats.length === 0
-                    ? Math.min(vh60, EMPTY_MIN)
-                    : Math.max(EMPTY_MIN, vh60),
-                minHeight: filteredStats.length === 0 ? EMPTY_MIN : undefined,
-                zIndex: 0,
-              }
-        }
+            : filteredStats.length === 0
+              ? { height: Math.min(vh60, EMPTY_MIN), minHeight: EMPTY_MIN, zIndex: 0 }
+              : {
+                  height: Math.min(
+                    vh60,
+                    getTotalListHeight() + (totalPx > viewportW ? HSCROLL_PX : 0)
+                  ),
+                  zIndex: 0,
+                } }
       >
         {filteredStats.length > 0 ? (
           <AutoSizer>
             {({ height, width }) => {
-              const contentHeight = getTotalListHeight();
+              const contentHeight = getTotalListHeight() + (totalPx > viewportW ? HSCROLL_PX : 0);
               const listHeight = Math.min(height, contentHeight);
 
               return (
@@ -953,12 +1004,12 @@ const DBStats = ({
                   ref={listRef}
                   height={listHeight}
                   width={width}
-                  itemCount={filteredStats.length}
+                  itemCount={filteredStats.length + (totalPx > viewportW ? 1 : 0)}
                   itemSize={getItemSize}
-
                   overscanCount={10}
                   estimatedItemSize={ROW_HEIGHT} 
                   outerElementType={OuterDiv}
+                  innerElementType={InnerDiv}
                   outerRef={setBodyOuterEl}
                 >
                   {({ index, style }) => <Row index={index} style={style} />}
@@ -970,14 +1021,21 @@ const DBStats = ({
           <div className="py-20 text-gray-500 italic text-center border-t">No matching data.</div>
         )}
       </div>
-
+      {/* Tiny banner so it’s obvious */}
+      {practiceMode && (
+        <div className="bg-yellow-50 py-2">
+          <div className="px-4 p-2 text-sm text-amber-900 bg-amber-100 border border-amber-200 rounded">
+            Demo mode: edits update the table locally but are <strong>not</strong> saved.
+          </div>
+        </div>
+      )}
       {['admin', 'editor'].includes(editMode) && !(isMobile && layoutMode === 'side-by-side') && (
         <div
           className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'items-start'} px-4 gap-3 ${!isMobile ? 'md:gap-6' : ''} ${editMode ? 'bg-yellow-50 transition-colors rounded' : ''}`}
         >
           {editMode === 'admin' && (
             <button className={`bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1 ${isMobile ? 'w-full mt-4' : 'w-auto'}`}
-              onClick={async () => {
+              onClick={async () => {               
                 const lastWithData = [...stats].reverse().find(r =>
                   r &&
                   (r.game_id != null ||
@@ -1008,6 +1066,14 @@ const DBStats = ({
                   ...base,
                   import_seq: Number((startSeq + i).toFixed(2)),
                 }));
+                if (practiceMode) {
+                  const fakeRows = newRows.map(r => ({
+                    id: `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    ...r,
+                  }));
+                  setStats([...stats, ...fakeRows]);
+                  return;
+                }                
                 const { data, error } = await supabase
                   .from('stats')
                   .insert(newRows)
@@ -1060,9 +1126,9 @@ const DBStats = ({
             </div>
           </div>
         </div>
-        <button className={`${isMobile ? 'w-full' : 'w-auto'} mb-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1`} onClick={refreshStats}>🔄 Refresh DB</button>
+        <button className={`${isMobile ? 'w-full' : 'w-auto'} mb-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1`} onClick={refreshStats}>🔄 Refresh Table from Database</button>
       </div>     
-    )}      
+    )}  
     <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />         
     <style>{`
       .db-row { border-bottom: 1px solid #e5e7eb; }

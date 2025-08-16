@@ -9,12 +9,7 @@ import Toast from './Toast';
 import TooltipPortal from '../utils/tooltipPortal';
 
 const TUS_ENDPOINT = '/api/upload-game';
-const getAuthHeaders = async (supabase) => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-  } catch { return {}; }
-};
+
 const SortableItem = ({ upload, id, onRemove }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, };
@@ -49,6 +44,96 @@ const SortableItem = ({ upload, id, onRemove }) => {
       </button>
     </div>
   );
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const parseUploadUrl = (url) => {
+  // /api/upload-game/<game_group_uuid>_SET-<n>
+  const m = /\/api\/upload-game\/([0-9a-f-]+)(?:_SET-(\d+))?$/i.exec(String(url || ''));
+  if (!m) return null;
+  return { groupId: m[1], setNumber: m[2] ? Number(m[2]) : null };
+};
+
+const readTusEntriesFromLocalStorage = () => {
+  const entries = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('tus::')) continue;
+    try {
+      const raw = localStorage.getItem(key);
+      const val = JSON.parse(raw);
+      entries.push({
+        key,
+        uploadUrl: val?.uploadUrl,
+        metadata: val?.metadata || {},
+      });
+    } catch {}
+  }
+  return entries;
+};
+
+const getAllGroupEntries = (groupId) => {
+  const all = readTusEntriesFromLocalStorage();
+  return all.filter(e => parseUploadUrl(e.uploadUrl)?.groupId === groupId);
+};
+
+const resolveGameIdsForGroup = async (supabase, groupId, fallbackEntries = []) => {
+  const known = new Map(); 
+  for (const e of fallbackEntries) {
+    const setNumber = Number(parseUploadUrl(e.uploadUrl)?.setNumber ?? e.metadata?.setNumber);
+    const maybe = e.metadata?.game_id;
+    if (setNumber && UUID_RE.test(String(maybe))) known.set(setNumber, String(maybe));
+  }
+  const allSets = fallbackEntries
+    .map(e => Number(parseUploadUrl(e.uploadUrl)?.setNumber ?? e.metadata?.setNumber))
+    .filter(n => Number.isFinite(n));
+  const uniqueSets = [...new Set(allSets)];
+  if (uniqueSets.every(s => known.has(s))) return known;
+  const { data, error } = await supabase
+    .from('games')
+    .select('id, game_group_id, set, game_number')
+    .eq('game_group_id', groupId);
+  if (!error && Array.isArray(data)) {
+    const setKey = data.some(r => r.set != null) ? 'set' : 'game_number';
+    for (const row of data) {
+      const s = Number(row?.[setKey]);
+      if (Number.isFinite(s) && UUID_RE.test(row.id)) {
+        if (!known.has(s)) known.set(s, row.id);
+      }
+    }
+  } else {
+    console.warn('resolveGameIdsForGroup: supabase lookup failed', error);
+  }
+  return known;
+};
+
+const getAuthHeaders = async (supabase) => {
+  const session = await supabase.auth.getSession();
+  const token = session?.data?.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const deleteByGameId = async (gameId, supabase) => {
+  const headers = await getAuthHeaders(supabase);
+  const res = await fetch(`/api/delete-game/${encodeURIComponent(gameId)}`, {
+    method: 'DELETE',
+    headers
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '(no body)');
+    console.error('Server delete failed:', res.status, body);
+  }
+  return res.ok;
+};
+
+const abortAllTusInGroup = (uploadsArray, groupId) => {
+  for (const u of uploadsArray ?? []) {
+    const url = u?.uploadRef?.url;
+    const parsed = parseUploadUrl(url);
+    if (parsed?.groupId === groupId) {
+      try { u.uploadRef?.abort?.(); } catch {}
+    }
+  }
 };
 
 const UploadOrderList = ({ uploads, setUploads, onRemove }) => {
@@ -204,6 +289,21 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
     }
     return null;
   };  
+  const cancelGroupById = async (groupId) => {
+    if (!groupId) return { deleted: 0 };
+    abortAllTusInGroup(uploads, groupId);
+    await deleteByGameId(groupId, supabase);
+    const entries = getAllGroupEntries(groupId);
+    for (const e of entries) {
+      try { await removeFileHandleFromIndexedDB(e.key); } catch {}
+      try { localStorage.removeItem(e.key); } catch {}
+    }
+    setUploads(prev => prev.filter(u => {
+      const gid = parseUploadUrl(u?.uploadRef?.url)?.groupId ?? u?.metadata?.game_group_id;
+      return gid !== groupId;
+    }));
+    return { deleted: 1 };
+  };
   const scanIncompleteUploads = () => {
     const incompleteUploads = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -361,7 +461,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
     return num;
   };
 
-  useImperativeHandle(ref, () => ({
+  useImperativeHandle(ref, () => ({   
     probeResumableState: async () => {
       const pending = scanIncompleteUploads(); 
       let withHandle = 0;
@@ -382,32 +482,28 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
         setToast('No resumable uploads found', 'error');
         return;
       }
-      const extractTusId = (url) => {
-        try {
-          if (!url) return null;
-          const u = new URL(url, window.location.origin);
-          const parts = u.pathname.split('/').filter(Boolean);
-          return parts[parts.length - 1] || null;
-        } catch { return null; }
-      };
-      let cancelled = 0;
+      const groups = new Map();
       for (const entry of pending) {
+        const parsed = parseUploadUrl(entry?.uploadUrl || entry?.url);
+        if (parsed?.groupId) groups.set(parsed.groupId, true);
+      }
+      if (groups.size === 0) {
+        setToast('No valid pending uploads found', 'error');
+        return;
+      }
+      let groupsCancelled = 0;
+      for (const groupId of groups.keys()) {
         try {
-          const tusUrl = entry?.url || entry?.uploadUrl;
-          const tusId = extractTusId(tusUrl);
-          if (tusId) {
-            await cancelUpload(undefined, tusId);
-            cancelled++;
-          }
-          try { await removeFileHandleFromIndexedDB(entry.key); } catch {}
-          localStorage.removeItem(entry.key);
+          await cancelGroupById(groupId);
+          groupsCancelled++;
         } catch (err) {
-          console.error('Unexpected cancel failure', err);
+          console.error('Unexpected cancel failure for group', groupId, err);
         }
       }
-      if (cancelled > 0) {
-        setToast(`Cancelled ${cancelled} upload${cancelled === 1 ? '' : 's'}`, 'success');
-      }
+      setToast(
+        `Cancelled ${groupsCancelled} group${groupsCancelled === 1 ? '' : 's'}`,
+        'success'
+      );
     },
     triggerResumeAllUploads: async () => {
       const pending = scanIncompleteUploads(); // all tus::* for this user
@@ -758,82 +854,36 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
       });
     }
   };
-
+  
   const cancelUpload = async (uploadId, tusUploadId = null) => {
-    if (tusUploadId) {
-      const match = uploads.find(u => u.uploadRef?.url?.endsWith(`/${tusUploadId}`));
-      try {
-        match?.uploadRef?.abort();
-      } catch {}
-      try {
-        const headers = await getAuthHeaders(supabase);
-        const res = await fetch(`/api/delete-upload/${tusUploadId}`, {
-          method: 'DELETE',
-          headers
-        });
-        if (!res.ok) {
-          console.error('Failed to delete upload on server:', await res.text().catch(() => '(no body)'));
-        }
-      } catch (err) {
-        console.error('Error deleting upload (by tusUploadId):', err);
-      }
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (!key || !key.startsWith('tus::')) continue;
-        try {
-          const data = JSON.parse(localStorage.getItem(key));
-          const url = data?.url || data?.uploadUrl;
-          const endsWithId =
-            typeof url === 'string' &&
-            (url.endsWith(`/${tusUploadId}`) || url.split('/').pop() === tusUploadId);
-          const sameUser = !data?.metadata?.user_id || data.metadata.user_id === userId;
-
-          if (endsWithId && sameUser) {
-            localStorage.removeItem(key);
-            await removeFileHandleFromIndexedDB(key);
-          }
-        } catch {
-        }
-      }
-      if (match) {
-        setUploads(prev => prev.filter(u => u !== match));
-      }
-      return;
-    }
-
-    const uploadIndex = uploads.findIndex(u => u.id === uploadId);
-    if (uploadIndex === -1) return;
-    const upload = uploads[uploadIndex];
-    if (!upload || !upload.uploadRef) return;
-    upload.uploadRef.abort();
-    const uploadUrl = upload.uploadRef.url;
-    if (!uploadUrl) return;
-    const tusIdFromRef = uploadUrl.split('/').pop();
     try {
-      const headers = await getAuthHeaders(supabase);
-      const res = await fetch(`/api/delete-upload/${tusIdFromRef}`, {
-        method: 'DELETE',
-        headers
-      });
-      if (!res.ok) {
-        console.error('Failed to delete upload on server:', await res.text().catch(() => '(no body)'));
-      }
-    } catch (err) {
-      console.error('Error deleting upload:', err);
-    }
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith('tus::')) continue;
-      try {
-        const data = JSON.parse(localStorage.getItem(key));
-        if (data?.metadata?.user_id === userId && data?.metadata?.filename === upload.file.name) {
-          localStorage.removeItem(key);
-          await removeFileHandleFromIndexedDB(key);
-          break;
+      let groupId = null;
+      if (tusUploadId) {
+        const match = uploads.find(u => u.uploadRef?.url?.endsWith(`/${tusUploadId}`));
+        try { match?.uploadRef?.abort?.(); } catch {}
+        let parsed = parseUploadUrl(match?.uploadRef?.url);
+        if (!parsed) {
+          const suffix = `/${tusUploadId}`;
+          const ls = readTusEntriesFromLocalStorage();
+          const m = ls.find(e => String(e.uploadUrl || '').endsWith(suffix));
+          parsed = parseUploadUrl(m?.uploadUrl);
         }
-      } catch {}
+        groupId = parsed?.groupId ?? null;
+      } else {
+        const u = uploads.find(x => x.id === uploadId);
+        if (!u) return;
+        try { u.uploadRef?.abort?.(); } catch {}
+        const parsed = parseUploadUrl(u?.uploadRef?.url);
+        groupId = parsed?.groupId ?? u?.metadata?.game_group_id ?? null;
+      }
+      if (!groupId) {
+        console.warn('cancelUpload: no groupId resolved');
+        return;
+      }
+      await cancelGroupById(groupId);
+    } catch (err) {
+      console.error('cancelUpload failed', err);
     }
-    setUploads(prev => prev.filter(u => u.id !== uploadId));
   };
 
   const handleSubmit = async (uploadId, fileOverride = null, dateOverride = null, playersOverride = null, tusKeyOverride = null, metaOverride = null) => {

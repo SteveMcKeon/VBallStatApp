@@ -16,7 +16,7 @@ import StatsSummary from './StatsSummary';
 import UploadGameModal from './UploadGameModal';
 
 const HEADER_HOVER_ZONE_PX = 50;
-
+const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
 const MiniSidebar = ({ onExpand }) => {
   const handlePanelClick = () => onExpand();
   const stopPropagation = (e) => e.stopPropagation();
@@ -307,6 +307,8 @@ const MainPage = () => {
     score: { visible: false, type: 'int2' },
     our_score: { visible: false, type: 'int2' },
     opp_score: { visible: false, type: 'int2' },
+    set_to_player: { visible: false, type: 'text', adminOnly: true },
+    set_to_position: { visible: false, type: 'text', adminOnly: true },    
   };
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
@@ -607,12 +609,6 @@ const MainPage = () => {
 
   const renderCell = (field, s, idx, prevRow = null) => {
     if (!visibleColumns[field]?.visible) return null;
-    let highlightClass = 'border border-black hover:bg-gray-100';
-    if (field === 'our_score' && prevRow && s[field] > prevRow[field]) {
-      highlightClass = 'border border-black bg-green-100 text-green-800';
-    } else if (field === 'opp_score' && prevRow && s[field] > prevRow[field]) {
-      highlightClass = 'border border-black bg-red-100 text-red-800';
-    }
     return (
       <td key={field} className={highlightClass}>
         {editMode ? (
@@ -687,7 +683,20 @@ const MainPage = () => {
     };
     el.addEventListener('transitionend', onEnd);
   };
-
+  
+  const effectiveVisibleColumns = useMemo(() => {
+    if (allowedRole === 'admin') return visibleColumns;
+    const next = { ...visibleColumns };
+    const deny = ['set', 'rally_id', 'score', 'our_score', 'opp_score'];
+    if (allowedRole !== 'editor') {
+      deny.push('result', 'set_to_player', 'set_to_position');
+    }
+    for (const k of deny) {
+      if (next[k]) next[k] = { ...next[k], visible: false };
+    }
+    return next;
+  }, [visibleColumns, editMode, allowedRole]);
+  
   if (isAppLoading) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
@@ -743,7 +752,7 @@ const MainPage = () => {
             setIsUploadModalOpen={setIsUploadModalOpen}
             setResumeSilently={setResumeSilently}
             resumeSilently={resumeSilently}
-            hideUploadOption={teamGames.length > 0}
+            hideUploadOption={teamId === DEMO_TEAM_ID || teamGames.length > 0}
           />
         </div>
         <UploadGameModal
@@ -763,7 +772,6 @@ const MainPage = () => {
   }
 
   const selectedGame = teamGames.find(g => g.id === selectedGameId);
-
   return (
     <div className="flex flex-col h-[100svh] overflow-hidden">
       <div className="relative flex flex-1 overflow-hidden">
@@ -861,6 +869,7 @@ const MainPage = () => {
                     setIsUploadModalOpen={setIsUploadModalOpen}
                     setResumeSilently={setResumeSilently}
                     resumeSilently={resumeSilently}
+                    hideUploadOption={teamId === DEMO_TEAM_ID}
                   />
                 </div>
                 <div>
@@ -889,13 +898,25 @@ const MainPage = () => {
                   <ColumnSelector
                     columns={[
                       { key: 'timestamp', label: 'Timestamp' },
-                      { key: 'set', label: 'Set' },
-                      { key: 'rally_id', label: 'Rally' },
+                      ...(allowedRole  === 'admin'
+                        ? [
+                            { key: 'set', label: 'Set' },
+                            { key: 'rally_id', label: 'Rally' },
+                          ]
+                        : []),                         
                       { key: 'player', label: 'Player' },
                       { key: 'action_type', label: 'Action Type' },
                       { key: 'quality', label: 'Quality' },
-                      { key: 'result', label: 'Result' },
-                      { key: 'score', label: 'Score' },
+                      ...(allowedRole === 'admin' || allowedRole === 'editor'
+                        ? [
+                            { key: 'set_to_player', label: 'Set To Player' },
+                            { key: 'set_to_position', label: 'Set To Position' },
+                            { key: 'result', label: 'Result' },
+                          ]
+                        : []),
+                      ...(allowedRole === 'admin'
+                        ? [{ key: 'score', label: 'Score' }]
+                        : []),              
                       { key: 'notes', label: 'Notes' },
                     ]}
                     visibleColumns={visibleColumns}
@@ -942,7 +963,7 @@ const MainPage = () => {
                 <div className={`${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2 overflow-hidden' : 'px-4 w-full overflow-auto'}`}>
                   <div className="bg-white w-full h-full flex flex-col">
                     <DBStats
-                      canEdit={editMode === 'admin' || editMode === 'editor'}
+                      canEdit={editMode && (allowedRole === 'admin' || allowedRole === 'editor')}
                       editMode={editMode}
                       hastimestamps={selectedGame?.hastimestamps}
                       isscored={selectedGame?.isscored}
@@ -951,7 +972,7 @@ const MainPage = () => {
                       setStats={setStats}
                       filteredStats={sortedStats}
                       gamePlayers={gamePlayers}
-                      visibleColumns={visibleColumns}
+                      visibleColumns={effectiveVisibleColumns}
                       sortConfig={sortConfig}
                       setSortConfig={setSortConfig}
                       textColumnFilters={textColumnFilters}
