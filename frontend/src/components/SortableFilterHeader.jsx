@@ -36,7 +36,7 @@ const SortableFilterHeader = ({
   onResize,
   onAutoFit,
   isLastColumn,
-  minFlexWidth = 160,
+  minFlexWidth,
   portalEl
 }) => {
   const px = (v) => (v ? parseFloat(v) || 0 : 0);
@@ -182,7 +182,6 @@ const SortableFilterHeader = ({
     const startWidth = width ?? th.getBoundingClientRect().width;
     const flexTh = th.parentElement.querySelector('th[data-flex="true"]');
     const flexWidth = flexTh ? Math.round(flexTh.getBoundingClientRect().width) : 0;
-    const minFlexWidth = 160;
     const maxGrow = Math.max(0, flexWidth - minFlexWidth);
     const hardMin = headerIntrinsicMin(th);
 

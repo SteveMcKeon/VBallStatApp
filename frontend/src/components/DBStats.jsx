@@ -6,7 +6,9 @@ import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
 import Toast from './Toast';
 
-const ROW_HEIGHT = 28; // px
+const ROW_HEIGHT = 28;
+const MIN_COL_PX  = 60;
+const FLEX_MIN_PX = 400;
 
 const OuterDiv = React.forwardRef(function OuterDiv({ style, className, ...rest }, ref) {
   return (
@@ -302,14 +304,13 @@ const DBStats = ({
     keys.forEach(k => autofitColumn(k));
   }, [bodyColumns, flexKey]);
 
-  // Compute total pixel width needed for all columns.
   const totalColumnsPx = useMemo(() => {
     const widthFor = (key) => {
       if (key === '__insert__' || key === '__delete__') return 32;
       if (key === flexKey) {
         return Math.max(
           60,
-          Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? 160)
+          Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? FLEX_MIN_PX)
         );
       }
       const explicit = columnWidths[key];
@@ -353,8 +354,6 @@ const DBStats = ({
   }, [mainContentRef]);
 
   const { gridTemplate, canFit, totalPx } = useMemo(() => {
-    const MIN_COL_PX  = 60;
-    const FLEX_MIN_PX = 160;
     const available = viewportW;
     const widthForFixed = (key) => {
       if (key === '__insert__' || key === '__delete__') return 32;
@@ -374,19 +373,12 @@ const DBStats = ({
     }, 0);
     const canFitLocal = available > 0 && fixedPx + FLEX_MIN_PX <= available;
     const pinnedFlexPx = Math.max(
-      MIN_COL_PX,
-      Math.floor(
-        columnWidths[flexKey] ??
-        measuredColPx[flexKey] ??
-        200
-      )
+      FLEX_MIN_PX,
+      Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? 200)
     );
     const template = bodyColumns.map(({ key }) => {
       if (key === flexKey) {
-        if (canFitLocal) {
-          return `minmax(${FLEX_MIN_PX}px, 1fr)`;
-        }
-        return `${pinnedFlexPx}px`;
+        return canFitLocal ? `minmax(${FLEX_MIN_PX}px, 1fr)` : `${pinnedFlexPx}px`;
       }
       const w = widthForFixed(key);
       return `${w}px`;
@@ -774,7 +766,9 @@ const DBStats = ({
                 width={columnWidths.our_score}
                 onResize={(w) => setColumnWidths(p => ({ ...p, our_score: w }))}
                 onAutoFit={() => autofitColumn('our_score')}
-                isLastColumn={'our_score' === flexKey}
+                isLastColumn={key === flexKey}
+                minFlexWidth={240}
+                minWidth={key === flexKey ? 240 : 60}
                 portalEl={filterPortalEl}
               />
               <SortableFilterHeader
@@ -789,6 +783,8 @@ const DBStats = ({
                 onResize={(w) => setColumnWidths(p => ({ ...p, opp_score: w }))}
                 onAutoFit={() => autofitColumn('opp_score')}
                 isLastColumn={'opp_score' === flexKey}
+                minFlexWidth={240}
+                minWidth={key === flexKey ? 240 : 60}
                 portalEl={filterPortalEl}
               />
             </React.Fragment>
@@ -811,6 +807,8 @@ const DBStats = ({
             onResize={(w) => setColumnWidths(p => ({ ...p, [key]: w }))}
             onAutoFit={() => autofitColumn(key)}
             isLastColumn={key === flexKey}
+            minFlexWidth={240}
+            minWidth={key === flexKey ? 240 : 60}
             portalEl={filterPortalEl}
           />
         );
@@ -883,7 +881,7 @@ const DBStats = ({
   }, [layoutMode, flexKey]);
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       {/* Toolbar shown when filters are active */}
       {isFiltered && (
         <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
@@ -898,9 +896,7 @@ const DBStats = ({
                 Play Filtered Touches ({filteredStats.length})
               </button>
             )}
-            {/* spacer pushes the next button to the right on wide screens */}
             <div className="db-toolbar-spacer flex-1" />
-
             <button
               onClick={handleClearAllFilters}
               className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
@@ -930,15 +926,19 @@ const DBStats = ({
       </div>
       <div ref={setFilterPortalEl} id="db-filter-portal" />
       <div
-        className="relative mb-4"
-        style={{
-          height:
-            filteredStats.length === 0
-              ? Math.min(vh60, EMPTY_MIN)
-              : Math.max(EMPTY_MIN, vh60),
-          minHeight: filteredStats.length === 0 ? EMPTY_MIN : undefined,
-          zIndex: 0,
-        }}
+        className={`relative ${layoutMode === 'side-by-side' ? 'flex-1 min-h-0' : ''}`}
+        style={
+          layoutMode === 'side-by-side'
+            ? { zIndex: 0 }
+            : {
+                height:
+                  filteredStats.length === 0
+                    ? Math.min(vh60, EMPTY_MIN)
+                    : Math.max(EMPTY_MIN, vh60),
+                minHeight: filteredStats.length === 0 ? EMPTY_MIN : undefined,
+                zIndex: 0,
+              }
+        }
       >
         {filteredStats.length > 0 ? (
           <AutoSizer>
@@ -1072,7 +1072,6 @@ const DBStats = ({
         table { table-layout: fixed; border-collapse: collapse; width: 100%; }
         thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 200; }
 
-        /* Shared scroller cosmetics */
         .db-x-scroll::-webkit-scrollbar { height: 0px; }
         .db-x-scroll { scrollbar-width: none; overflow-y: visible; position: relative; }
         .db-list-outer {
@@ -1084,24 +1083,32 @@ const DBStats = ({
         }
         .db-list-outer::-webkit-scrollbar { width: 0px; height: 0px; }
         .db-list-outer::-webkit-scrollbar-track { background: transparent; }
-        .db-list-outer::-webkit-scrollbar-thumb {
-          background-color: rgba(0,0,0,0.4);
-          border-radius: 4px;
-        }
-        .db-toolbar { /* already flex from JSX */ }
+        .db-toolbar
         .db-toolbar-spacer { flex: 1 1 auto; }
         @media (max-width: 360px) {
           .db-toolbar {
             flex-direction: column;
-            align-items: flex-start;  /* left align when stacked */
+            align-items: flex-start;
             gap: 8px;
           }
           .db-toolbar-spacer {
-            display: none;            /* no push-right on the stacked layout */
+            display: none;
           }
+        }
+        .db-list-outer {
+          /* Firefox */
+          scrollbar-width: 0px;
+          scrollbar-color: auto transparent;
+        }
+        .db-list-outer::-webkit-scrollbar:vertical { width: 0px; }
+        .db-list-outer::-webkit-scrollbar:horizontal { height: 10px; }
+        .db-list-outer::-webkit-scrollbar-thumb:horizontal {
+          background-clip: padding-box;
+          background-color: rgba(0,0,0,.3);
+          border-radius: 9999px;
         }        
       `}</style>
-    </>
+    </div>
   );
 };
 

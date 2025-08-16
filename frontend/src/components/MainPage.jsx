@@ -931,16 +931,16 @@ const MainPage = () => {
           ref={mainContentRef}
           onPointerDown={handleMainInteract}
           onFocusCapture={handleMainInteract}
-         className={`relative flex-1 overflow-y-auto transform-gpu will-change-transform transition-transform duration-300 ease-out
-           ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
+          className={`relative flex-1 overflow-y-auto transform-gpu will-change-transform transition-transform duration-300 ease-out
+            ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
         >
           <div className="h-full">
             {showStatsView ? (
               <StatsSummary onBack={() => setShowStatsView(false)} setSidebarContent={setSidebarContent} />
             ) : selectedVideo ? (
               <div className={`flex ${layoutMode === 'side-by-side' ? 'flex-row h-full' : 'flex-col-reverse'}`}>
-                <div className={`${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2' : 'px-4 w-full'} overflow-auto`}>
-                  <div className="bg-white w-full">
+                <div className={`${editMode ? 'bg-yellow-50 transition-colors' : ''} ${layoutMode === 'side-by-side' ? 'w-1/2 overflow-hidden' : 'px-4 w-full overflow-auto'}`}>
+                  <div className="bg-white w-full h-full flex flex-col">
                     <DBStats
                       canEdit={editMode === 'admin' || editMode === 'editor'}
                       editMode={editMode}
