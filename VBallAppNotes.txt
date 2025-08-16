@@ -24,5 +24,7 @@ Encode videos like youtube
 #Fixes
 REFACTOR
 
-Delete team_name from games table
-If only one team, auto select. same for games.
+remove user roles from metadata, its now in team_members table
+make toasts appear from top of viewport so its visible on scroll
+combine two docker environments.
+draggable col widths on mobile

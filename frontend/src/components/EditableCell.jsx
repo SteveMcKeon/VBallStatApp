@@ -446,13 +446,15 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           }
           setEditing(true);
         }}
-        className={`cursor-pointer w-full h-full flex items-center justify-center ${highlightClass}`}
+        className={`cursor-pointer w-full h-full flex items-center justify-center text-center ${highlightClass}`}
       >
-        {(value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) ? (
-          <span className="text-gray-400 italic">–</span>
-        ) : (
-          value
-        )}
+        <div ref={displayRef} className="w-full text-center">
+          {(value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) ? (
+            <span className="text-gray-400 italic">–</span>
+          ) : (
+            value
+          )}
+        </div>
       </div>
     )
   );

@@ -8,6 +8,7 @@ import SidebarFooter from './SidebarFooter';
 
 const StatsSummary = ({ onBack, setSidebarContent  }) => {
   const [teamName, setTeamName] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
@@ -53,40 +54,40 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   }, []);
   
   useEffect(() => {
-    const savedTeam = getLocal('teamName');
+    const savedTeamId = getLocal('teamId');
     const fetchTeams = async () => {
-      const { data, error } = await supabase
-        .from('games')
-        .select('team_name')
-        .neq('team_name', '')
-        .order('team_name', { ascending: true });
-
+    const { data, error } = await supabase
+      .from('teams')
+      .select('id, name')
+      .order('name', { ascending: true });
       if (error) {
         console.error("Error fetching teams:", error);
         return;
       }
-
-      const unique = [...new Set(data.map(row => row.team_name))];
-      setAvailableTeams(unique);
-
-      if (savedTeam && unique.includes(savedTeam)) {
-        setTeamName(savedTeam);
-        setLocal('teamName', savedTeam);
+      setAvailableTeams(data ?? []);
+      if (savedTeamId && (data ?? []).some(t => String(t.id) === String(savedTeamId))) {
+        const t = data.find(tt => String(tt.id) === String(savedTeamId));
+        setTeamId(savedTeamId);
+        setTeamName(t?.name ?? '');
+        setLocal('teamId', savedTeamId);
+        setLocal('teamName', t?.name ?? '');
       } else {
+        setTeamId('');
         setTeamName('');
+        setLocal('teamId', '');
         setLocal('teamName', '');
       }
     };
-
     fetchTeams();
   }, []);  
+  
   useEffect(() => {
     const fetchGames = async () => {
-      if (!teamName) return;
+      if (!teamId) return;
       const { data, error } = await supabase
         .from('games')
-        .select('id, title, team_name, isscored, date, processed')
-        .eq('team_name', teamName);
+        .select('id, title, isscored, date, processed')
+        .eq('team_id', teamId);
       if (!error) {
         setGames(data);
         setSelectedGame('scored');
@@ -102,12 +103,11 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
       if (!selectedGame) return;
       let gameIds = [];
       if (selectedGame === 'all' || selectedGame === 'scored') {
-        if (!teamName) return;
-
+        if (!teamId) return;
         let gameQuery = supabase
           .from('games')
           .select('id')
-          .eq('team_name', teamName);
+          .eq('team_id', teamId);
 
         if (selectedGame === 'scored') {
           gameQuery = gameQuery.eq('isscored', true);
@@ -351,16 +351,15 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
         <div>
           <label className="font-semibold block mb-1">Your Team:</label>
           <StyledSelect
-            options={availableTeams.map(team => ({
-              label: team,
-              value: team,
-              color: 'blue',
-            }))}
-            value={teamName}
+            options={availableTeams.map(t => ({ label: t.name, value: t.id, color: 'blue' }))}
+            value={teamId}
             onChange={(selected) => {
-              const selectedValue = selected?.value || '';
-              setTeamName(selectedValue);
-              setLocal('teamName', selectedValue);
+              const id = selected?.value || '';
+              setTeamId(id);
+              const t = availableTeams.find(tt => String(tt.id) === String(id));
+              setTeamName(t?.name || '');
+              setLocal('teamId', id);
+              setLocal('teamName', t?.name || '');
               setSelectedGame('all');
             }}
             placeholder="Select a team"

@@ -404,14 +404,10 @@ const DBStats = ({
   useEffect(() => {
     const onStart = () => setIsResizingCol(true);
     const onEnd = () => {
-     requestAnimationFrame(() => {
-       rowHeightsRef.current.clear();
-       listRef.current?.resetAfterIndex(0, true);
-       requestAnimationFrame(() => {
-         setIsResizingCol(false);
-         listRef.current?.resetAfterIndex(0, true);
-       });
-     });
+      setIsResizingCol(false);
+      requestAnimationFrame(() => {
+        listRef.current?.resetAfterIndex(0, false);
+      });
     };
     window.addEventListener('db_col_resize_start', onStart);
     window.addEventListener('db_col_resize_end', onEnd);
@@ -734,7 +730,7 @@ const DBStats = ({
 
   const renderHeader = () => (
     <tr>
-      {editMode === 'admin' && <th data-key="__insert__" style={{ width: 32 }} />}
+      {editMode === 'admin' && <th data-key="__insert__" className="border-b border-gray-300" style={{ width: 32 }} />}
 
       {orderedKeys.map((key) => {
         const config = visibleColumns[key];
@@ -794,7 +790,7 @@ const DBStats = ({
         );
       })}
 
-      {editMode === 'admin' && <th data-key="__delete__" style={{ width: 32 }} />}
+      {editMode === 'admin' && <th data-key="__delete__" className="border-b border-gray-300" style={{ width: 32 }} />}
     </tr>
   );
 
@@ -840,8 +836,7 @@ const DBStats = ({
     }
     setColumnWidths((prev) => ({ ...prev, [key]: needed }));
     requestAnimationFrame(() => {
-      rowHeightsRef.current.clear();
-      listRef.current?.resetAfterIndex(0, true);
+      listRef.current?.resetAfterIndex(0, false);
     });
   };
   const EMPTY_MIN = 160;

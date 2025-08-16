@@ -172,15 +172,16 @@ const MainPage = () => {
       window.dispatchEvent(new Event('db_layout_change'))
     );
     const { data, error } = await refreshGames(selectedId);
-    if (!error && Array.isArray(data) && data.length === 1) {
-      const only = data[0];
-      setSelectedGameId(only.id);
-      setSelectedVideo(only.video_url || '');
+    if (!error && Array.isArray(data) && data.length > 0 && !force) {
+      const mostRecent = data[0];
+      setSelectedGameId(mostRecent.id);
+      setSelectedVideo(mostRecent.video_url || '');
       setShowCenteredGamePicker(false);
-      localStorage.setItem('selectedGameId', only.id);
+      localStorage.setItem('selectedGameId', mostRecent.id);
       localStorage.removeItem('videoTime');
     }
-    return await refreshGames(selectedId);
+
+    return { data, error };
   };
 
   const refreshGames = async (id = teamId) => {
@@ -440,22 +441,29 @@ const MainPage = () => {
         setLocal('teamName', t?.name ?? '');
         const { data: gamesData, error: gamesError } =
           await handleTeamChange({ target: { value: savedTeamId } , force: true });
-        if (!gamesError && gamesData) {
-          const byId = (g) => String(g.id) === String(savedGame);
-          if (savedGame && gamesData.some(byId)) {
-            const selectedGame = gamesData.find(byId);
-            setSelectedGameId(savedGame);
-            setSelectedVideo(selectedGame?.video_url || '');
-            setShowCenteredGamePicker(false);
-          } else if (gamesData.length === 1) {
-            const only = gamesData[0];
-            setSelectedGameId(only.id);
-            setSelectedVideo(only.video_url || '');
-            setShowCenteredGamePicker(false);
-            localStorage.setItem('selectedGameId', only.id);
-            localStorage.removeItem('videoTime');
+          if (!gamesError && gamesData) {
+            const byId = (g) => String(g.id) === String(savedGame);
+            if (savedGame && gamesData.some(byId)) {
+              const selectedGame = gamesData.find(byId);
+              setSelectedGameId(savedGame);
+              setSelectedVideo(selectedGame?.video_url || '');
+              setShowCenteredGamePicker(false);
+            } else if (gamesData.length > 0) {
+              const mostRecent = gamesData[0];
+              setSelectedGameId(mostRecent.id);
+              setSelectedVideo(mostRecent.video_url || '');
+              setShowCenteredGamePicker(false);
+              localStorage.setItem('selectedGameId', mostRecent.id);
+              localStorage.removeItem('videoTime');
+            }
           }
-        }
+      } else if (teams.length === 1) {
+        const only = teams[0];
+        setTeamId(only.id);
+        setTeamName(only.name);
+        setLocal('teamId', only.id);
+        setLocal('teamName', only.name);
+        await handleTeamChange({ target: { value: only.id }, force: true });
       } else {
         setTeamId('');
         setTeamName('');
