@@ -7,7 +7,7 @@ import TooltipPortal from '../utils/tooltipPortal';
 import Toast from './Toast';
 
 const ROW_HEIGHT = 28;
-const MIN_COL_PX  = 60;
+const MIN_COL_PX  = 5;
 const FLEX_MIN_PX = 400;
 
 const OuterDiv = React.forwardRef(function OuterDiv({ style, className, ...rest }, ref) {
@@ -83,6 +83,7 @@ const DBStats = ({
   refreshGames,
   supabase,
   teamId,
+  isMobile,
 }) => { 
   const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
@@ -970,11 +971,12 @@ const DBStats = ({
         )}
       </div>
 
-      {['admin', 'editor'].includes(editMode) && (
-        <div className={`flex justify-between items-start pt-4 px-4 gap-6 ${editMode ? 'bg-yellow-50 transition-colors pb-4 rounded' : ''}`}>
+      {['admin', 'editor'].includes(editMode) && !(isMobile && layoutMode === 'side-by-side') && (
+        <div
+          className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'items-start'} px-4 gap-3 ${!isMobile ? 'md:gap-6' : ''} ${editMode ? 'bg-yellow-50 transition-colors rounded' : ''}`}
+        >
           {editMode === 'admin' && (
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1"
+            <button className={`bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1 ${isMobile ? 'w-full mt-4' : 'w-auto'}`}
               onClick={async () => {
                 const lastWithData = [...stats].reverse().find(r =>
                   r &&
@@ -1019,96 +1021,95 @@ const DBStats = ({
               }}
             >
               ➕ Add 10 Rows to Bottom
-            </button>
-          )}
-          <div className="mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md w-fit">
-            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">🛠 Update Game Settings</h3>
-            <div className="flex flex-col space-y-3">
-              <div className="flex justify-between items-center w-full">
-                <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
-                <select
-                  disabled={editMode !== 'admin'}
-                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${editMode !== 'admin' ? 'opacity-50' : ''}`}
-                  value={gameSettings.hastimestamps ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value === 'true';
-                    setGameSettings(prev => ({ ...prev, hastimestamps: value }));
-                    toggleGameField('hastimestamps', value);
-                  }}
-                >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-              <div className="flex justify-between items-center w-full">
-                <label className="text-sm font-medium text-gray-700">Is Scored:</label>
-                <select
-                  disabled={!(editMode === 'admin' || editMode === 'editor')}
-                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
-                  value={gameSettings.isscored ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value === 'true';
-                    setGameSettings(prev => ({ ...prev, isscored: value }));
-                    toggleGameField('isscored', value);
-                  }}
-                >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
+          </button>
+        )}
+        <div className={`${isMobile ? 'w-full' : 'w-auto'} mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md`}>
+          <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">🛠 Update Game Settings</h3>
+          <div className="flex flex-col space-y-3">
+            <div className="flex justify-between items-center w-full">
+              <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
+              <select
+                disabled={editMode !== 'admin'}
+                className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${editMode !== 'admin' ? 'opacity-50' : ''}`}
+                value={gameSettings.hastimestamps ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value === 'true';
+                  setGameSettings(prev => ({ ...prev, hastimestamps: value }));
+                  toggleGameField('hastimestamps', value);
+                }}
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+            <div className="flex justify-between items-center w-full">
+              <label className="text-sm font-medium text-gray-700">Is Scored:</label>
+              <select
+                disabled={!(editMode === 'admin' || editMode === 'editor')}
+                className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
+                value={gameSettings.isscored ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value === 'true';
+                  setGameSettings(prev => ({ ...prev, isscored: value }));
+                  toggleGameField('isscored', value);
+                }}
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
             </div>
           </div>
-          <button className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1" onClick={refreshStats}>🔄 Refresh DB</button>
-        </div>     
-      )}      
-      <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />         
+        </div>
+        <button className={`${isMobile ? 'w-full' : 'w-auto'} mb-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1`} onClick={refreshStats}>🔄 Refresh DB</button>
+      </div>     
+    )}      
+    <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />         
+    <style>{`
+      .db-row { border-bottom: 1px solid #e5e7eb; }
+      .db-cell { padding: 2px 4px; display: flex; align-items: center; justify-content: center; }
+      .db-cell input, .db-cell select { height: auto; }
+      .db-cell textarea { height: auto; min-height: 21px; resize: none; }
+      .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
+      table { table-layout: fixed; border-collapse: collapse; width: 100%; }
+      thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 200; }
 
-      <style>{`
-        .db-row { border-bottom: 1px solid #e5e7eb; }
-        .db-cell { padding: 2px 4px; display: flex; align-items: center; justify-content: center; }
-        .db-cell input, .db-cell select { height: auto; }
-        .db-cell textarea { height: auto; min-height: 21px; resize: none; }
-        .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
-        table { table-layout: fixed; border-collapse: collapse; width: 100%; }
-        thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 200; }
-
-        .db-x-scroll::-webkit-scrollbar { height: 0px; }
-        .db-x-scroll { scrollbar-width: none; overflow-y: visible; position: relative; }
-        .db-list-outer {
-          -webkit-overflow-scrolling: touch;
-          touch-action: pan-x pan-y;
-          overscroll-behavior: auto;
-          background: transparent;
-          scrollbar-color: auto transparent;
+      .db-x-scroll::-webkit-scrollbar { height: 0px; }
+      .db-x-scroll { scrollbar-width: none; overflow-y: visible; position: relative; }
+      .db-list-outer {
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+        overscroll-behavior: auto;
+        background: transparent;
+        scrollbar-color: auto transparent;
+      }
+      .db-list-outer::-webkit-scrollbar { width: 0px; height: 0px; }
+      .db-list-outer::-webkit-scrollbar-track { background: transparent; }
+      .db-toolbar
+      .db-toolbar-spacer { flex: 1 1 auto; }
+      @media (max-width: 360px) {
+        .db-toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
         }
-        .db-list-outer::-webkit-scrollbar { width: 0px; height: 0px; }
-        .db-list-outer::-webkit-scrollbar-track { background: transparent; }
-        .db-toolbar
-        .db-toolbar-spacer { flex: 1 1 auto; }
-        @media (max-width: 360px) {
-          .db-toolbar {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-          }
-          .db-toolbar-spacer {
-            display: none;
-          }
+        .db-toolbar-spacer {
+          display: none;
         }
-        .db-list-outer {
-          /* Firefox */
-          scrollbar-width: 0px;
-          scrollbar-color: auto transparent;
-        }
-        .db-list-outer::-webkit-scrollbar:vertical { width: 0px; }
-        .db-list-outer::-webkit-scrollbar:horizontal { height: 10px; }
-        .db-list-outer::-webkit-scrollbar-thumb:horizontal {
-          background-clip: padding-box;
-          background-color: rgba(0,0,0,.3);
-          border-radius: 9999px;
-        }        
-      `}</style>
-    </div>
+      }
+      .db-list-outer {
+        /* Firefox */
+        scrollbar-width: 0px;
+        scrollbar-color: auto transparent;
+      }
+      .db-list-outer::-webkit-scrollbar:vertical { width: 0px; }
+      .db-list-outer::-webkit-scrollbar:horizontal { height: 10px; }
+      .db-list-outer::-webkit-scrollbar-thumb:horizontal {
+        background-clip: padding-box;
+        background-color: rgba(0,0,0,.3);
+        border-radius: 9999px;
+      }        
+    `}</style>
+  </div>
   );
 };
 

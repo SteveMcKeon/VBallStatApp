@@ -969,6 +969,7 @@ const MainPage = () => {
                       refreshGames={refreshGames}
                       supabase={supabase}
                       teamId={teamId}
+                      isMobile={isMobile}
                     />
                   </div>
                 </div>
