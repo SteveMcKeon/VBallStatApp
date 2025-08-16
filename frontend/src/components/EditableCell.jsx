@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle  } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect  } from 'react';
 
 const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase }, ref) => {
   const RALLY_FIELD = 'rally_id';
@@ -35,6 +35,26 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     return true; 
   };
   const highlightClass = !editing && !isValidValue() ? 'bg-yellow-200 hover:bg-yellow-300' : 'hover:bg-gray-100';
+  const lastAnnouncedH = useRef(0);
+
+  const measureGhost = () => {
+    const gh = ghostRef.current?.getBoundingClientRect().height || 0;
+    const h = Math.ceil(gh);
+    if (h && h !== cellHeight) setCellHeight(h);
+    // Only tell the table if the height actually changed
+    if (h && h !== lastAnnouncedH.current) {
+      lastAnnouncedH.current = h;
+      // idx: the row index prop you're already passing into EditableCell
+      window.dispatchEvent(new CustomEvent('db_row_maybe_grow', { detail: { index: idx, height: h } }));
+    }
+    return h;
+  };
+
+  useLayoutEffect(() => {
+    if (!editing) return;
+    measureGhost();
+  }, [editing, tempValue]);
+
   useEffect(() => {
     if (!editing) return;
 
@@ -342,7 +362,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
 
   return (
     editing ? (
-      <div ref={wrapperRef} className="relative w-full h-full editable-cell-wrapper">
+      <div ref={wrapperRef} className="relative w-full editable-cell-wrapper">
         <textarea
           ref={inputRef}
           autoFocus
@@ -370,9 +390,10 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
             boxSizing: 'border-box',
             overflow: 'hidden',
           }}   
-          value={tempValue}
+           value={tempValue}
           onChange={(e) => {
-            setTempValue(e.target.value);           
+            setTempValue(e.target.value);
+            requestAnimationFrame(measureGhost);
           }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}

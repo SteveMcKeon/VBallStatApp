@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useRef, useMemo, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import SortableFilterHeader from './SortableFilterHeader';
@@ -526,6 +526,33 @@ const DBStats = ({
 
   const Row = ({ index, style }) => {
     const rowRef = useRef(null);
+    const measureAndCommit = useCallback(() => {
+      const el = rowRef.current;
+      if (!el) return;
+      const prev = rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
+      const prevInline = el.style.height;
+      el.style.height = 'auto';
+      // keep the small +1 you use elsewhere to avoid off-by-one jitters
+      const next = Math.max(ROW_HEIGHT, Math.ceil(el.getBoundingClientRect().height)) + 1;
+      el.style.height = prevInline || `${prev}px`;
+      if (next !== prev) {
+        rowHeightsRef.current.set(index, next);
+        requestAnimationFrame(() => {
+          // force update so the list re-renders immediately
+          listRef.current?.resetAfterIndex(index, true);
+        });
+      }
+    }, [index]);
+
+    useEffect(() => {
+      const onMaybeGrow = (e) => {
+        if (e?.detail?.index !== index) return;
+        requestAnimationFrame(measureAndCommit);
+      };
+      window.addEventListener('db_row_maybe_grow', onMaybeGrow);
+      return () => window.removeEventListener('db_row_maybe_grow', onMaybeGrow);
+    }, [index, measureAndCommit]);   
+    
     useLayoutEffect(() => {
       if (!rowRef.current) return;
       const measure = () => {
@@ -541,8 +568,7 @@ const DBStats = ({
         const DIFF_THRESHOLD = 2;
         if (Math.abs(h - prev) > DIFF_THRESHOLD) {
           rowHeightsRef.current.set(index, h);
-      const shrinking = h < prev;
-      listRef.current?.resetAfterIndex(index, shrinking);
+          listRef.current?.resetAfterIndex(index, true);
         }
       };
 
