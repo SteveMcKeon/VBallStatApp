@@ -136,19 +136,6 @@ const MainPage = () => {
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
   const [availableTeams, setAvailableTeams] = useState([]);
-  const [userRole, setUserRole] = useState(null);
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error('Failed to get user', error);
-        return;
-      }
-      setUserRole(user?.user_metadata?.role);
-    };
-    fetchUserRole();
-  }, []);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
 
   const handleTeamChange = async (e, { force = false } = {}) => {
@@ -256,7 +243,7 @@ const MainPage = () => {
   const [videoList, setVideoList] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
-  const { editMode, toggleEditMode } = EditMode();
+  const { editMode, toggleEditMode, allowedRole } = EditMode(teamId);
 
   const handleEditModeToggle = () => {
     toggleEditMode();
@@ -916,7 +903,7 @@ const MainPage = () => {
                   />
                 </div>
                 <div className="mt-auto p-4 space-y-4">
-                  {userRole && (
+                  {allowedRole && (
                     <button
                       onClick={handleEditModeToggle}
                       className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform cursor-pointer transition hover:scale-[1.03] ${
@@ -937,7 +924,7 @@ const MainPage = () => {
                 </div>
               </div>
             )}
-            <SidebarFooter />
+            <SidebarFooter teamId={teamId}/>
           </div>
         </div>
         <div

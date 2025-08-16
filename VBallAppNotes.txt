@@ -25,6 +25,5 @@ Encode videos like youtube
 REFACTOR
 
 remove user roles from metadata, its now in team_members table
-make toasts appear from top of viewport so its visible on scroll
 combine two docker environments.
 draggable col widths on mobile

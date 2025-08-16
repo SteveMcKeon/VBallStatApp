@@ -15,6 +15,21 @@ const INTRO_SKIP_THRESHOLD = 0.5;
 const TOUCH_BUFFER_INTERVAL_MS = 500;
 const FRAME_DURATION = 1 / 60;
 
+const Key = ({ combo }) => {
+  const prettify = (s) =>
+    s
+      .trim()
+      .replace(/^\(|\)$/g, '')                 // remove ( )
+      .replace(/\bctrl\b/gi, 'Ctrl')
+      .replace(/\balt\b/gi, 'Alt')
+      .replace(/\bshift\b/gi, 'Shift')
+      .replace(/\bspace(bar)?\b/gi, 'Space')
+      .replace(/\b[a-z]\b/g, (m) => m.toUpperCase()); // single letters
+
+  return <span className="text-neutral-400">{prettify(combo)}</span>;
+};
+
+
 const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
@@ -991,7 +1006,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
             )}
             </button>
             <div className="focus:outline-none absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-              Mute (m)<br />Volume (↑↓)
+              Mute <Key combo="m" /><br />Volume <Key combo="↑↓" />
             </div>
             {/* Volume Slider — visible on hover of button or slider */}
             <div className="absolute left-full focus:outline-none top-1/2 -translate-y-1/2 ml-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-40 bg-transparent">
@@ -1074,7 +1089,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
             disabled={isCustomPlayback}
           />
           <div className="absolute bottom-[58px] left-1/2 whitespace-nowrap -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-            {isCustomPlayback ? "Disabled during highlight reel playback" : "Previous Rally (ctrl + ←)"}
+            {isCustomPlayback ? "Disabled during highlight reel playback" : <>Previous Rally <Key combo="ctrl + ←" /></>}
           </div>
         </div>            
         {/* Rewind Button */}
@@ -1085,7 +1100,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           }}
           />
           <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-            Rewind {REWIND_AMOUNT}s (←) 
+            <>Rewind {REWIND_AMOUNT}s <Key combo="←" /></>
           </div>
         </div>
       {/*  Play/Pause Button */}
@@ -1109,7 +1124,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
         )}
         </button>
         <div className="absolute bottom-[62px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-          Play/Pause (space)
+          <>Play/Pause <Key combo="Space" /></>
         </div>
       </div>
       {/* Forward Button */}
@@ -1119,7 +1134,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           video.currentTime = Math.min(video.duration, video.currentTime + FORWARD_AMOUNT );
         }}/>
         <div className="absolute bottom-[58px] left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-          Forward {FORWARD_AMOUNT}s (→)
+          <>Forward {FORWARD_AMOUNT}s <Key combo="→" /></>
         </div>
       </div>
       {/* Next Rally */}
@@ -1136,7 +1151,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           disabled={isCustomPlayback}
         />
         <div className="absolute bottom-[58px] left-1/2 whitespace-nowrap -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-40 pointer-events-none">
-          {isCustomPlayback ? "Disabled during highlight reel playback" : "Next Rally (ctrl + →)"}
+          {isCustomPlayback ? "Disabled during highlight reel playback" : <>Next Rally <Key combo="ctrl + →" /></>}
         </div>
       </div>      
       {/* Next Set */}
