@@ -26,3 +26,8 @@ switch to IDE
 #Fixes
 REFACTOR
 
+make invitation email nicer.
+avatar caching breaks if >1 user on same browser
+add Google Auth to acecpt-invite
+on inputting emails, once "Add another..." pops up, enter again should submit.
+Pending badge disappeared. If augh.users last sign in at is waiting for verification, or if the invite still exists in the team_invites table, then mark as pending. changing the role should change the teams_invite table role.

@@ -43,7 +43,7 @@ const Modal = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 rounded-md hover:bg-gray-200 transition-colors w-8 h-8 flex items-center justify-center"
+          className="absolute top-3 right-3 rounded-md hover:bg-gray-200 transition-colors w-8 h-8 flex items-center justify-center cursor-pointer"
           aria-label="Close"
         >
           <span className="text-gray-500 hover:text-black">✕</span>

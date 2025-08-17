@@ -4,6 +4,7 @@ import MainPage from './components/MainPage';
 import LoginPage from './components/LoginPage';
 import NotFound from './components/NotFound';
 import ResetPassword from './components/ResetPassword';
+import AcceptInvite from './components/AcceptInvite';
 
 const AppRoutes = () => {
   const location = useLocation();
@@ -12,6 +13,7 @@ const AppRoutes = () => {
     { path: '/' },
     { path: '/login' },
     { path: '/reset-password' },
+    { path: '/accept-invite' },
   ];
   
   const isKnownRoute = matchRoutes(routes, location) !== null;
@@ -22,6 +24,7 @@ const AppRoutes = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<MainPage />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

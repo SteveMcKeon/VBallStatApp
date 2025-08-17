@@ -49,5 +49,5 @@ export default defineConfig(async () => {
         react: path.resolve('./node_modules/react'),
       },     
     },
-  };
+  }; 
 });

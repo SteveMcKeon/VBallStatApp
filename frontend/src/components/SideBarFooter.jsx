@@ -61,12 +61,19 @@ const SidebarFooter = ({ mini = false, teamId }) => {
         sessUser.id,
         sessUser.user_metadata?.avatar_url
       );
-
+      const meta = sessUser.user_metadata || {};
+      const providerName =
+        Array.isArray(sessUser.identities) && sessUser.identities[0]?.identity_data?.name;
       setUser({
         id: sessUser.id,
         email: sessUser.email,
-        name: sessUser.user_metadata?.full_name || sessUser.email,
-        avatarUrl,
+        name:
+          meta.full_name ||
+          meta.display_name ||
+          meta.name ||
+          providerName ||
+          (sessUser.email ? sessUser.email.split('@')[0] : 'User'),
+        avatarUrl: meta.avatar_url || meta.picture || avatarUrl || null,
         role: teamRole || 'viewer',
       });
     };
@@ -123,16 +130,30 @@ const SidebarFooter = ({ mini = false, teamId }) => {
               <img
                 src={user.avatarUrl}
                 alt="User"
-                className="w-8 h-8 rounded-full object-cover"
+                className="w-8 h-8 rounded-full object-cover shrink-0"
                 onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/default-avatar.png'; }}
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold">
+              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold shrink-0">
                 {user?.name?.[0] || 'U'}
               </div>
             )}
-            <div className="text-left">
-              <div className="text-sm font-medium text-gray-900">{user?.name}</div>
+            <div className="text-left flex-1 min-w-0">
+              {(() => {
+                
+                const meta = user?.user_metadata || {};
+                const label =
+                  meta.display_name ||
+                  meta.full_name ||
+                  meta.name ||
+                  user?.name ||
+                  (user?.email ? user.email.split('@')[0] : 'User');
+                return (
+                  <div className="text-sm font-medium text-gray-900 truncate" title={label}>
+                    {label}
+                  </div>
+                );
+              })()}
               <div className="text-xs text-gray-500 capitalize">
                 {user?.role || 'viewer'}
               </div>

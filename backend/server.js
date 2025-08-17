@@ -11,6 +11,7 @@ const app = express();
 const EXPRESSPORT = 3001;
 const VIDEO_DIR = '/app/videos';
 const TUS_DIR = path.join(VIDEO_DIR, 'user-uploads');
+const crypto = require('crypto');
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -28,15 +29,76 @@ app.use((req, res, next) => {
   console.log(`🛰️  ${req.method} ${req.url}`);
   next();
 });
-
 app.use(cors());
 app.use(express.json());
 app.use('/videos', express.static(VIDEO_DIR));
-
 const options = {
   key: fs.readFileSync('./cert/key.pem'),
   cert: fs.readFileSync('./cert/cert.pem'),
 };
+function buildInviteEmail({ inviterLabel, teamName, actionLink, siteUrl }) {
+  const prettyTeam = teamName || 'your volleyball team';
+  const host = (() => {
+    try { return new URL(siteUrl).host; } catch { return siteUrl || 'the site'; }
+  })();
+  const subject = `Join ${prettyTeam} on VBallTracker — stats & video viewer`;
+  const preheader = `${inviterLabel} invited you to ${prettyTeam}. Click to accept.`;
+  const html = `
+  <!doctype html>
+  <html>
+    <body style="margin:0;padding:0;background:#f6f7fb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;">
+      <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        ${preheader}
+      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f6f7fb;padding:24px 0;">
+        <tr>
+          <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+              <tr>
+                <td style="padding:24px 24px 8px;">
+                  <h1 style="margin:0;font-size:20px;line-height:1.3;">You’ve been invited</h1>
+                  <p style="margin:12px 0 0;color:#374151;font-size:14px;line-height:1.6;">
+                    <strong>${inviterLabel}</strong> has invited you to join <strong>${prettyTeam}</strong> on
+                    VBallTracker — a volleyball stats tracker & content viewer.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding:24px;">
+                  <a href="${actionLink}"
+                     style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600;">
+                    Accept invite
+                  </a>
+                  <p style="margin:16px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
+                    If the button doesn’t work, copy & paste this link:<br>
+                    <span style="word-break:break-all;">${actionLink}</span>
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:0 24px 24px;">
+                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 16px;">
+                  <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
+                    You received this because someone entered your email on ${host}. If this wasn’t you, you can ignore this email.
+                  </p>
+                </td>
+              </tr>
+            </table>
+            <p style="color:#9ca3af;font-size:12px;margin:12px 0 0;">© ${new Date().getFullYear()} VBallTracker</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+  </html>`.trim();
+  const text =
+`${inviterLabel} invited you to join ${prettyTeam} on VBallTracker.
+
+Accept invite: ${actionLink}
+
+If you didn’t request this, you can ignore this email.`;
+  return { subject, html, text };
+}
+
 async function readSidecar(id) {
   for (const sfx of ['.json', '.info']) {
     const p = path.join(TUS_DIR, id + sfx);
@@ -130,6 +192,141 @@ async function userCanManageTeam(userId, teamId) {
   } catch {}
   return false;
 }
+async function sendTransactionalEmail({ to, subject, html, text }) {
+  if (process.env.EMAIL_HOOK_URL) {
+    await fetch(process.env.EMAIL_HOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, text }),
+    });
+    return;
+  }
+  console.log('Invite email (dev):', { to, subject, html, text });
+}
+
+app.get('/api/team-invites', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const requesterId = decoded?.sub;
+    if (!requesterId) return res.status(403).json({ error: 'Unauthorized' });
+    const teamId = String(req.query.team_id || '').trim();
+    const status = String(req.query.status || 'pending').trim();
+    if (!teamId) return res.status(400).json({ error: 'Missing team_id' });
+    const allowed = await userCanManageTeam(requesterId, teamId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    const q = supabase.from('team_invites')
+      .select('email, role, invited_user, created_at')
+      .eq('team_id', teamId);
+    const { data, error } = await q.order('email', { ascending: true });
+    if (error) return res.status(500).json({ error: 'Failed to load invites' });
+    return res.json({ invites: data || [] });
+  } catch (e) {
+    console.error('❌ GET /api/team-invites failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
+
+app.post('/api/team-invites', async (req, res) => {
+  try {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const inviterId = decoded?.sub;
+    if (!inviterId) return res.status(403).json({ error: 'Unauthorized' });
+    let { email, teamId, role = 'player' } = req.body || {};
+    if (!email || !teamId) return res.status(400).json({ error: 'Missing email or teamId' });
+    email = String(email).trim();
+    const emailRx = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+    if (!emailRx.test(email)) {
+      return res.status(400).json({ error: `Email address "${email}" is invalid` });
+    }
+    if (!['player', 'editor'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    const allowed = await userCanManageTeam(inviterId, teamId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    const inviteToken = crypto.randomUUID();
+    const redirectTo =
+      `${process.env.SITE_URL}/accept-invite?team=${encodeURIComponent(teamId)}&token=${encodeURIComponent(inviteToken)}`;
+    const { error: inviteErr } =
+      await supabase.auth.admin.inviteUserByEmail(email, { redirectTo });
+    if (inviteErr?.message?.toLowerCase().includes('already registered')) {
+      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: { redirectTo },
+      });
+      if (linkErr) {
+        return res.status(400).json({ error: linkErr.message });
+      }
+      await supabase.from('team_invites')
+        .delete()
+        .eq('team_id', teamId)
+        .eq('email', email);
+      const { error: insertErr } = await supabase.from('team_invites').insert({
+        team_id: teamId,
+        email,
+        invited_by: inviterId,
+        role,
+        token: inviteToken,
+      });
+      if (insertErr) {
+        return res.status(400).json({ error: insertErr.message || 'Failed to record invite' });
+      }
+      let inviterLabel = 'the team captain';
+      try {
+        const inviterRes = await supabase.auth.admin.getUserById(inviterId);
+        const inviter = inviterRes.user || inviterRes.data?.user || null;
+        inviterLabel =
+          inviter?.user_metadata?.display_name ||
+          inviter?.user_metadata?.full_name ||
+          inviter?.user_metadata?.name ||
+          inviter?.email ||
+          'the team captain';
+      } catch {}
+      let teamNameForEmail = '';
+      try {
+        const { data: teamRow } = await supabase
+          .from('teams')
+          .select('name')
+          .eq('id', teamId)
+          .maybeSingle();
+        teamNameForEmail = teamRow?.name || '';
+      } catch {}
+      const { subject, html, text } = buildInviteEmail({
+        inviterLabel,
+        teamName: teamNameForEmail,
+        actionLink: linkData.properties.action_link,
+        siteUrl: process.env.SITE_URL,
+      });
+      await sendTransactionalEmail({ to: email, subject, html, text });
+      return res.json({ ok: true });
+    }
+    if (inviteErr) {
+      return res.status(400).json({ error: inviteErr.message || 'Invite failed' });
+    }
+    await supabase.from('team_invites')
+      .delete()
+      .eq('team_id', teamId)
+      .eq('email', email);
+    const { error: insertErr } = await supabase.from('team_invites').insert({
+      team_id: teamId,
+      email,
+      invited_by: inviterId,
+      role,
+      token: inviteToken,
+    });
+    if (insertErr) {
+      return res.status(400).json({ error: insertErr.message || 'Failed to record invite' });
+    }
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/team-invites failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
 
 app.get('/api/team-members', async (req, res) => {
   try {
@@ -151,12 +348,20 @@ app.get('/api/team-members', async (req, res) => {
       try {
         const userRes = await supabase.auth.admin.getUserById(m.user_id);
         const user = userRes.user || userRes.data?.user || null;
+        const avatar_url =
+          user?.user_metadata?.avatar_url ||
+          user?.user_metadata?.picture ||
+          user?.user_metadata?.avatar ||
+          user?.user_metadata?.image ||
+          user?.identities?.[0]?.identity_data?.avatar_url ||
+          null;
         return {
           user_id: m.user_id,
           role: m.role,
           email: user?.email || null,
           full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
           display_name: user?.user_metadata?.display_name || null,
+          avatar_url,
         };
       } catch {
         return { user_id: m.user_id, role: m.role, email: null, full_name: null, display_name: null };
@@ -206,11 +411,21 @@ app.get('/api/search-users', async (req, res) => {
         const full  = (u.user_metadata?.full_name || u.user_metadata?.name || '').toLowerCase();
         const disp  = (u.user_metadata?.display_name || '').toLowerCase();
         if (email.includes(qLower) || full.includes(qLower) || disp.includes(qLower)) {
+          const confirmedAt =
+            u.email_confirmed_at || u.confirmed_at || u.last_sign_in_at || null;          
           matches.push({
             id: u.id,
             email: u.email,
             full_name: u.user_metadata?.full_name || u.user_metadata?.name || '',
-            display_name: u.user_metadata?.display_name || ''
+            display_name: u.user_metadata?.display_name || '',
+            is_confirmed: !!confirmedAt,
+            avatar_url:
+              u.user_metadata?.avatar_url ||
+              u.user_metadata?.picture ||
+              u.user_metadata?.avatar ||
+              u.user_metadata?.image ||
+              u.identities?.[0]?.identity_data?.avatar_url ||
+              null,            
           });
           if (matches.length >= limit) break;
         }
