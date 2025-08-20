@@ -739,13 +739,18 @@ export default function ManageTeamModal({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {(m.inviteOnly || m.pendingInvite) && (
+                  <span className="px-2 py-0.5 text-[11px] rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200" >
+                    Pending
+                  </span>
+                )}              
                 {canManage ? (
                   <>
                     {(() => {
                       const isCaptainRow = m.user_id === captainId;
                       return (
                         <select
-                          className={`border rounded-md px-2 py-1 text-sm bg-white transition-colors
+                          className={`border rounded-md px-2 py-1 text-sm bg-white transition-colors w-22
                             ${isCaptainRow ? 'opacity-60' : 'hover:bg-gray-50 cursor-pointer'}`}
                           value={m.role}
                           disabled={isCaptainRow}
@@ -773,7 +778,6 @@ export default function ManageTeamModal({
                         </select>
                       );
                     })()}
-
                     <button
                       onClick={() =>
                         m.pendingInvite ? cancelInvite(m.email) : removeMember(m.user_id)
@@ -796,7 +800,7 @@ export default function ManageTeamModal({
                     </button>
                   </>
                 ) : (
-                  <span className="px-2 py-1 text-xs rounded-md border bg-gray-50 text-gray-700">
+                  <span className="px-2 py-1 text-xs rounded-md border bg-gray-50 text-gray-700 text-center">
                     {cap(m.role)}
                   </span>
                 )}

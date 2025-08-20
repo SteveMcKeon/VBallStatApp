@@ -418,17 +418,26 @@ app.get('/api/search-users', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Missing token' });
     const decoded = verifySupabaseToken(token);
-    const userId = decoded?.sub;
-    if (!userId) return res.status(403).json({ error: 'Unauthorized' });
+    const requesterId = decoded?.sub;
+    if (!requesterId) return res.status(403).json({ error: 'Unauthorized' });
     const q = String(req.query.q || '').trim();
     const teamId = String(req.query.team_id || '').trim();
+    if (!teamId) return res.status(400).json({ error: 'Missing team_id' });
     if (q.length < 2) return res.json({ users: [] });
-    const allowed = await userCanManageTeam(userId, teamId);
+    const allowed = await userCanManageTeam(requesterId, teamId);
     if (!allowed) return res.status(403).json({ error: 'Forbidden' });
     const qLower = q.toLowerCase();
     const limit = 8;
     const perPage = 1000;
     let page = 1;
+    const [{ data: memberRows }, { data: inviteRows }] = await Promise.all([
+      supabase.from('team_members').select('user_id').eq('team_id', teamId),
+      supabase.from('team_invites').select('email').eq('team_id', teamId),
+    ]);
+    const memberIds = new Set((memberRows || []).map(r => r.user_id));
+    const inviteEmails = new Set(
+      (inviteRows || []).map(r => (r.email || '').toLowerCase()).filter(Boolean)
+    );
     const matches = [];
     while (matches.length < limit) {
       const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
@@ -442,25 +451,31 @@ app.get('/api/search-users', async (req, res) => {
         const email = (u.email || '').toLowerCase();
         const full  = (u.user_metadata?.full_name || u.user_metadata?.name || '').toLowerCase();
         const disp  = (u.user_metadata?.display_name || '').toLowerCase();
-        if (email.includes(qLower) || full.includes(qLower) || disp.includes(qLower)) {
-          const confirmedAt =
-            u.email_confirmed_at || u.confirmed_at || u.last_sign_in_at || null;          
-          matches.push({
-            id: u.id,
-            email: u.email,
-            full_name: u.user_metadata?.full_name || u.user_metadata?.name || '',
-            display_name: u.user_metadata?.display_name || '',
-            is_confirmed: !!confirmedAt,
-            avatar_url:
-              u.user_metadata?.avatar_url ||
-              u.user_metadata?.picture ||
-              u.user_metadata?.avatar ||
-              u.user_metadata?.image ||
-              u.identities?.[0]?.identity_data?.avatar_url ||
-              null,            
-          });
-          if (matches.length >= limit) break;
+        if (!(email.includes(qLower) || full.includes(qLower) || disp.includes(qLower))) {
+          continue;
         }
+        const verified = Boolean(
+          u.email_confirmed_at || u.confirmed_at || u.last_sign_in_at || (u.identities?.length)
+        );
+        if (!verified) continue;
+        if (!email) continue;
+        if (memberIds.has(u.id)) continue;
+        if (inviteEmails.has(email)) continue;
+        matches.push({
+          id: u.id,
+          email: u.email,
+          full_name: u.user_metadata?.full_name || u.user_metadata?.name || '',
+          display_name: u.user_metadata?.display_name || '',
+          is_confirmed: true,
+          avatar_url:
+            u.user_metadata?.avatar_url ||
+            u.user_metadata?.picture ||
+            u.user_metadata?.avatar ||
+            u.user_metadata?.image ||
+            u.identities?.[0]?.identity_data?.avatar_url ||
+            null,
+        });
+        if (matches.length >= limit) break;
       }
       if (users.length < perPage) break;
       page += 1;

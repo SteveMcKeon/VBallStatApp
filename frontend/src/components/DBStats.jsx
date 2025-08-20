@@ -420,6 +420,30 @@ const DBStats = ({
   const toggleGameField = async (field, value) => {
     if (!gameId) return;
     try {
+      if (field === 'isscored') {
+        const { data, error } = await supabase.rpc('set_game_isscored', {
+          p_team_id: teamId,
+          p_game_id: gameId,
+          p_value: value,
+        });
+        if (error) {
+          setToast(`Failed to update ${field}: ${error.message}`, 'error');
+          if (typeof prevValue !== 'undefined') {
+            setGameSettings((p) => ({ ...p, [field]: prevValue }));
+          }
+          return;
+        }
+        if (!data || data.length === 0) {
+          setToast(`You don't have permission to update ${field}`, 'error');
+          if (typeof prevValue !== 'undefined') {
+            setGameSettings((p) => ({ ...p, [field]: prevValue }));
+          }
+          return;
+        }
+        refreshStats();
+        if (refreshGames) refreshGames();
+        return;
+      }      
       const { error } = await supabase
         .from('games')
         .update({ [field]: value })
@@ -444,7 +468,6 @@ const DBStats = ({
         'action_type',
         'quality',
         'notes',
-        'result',
         'set_to_player',
         'set_to_position',
       ];
@@ -724,7 +747,6 @@ const DBStats = ({
             'action_type',
             'quality',
             'notes',
-            'result',
             'set_to_player',
             'set_to_position',
           ];
@@ -1143,8 +1165,9 @@ const DBStats = ({
                 value={gameSettings.isscored ?? ''}
                 onChange={(e) => {
                   const value = e.target.value === 'true';
-                  setGameSettings(prev => ({ ...prev, isscored: value }));
-                  toggleGameField('isscored', value);
+                  const prev = gameSettings.isscored;
+                  setGameSettings((p) => ({ ...p, isscored: value }));
+                  toggleGameField('isscored', value, prev);
                 }}
               >
                 <option value="true">Yes</option>

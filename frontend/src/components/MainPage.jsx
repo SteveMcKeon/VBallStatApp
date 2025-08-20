@@ -302,8 +302,8 @@ const MainPage = () => {
     player: { visible: true, type: 'text' },
     action_type: { visible: true, type: 'text' },
     quality: { visible: true, type: 'numeric' },
-    set_to_player: { visible: false, type: 'text', adminOnly: true },
-    set_to_position: { visible: false, type: 'text', adminOnly: true },  
+    set_to_player: { visible: false, type: 'text' },
+    set_to_position: { visible: false, type: 'text' },  
     result: { visible: false, type: 'text' },
     score: { visible: false, type: 'int2' },
     our_score: { visible: false, type: 'int2' },
@@ -687,7 +687,7 @@ const MainPage = () => {
   const effectiveVisibleColumns = useMemo(() => {
     if (allowedRole === 'admin') return visibleColumns;
     const next = { ...visibleColumns };
-    const deny = ['set', 'rally_id', 'score', 'our_score', 'opp_score'];
+    const deny = ['set', 'rally_id'];
     if (allowedRole !== 'editor') {
       deny.push('result', 'set_to_player', 'set_to_position');
     }
@@ -915,9 +915,7 @@ const MainPage = () => {
                             { key: 'result', label: 'Result' },
                           ]
                         : []),
-                      ...(allowedRole === 'admin'
-                        ? [{ key: 'score', label: 'Score' }]
-                        : []),              
+                      { key: 'score', label: 'Score' },            
                       { key: 'notes', label: 'Notes' },
                     ]}
                     visibleColumns={visibleColumns}
