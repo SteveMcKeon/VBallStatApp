@@ -6,6 +6,7 @@ wsl rsync -av --exclude 'Dockerfile' `
              --exclude 'push_to_prod.sh' `
              --exclude 'videos/' `
              --exclude 'node_modules/' `
+             --exclude '.env' `
              /mnt/c/VBallStatApp_dev/ /mnt/c/VBallStatApp_prod/
 
 Set-Location "C:\VBallStatApp_prod\frontend"

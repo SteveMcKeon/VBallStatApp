@@ -31,7 +31,20 @@ app.use((req, res, next) => {
 });
 app.use(cors());
 app.use(express.json());
-app.use('/videos', express.static(VIDEO_DIR));
+app.use('/videos', express.static(VIDEO_DIR, {
+  setHeaders(res, p) {
+    if (p.endsWith('.m3u8')) {
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+      res.setHeader('Cache-Control', 'public, max-age=30');
+    } else if (p.endsWith('.m4s') || p.endsWith('.mp4')) {
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+    res.setHeader('Accept-Ranges', 'bytes');
+  }
+}));
+
+
 const options = {
   key: fs.readFileSync('./cert/key.pem'),
   cert: fs.readFileSync('./cert/cert.pem'),
@@ -171,18 +184,6 @@ async function userCanDeleteGame(userId, teamId) {
 async function userCanManageTeam(userId, teamId) {
   if (!teamId || !userId) return false;
   try {
-    const { data: team, error: teamErr } = await supabase
-      .from('teams')
-      .select('captain_id')
-      .eq('id', teamId)
-      .maybeSingle();
-    if (!teamErr && team?.captain_id === userId) return true;
-  } catch (_) {}
-  return false;
-}
-async function userCanManageTeam(userId, teamId) {
-  if (!teamId || !userId) return false;
-  try {
     const { data: team, error } = await supabase
       .from('teams')
       .select('captain_id')
@@ -203,6 +204,37 @@ async function sendTransactionalEmail({ to, subject, html, text }) {
   }
   console.log('Invite email (dev):', { to, subject, html, text });
 }
+app.post('/api/set-display-name', async (req, res) => {
+  try {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const requesterId = decoded?.sub;
+    if (!requesterId) return res.status(403).json({ error: 'Unauthorized' });
+    const { teamId, userId, display_name } = req.body || {};
+    const newName = String(display_name || '').trim();
+    if (!teamId || !userId || !newName) {
+      return res.status(400).json({ error: 'Missing teamId, userId or display_name' });
+    }
+    const allowed = await userCanManageTeam(requesterId, teamId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    const { data: targetRow } = await supabase
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!targetRow) return res.status(400).json({ error: 'User not in team' });
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: { display_name: newName },
+    });
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('❌ /api/set-display-name failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
 
 app.get('/api/team-invites', async (req, res) => {
   try {

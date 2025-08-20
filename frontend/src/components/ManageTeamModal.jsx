@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Modal from './Modal';
 import Toast from './Toast';
 import supabase from '../supabaseClient';
+import { TeamRoster } from './TeamRoster';
 
 const ROLES = ['captain', 'editor', 'player'];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -43,7 +44,15 @@ export default function ManageTeamModal({
   onClose,
   teamId,
   currentUserId,
+  canManage = false,
 }) {
+  const {
+    members: rosterMembers,
+    invites: rosterInvites,
+    loading: rosterLoading,
+    errorMsg: rosterError,
+    refresh,
+  } = TeamRoster(supabase, teamId);
   const isDemoTeam = teamId === DEMO_TEAM_ID;
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('error');
@@ -53,16 +62,18 @@ export default function ManageTeamModal({
     setToastType(type);
     setShowToast(true);
   };
+  const [editingNameId, setEditingNameId] = useState(null);
+  const [editingNameVal, setEditingNameVal] = useState('');  
   const [confirmCaptain, setConfirmCaptain] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [teamName, setTeamName] = useState('');
-  const [members, setMembers] = useState([]);
+  const [demoMembers, setDemoMembers] = useState([]);
   const [inviteQuery, setInviteQuery] = useState('');
   const [emailChips, setEmailChips] = useState([]);
   const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
   const splitEmails = (s) =>
     (s || '')
-      .split(/[\s,;]+/)
+      .split(/[\s,;\uFF0C]+/) // include full-width comma (iOS)
       .map(x => x.trim())
       .filter(Boolean);
   const addChip = (raw) => {
@@ -77,11 +88,44 @@ export default function ManageTeamModal({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [savingName, setSavingName] = useState(false);
-
+  const saveDisplayName = async (userId, value) => {
+    if (!teamId || !userId) return;
+    const trimmed = String(value || '').trim();
+    setEditingNameId(null);
+    if (!trimmed) return;
+    if (isDemoTeam) {
+      setDemoMembers(prev => prev.map(m => (m.user_id === userId ? { ...m, name: trimmed } : m)));
+      setToast('Display name updated (demo)', 'success');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      };
+      const res = await fetch('/api/set-display-name', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ teamId, userId, display_name: trimmed }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error || 'Failed to update display name');
+      }
+      setToast('Display name updated', 'success');
+      await refresh();
+    } catch (e) {
+      setToast(e?.message || 'Failed to update display name');
+    } finally {
+      setBusy(false);
+    }
+  };
   const cancelInvite = async (email) => {
   if (!teamId) return;
   if (isDemoTeam) {
-    setMembers(prev =>
+    setDemoMembers(prev =>
       prev.filter(m => !(m.inviteOnly && (m.email || '').toLowerCase() === (email || '').toLowerCase()))
     );
     setToast('Invite canceled (demo)', 'success');
@@ -93,7 +137,7 @@ export default function ManageTeamModal({
         .delete()
         .eq('team_id', teamId)
         .eq('email', email);
-      await fetchMembers();
+      await refresh();
       setToast('Invite canceled', 'success');
     } catch (e) {
       setToast(e?.message || 'Failed to cancel invite');
@@ -103,7 +147,7 @@ export default function ManageTeamModal({
   const updateInviteRole = async (email, role) => {
   if (!teamId) return;
   if (isDemoTeam) {
-    setMembers(prev =>
+    setDemoMembers(prev =>
       prev.map(m => (m.inviteOnly && (m.email || '').toLowerCase() === (email || '').toLowerCase())
         ? { ...m, role }
         : m
@@ -112,8 +156,8 @@ export default function ManageTeamModal({
     setToast('Invite role updated (demo)', 'success');
     return;
   }
-    const prev = members;
-    setMembers(prev =>
+    const prev = demoMembers;
+    setDemoMembers(prev =>
       prev.map(m =>
         m.inviteOnly && (m.email || '').toLowerCase() === (email || '').toLowerCase()
           ? { ...m, role }
@@ -128,11 +172,11 @@ export default function ManageTeamModal({
       .select();
 
     if (error) {
-      setMembers(prev); // revert
+      setDemoMembers(prev);
       setToast(error.message || 'Failed to update invite role');
       return;
     }
-    await fetchMembers();
+    await refresh();
     setToast('Invite role updated', 'success');
   };
 
@@ -141,7 +185,7 @@ export default function ManageTeamModal({
     if (isDemoTeam) {
       setTeamName('Demo');
       setCaptainId(DEMO_CAPTAIN_ID);
-      setMembers(DEMO_MEMBERS);
+      setDemoMembers(DEMO_MEMBERS);
       return;
     }
     const { data, error } = await supabase
@@ -160,11 +204,11 @@ export default function ManageTeamModal({
   const removeMember = async (userId) => {
   if (!teamId) return;
   if (isDemoTeam) {
-    setMembers(prev => prev.filter(m => m.user_id !== userId));
+    setDemoMembers(prev => prev.filter(m => m.user_id !== userId));
     setToast('Removed from team (demo)', 'success');
     return;
   }
-    setLoading(true);
+    setBusy(true);
     try {
       const { error } = await supabase
         .from('team_members')
@@ -172,63 +216,15 @@ export default function ManageTeamModal({
         .eq('team_id', teamId)
         .eq('user_id', userId);
       if (error) throw error;
-      await fetchMembers();
+      await refresh();
       setToast('Removed from team', 'success');
     } catch (e) {
       setToast(e?.message || 'Failed to remove member');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
-
-  const fetchMembers = async () => {
-    if (!teamId) return;
-    if (isDemoTeam) {
-      setMembers(DEMO_MEMBERS);
-      return;
-    }
-    const headers = await getAuthHeaders();
-
-    const res = await fetch(`/api/team-members?team_id=${encodeURIComponent(teamId)}`, { headers });
-    const json = await res.json().catch(() => ({ members: [] }));
-
-    const invRes = await fetch(
-      `/api/team-invites?team_id=${encodeURIComponent(teamId)}&status=pending`,
-      { headers }
-    );
-    const invJson = await invRes.json().catch(() => ({ invites: [] }));
-
-    const pendingEmails = new Set(
-      (invJson.invites || [])
-        .map(i => (i.email || '').toLowerCase())
-        .filter(Boolean)
-    );
-
-    const list = (json.members || []).map(m => {
-      const email = (m.email || '').toLowerCase();
-      return {
-        user_id: m.user_id,
-        role: m.role,
-        email: m.email || undefined,
-        name: m.full_name || m.display_name || undefined,
-        avatar_url: m.avatar_url || m.user_metadata?.avatar_url || null,
-        pendingInvite: email && pendingEmails.has(email),
-      };
-    });
-
-    const memberEmails = new Set(list.map(m => (m.email || '').toLowerCase()).filter(Boolean));
-    const inviteOnly = (invJson.invites || [])
-      .filter(i => !memberEmails.has((i.email || '').toLowerCase()))
-      .map(i => ({
-        user_id: `invite:${i.email}`,
-        role: i.role || 'player',
-        email: i.email,
-        name: null,
-        pendingInvite: true,
-        inviteOnly: true,
-      }));
-    setMembers([...list, ...inviteOnly]);
-  };
+  
   const getUserByEmail = async (email) => {
     if (isDemoTeam) return null;
     try {
@@ -274,7 +270,7 @@ export default function ManageTeamModal({
   const addExistingUserToTeam = async (userId) => {
   if (isDemoTeam) {
     const s = suggestions.find(x => x.id === userId);
-    setMembers(prev => {
+    setDemoMembers(prev => {
       if (prev.some(m => m.user_id === userId)) return prev;
       return [...prev, {
         user_id: userId,
@@ -290,7 +286,7 @@ export default function ManageTeamModal({
     setToast('Added to team (demo)', 'success');
     return;
   }
-    setLoading(true);
+    setBusy(true);
     try {
       const { data: existing } = await supabase
         .from('team_members')
@@ -307,20 +303,20 @@ export default function ManageTeamModal({
         });
         if (error) throw error;
       }
-      await fetchMembers();
+      await refresh();
       setInviteQuery('');
       setSuggestions([]);
       setSuggestOpen(false);
     } catch (e) {
       setToast(e?.message || 'Failed to add user');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   const inviteByEmail = async (email) => {
   if (isDemoTeam) {
-    setMembers(prev => {
+    setDemoMembers(prev => {
       const lower = (email || '').toLowerCase();
       if (prev.some(m => (m.email || '').toLowerCase() === lower)) return prev;
       return [...prev, {
@@ -335,7 +331,7 @@ export default function ManageTeamModal({
     setToast('Invite created (demo)', 'success');
     return;
   }
-    setLoading(true);
+    setBusy(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const headers = {
@@ -357,12 +353,12 @@ export default function ManageTeamModal({
       setInviteQuery('');
       setSuggestions([]);
       setSuggestOpen(false);
-      await fetchMembers();
+      await refresh();
     } catch (e) {
-      await fetchMembers();
+      await refresh();
       setToast(e?.message || 'Failed to send invite');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
   const inviteMany = async (emailsOverride) => {
@@ -370,10 +366,12 @@ export default function ManageTeamModal({
       .map(e => (e || '').toLowerCase().trim())
       .filter(Boolean);
     if (isDemoTeam || list.length === 0) return;
-    setLoading(true);
+    setBusy(true);
     let invited = 0, added = 0, dupes = 0, invalid = 0, errors = 0;
     const existingEmails = new Set(
-      members.map(m => (m.email || '').toLowerCase()).filter(Boolean)
+      (isDemoTeam ? demoMembers : (rosterMembers ?? []))
+        .map(m => (m.email || '').toLowerCase())
+        .filter(Boolean)
     );
     try {
       for (const email of list) {
@@ -392,7 +390,7 @@ export default function ManageTeamModal({
           errors++;
         }
       }
-      await fetchMembers();
+      await refresh();
       setEmailChips([]);
       setInviteQuery('');
       const parts = [];
@@ -401,7 +399,7 @@ export default function ManageTeamModal({
       const any = invited > 0 || added > 0;
       setToast(any ? parts.join(' • ') : 'No invites sent.', any ? 'success' : 'error');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };  
   const updateRole = async (userId, role) => {
@@ -411,7 +409,7 @@ export default function ManageTeamModal({
   }
   if (isDemoTeam) {
     if (role === 'captain' && userId !== captainId) {
-      setMembers(prev =>
+      setDemoMembers(prev =>
         prev.map(m =>
           m.user_id === userId
             ? { ...m, role: 'captain' }
@@ -422,7 +420,7 @@ export default function ManageTeamModal({
       setToast('Captain transferred (demo)', 'success');
       return;
     }
-    setMembers(prev => prev.map(m => (m.user_id === userId ? { ...m, role } : m)));
+    setDemoMembers(prev => prev.map(m => (m.user_id === userId ? { ...m, role } : m)));
     setToast('Role updated (demo)', 'success');
     return;
   }    
@@ -433,7 +431,7 @@ export default function ManageTeamModal({
           p_new_captain: userId,
         });
         if (error) throw error;
-        await Promise.all([fetchTeam(), fetchMembers()]);
+        await Promise.all([fetchTeam(), refresh()]);
         setToast('Captain transferred', 'success');
         return;
       }
@@ -443,7 +441,7 @@ export default function ManageTeamModal({
         .eq('team_id', teamId)
         .eq('user_id', userId);
       if (error) throw error;
-      setMembers(members.map(m => (m.user_id === userId ? { ...m, role } : m)));
+      await refresh();
       setToast('Role updated', 'success');
     } catch (e) {
       setToast(e?.message || 'Failed to update role');
@@ -470,73 +468,142 @@ export default function ManageTeamModal({
     setSuggestions([]);
     setSuggestOpen(false);
     fetchTeam();
-    fetchMembers();
-  }, [isOpen, teamId]);
+    refresh();
+    if (isDemoTeam) {
+      setDemoMembers(DEMO_MEMBERS);
+    }
+  }, [isOpen, teamId, isDemoTeam, refresh]);
 
   useEffect(() => {
     const t = setTimeout(() => searchActiveUsers(inviteQuery), 250);
     return () => clearTimeout(t);
   }, [inviteQuery]);
-
   const isEmail = useMemo(
     () => EMAIL_RX.test(inviteQuery.trim()),
     [inviteQuery]
   );
+  const baseMembers = useMemo(() => {
+    if (isDemoTeam) return demoMembers;
+
+    const rows = rosterMembers ?? [];
+    return rows.map(m => {
+      const preferredName =
+        m.full_name && m.email && m.full_name === m.email
+          ? (m.display_name || null)
+          : (m.full_name || m.display_name || null);
+      return {
+        ...m,
+        name: preferredName,
+      };
+    });
+  }, [isDemoTeam, demoMembers, rosterMembers]);
+  const visibleMembers = useMemo(() => {
+    const pendingEmails = new Set(
+      (rosterInvites ?? [])
+        .map(i => (i.email || '').toLowerCase())
+        .filter(Boolean)
+    );
+    const list = baseMembers.map(m => {
+      const email = (m.email || '').toLowerCase();
+      return {
+        ...m,
+        pendingInvite: email && pendingEmails.has(email),
+      };
+    });
+    const memberEmails = new Set(
+      list.map(m => (m.email || '').toLowerCase()).filter(Boolean)
+    );
+    const inviteOnly = (rosterInvites ?? [])
+      .filter(i => !memberEmails.has((i.email || '').toLowerCase()))
+      .map(i => ({
+        user_id: `invite:${i.email}`,
+        role: i.role || 'player',
+        email: i.email,
+        name: null,
+        pendingInvite: true,
+        inviteOnly: true,
+      }));
+    const full = [...list, ...inviteOnly];
+    return canManage ? full : full.filter(m => !m.inviteOnly);
+  }, [baseMembers, rosterInvites, canManage]);
+  
   const typedIsValid = EMAIL_RX.test(inviteQuery.trim());
   const hasAnythingToSend = emailChips.length > 0 || typedIsValid;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="text-center">
-        <h2 className="text-xl font-semibold mb-2">Manage Team</h2>
-        <p className="text-sm text-gray-600">Invite players, rename your team, and set member roles.</p>
+        <h2 className="text-xl font-semibold mb-2">{canManage ? 'Manage Team' : 'My Team'}</h2>
+        <p className="text-sm text-gray-600">    {canManage ? 'Invite players, rename your team, and set member roles.' : 'View your team roster and roles.'}</p> 
       </div>
-
-      {/* Rename team */}
+      {/* Team name */}
       <div className="mt-6">
         <label className="block text-sm font-medium text-gray-700 mb-1">Team name</label>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 border rounded-md px-3 py-2"
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-            placeholder="Team name"
-          />
-          <button
-            onClick={saveTeamName}
-            disabled={!teamName || savingName}
-            className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
-          >
-            Save
-          </button>
-        </div>
+        {canManage ? (
+          <div className="flex gap-2">
+            <input
+              className="flex-1 border rounded-md px-3 py-2"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              placeholder="Team name"
+            />
+            <button
+              onClick={saveTeamName}
+              disabled={!teamName || savingName}
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <div className="px-3 py-2 border rounded-md bg-gray-50 text-gray-700">
+            {teamName || '—'}
+          </div>
+        )}
       </div>
 
       {/* Invite */}
-      <div className="mt-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Invite player</label>
-        <div className="relative">
-          {/* Chips + input */}
-          <div className="w-full border rounded-md px-2 py-2 flex flex-wrap gap-2">
-            {emailChips.map((em) => (
-              <span key={em} className="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-1">
-                {em}
-                <button
-                  className="hover:text-gray-700"
-                  onClick={() => removeChip(em)}
-                  aria-label={`Remove ${em}`}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
+      {canManage && (      
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Invite player</label>
+          <div className="relative">
+            {/* Chips + input */}
+            <div className="w-full border rounded-md px-2 py-2 flex flex-wrap gap-2">
+              {emailChips.map((em) => (
+                <span key={em} className="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-1">
+                  {em}
+                  <button
+                    className="hover:text-gray-700"
+                    onClick={() => removeChip(em)}
+                    aria-label={`Remove ${em}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
             <input
               className="flex-1 min-w-[8rem] outline-none px-1"
               value={inviteQuery}
-              onChange={(e) => setInviteQuery(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (/[,\uFF0C;\s]/.test(v)) {
+                  const tokens = v.split(/[,;\uFF0C\s]+/);
+                  const partial = tokens[tokens.length - 1] ?? '';
+                  let any = false;
+                  tokens.slice(0, -1).forEach(t => { any = addChip(t) || any; });
+                  setInviteQuery(partial);
+                } else {
+                  setInviteQuery(v);
+                }
+              }}
               placeholder={emailChips.length ? 'Add another…' : 'Type a name for suggestions, or paste emails…'}
               onFocus={() => inviteQuery && setSuggestOpen(true)}
-              onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}         
+              onBlur={() => {
+                const typed = inviteQuery.trim();
+                if (EMAIL_RX.test(typed)) addChip(typed);
+                setInviteQuery('');
+                setTimeout(() => setSuggestOpen(false), 120);
+              }}
               onPaste={(e) => {
                 const pasted = e.clipboardData?.getData('text') || '';
                 const parts = splitEmails(pasted);
@@ -574,69 +641,97 @@ export default function ManageTeamModal({
                 }
               }}
             />
-          </div>
-          {suggestOpen && suggestions.length > 0 && (
-            <div className="absolute z-10 mt-1 w-full bg-white border rounded-md overflow-hidden shadow">
-              {suggestions.map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => addExistingUserToTeam(s.id)}
-                  onMouseEnter={() => setSelectedIdx(i)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer
-                    ${i === selectedIdx ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                >
-                  <Avatar src={s.avatar} label={s.label || s.email} />
-                  <div className="flex-1 min-w-0 flex items-center gap-3">
-                    <div className="text-sm text-gray-900 truncate" title={s.label || s.email}>
-                      {s.label || s.email}
-                    </div>
-                    {s.email && (
-                      <div className="ml-auto text-xs text-gray-600 truncate" title={s.email}>
-                        {s.email}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ))}
             </div>
-          )}
+            {suggestOpen && suggestions.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white border rounded-md overflow-hidden shadow">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onClick={() => addExistingUserToTeam(s.id)}
+                    onMouseEnter={() => setSelectedIdx(i)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer
+                      ${i === selectedIdx ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                  >
+                    <Avatar src={s.avatar} label={s.label || s.email} />
+                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                      <div className="text-sm text-gray-900 truncate" title={s.label || s.email}>
+                        {s.label || s.email}
+                      </div>
+                      {s.email && (
+                        <div className="ml-auto text-xs text-gray-600 truncate" title={s.email}>
+                          {s.email}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => {
+                const typed = inviteQuery.trim();
+                const payload = [...emailChips];
+                if (EMAIL_RX.test(typed)) payload.push(typed.toLowerCase());
+                if (payload.length === 0) return;
+                setInviteQuery('');
+                setEmailChips([]);
+                inviteMany(payload);
+              }}
+              disabled={!hasAnythingToSend || busy}
+              className="px-4 py-2 bg-black text-white rounded-md disabled:cursor-default disabled:opacity-50 disabled:hover:bg-black hover:bg-gray-800 cursor-pointer"
+            >
+              Invite {emailChips.length > 0 ? `(${emailChips.length})` : ''}
+            </button>
+            <span className="block w-fit mx-auto text-xs text-gray-500 self-center">
+              New players are immediately given the <b>Player</b> role.
+            </span>
+          </div>
         </div>
-        <div className="mt-2 flex gap-2">
-          <button
-            onClick={() => {
-              const typed = inviteQuery.trim();
-              const payload = [...emailChips];
-              if (EMAIL_RX.test(typed)) payload.push(typed.toLowerCase());
-              if (payload.length === 0) return;
-              setInviteQuery('');
-              setEmailChips([]);
-              inviteMany(payload);
-            }}
-            disabled={!hasAnythingToSend || loading}
-            className="px-4 py-2 bg-black text-white rounded-md disabled:cursor-default disabled:opacity-50 disabled:hover:bg-black hover:bg-gray-800 cursor-pointer"
-          >
-            Invite {emailChips.length > 0 ? `(${emailChips.length})` : ''}
-          </button>
-          <span className="block w-fit mx-auto text-xs text-gray-500 self-center">
-            New players are immediately given the <b>Player</b> role.
-          </span>
-        </div>
-      </div>
-
+      )}
       {/* Members & roles */}
       <div className="mt-6">
         <div className="font-medium text-gray-700 mb-2 mx-auto text-center">Team members</div>
         <div className="divide-y border rounded-md max-h-72 overflow-y-auto">
-          {members.length === 0 && (
+          {visibleMembers.length === 0 && (
             <div className="p-3 text-sm text-gray-500">No members yet.</div>
           )}
-          {members.map(m => (
+          {visibleMembers.map(m => (
             <div key={m.user_id} className="flex items-center justify-between px-3 py-2">
               <div className="min-w-0 flex items-center gap-3">
                 <Avatar src={m.avatar_url} label={m.name || m.email || m.user_id} />
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">
-                    {m.name || m.email || m.user_id}
+                    {canManage && !m.inviteOnly ? (
+                      editingNameId === m.user_id ? (
+                        <input
+                          className="border rounded px-2 py-1 text-sm w-56"
+                          value={editingNameVal}
+                          onChange={(e) => setEditingNameVal(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveDisplayName(m.user_id, editingNameVal);
+                            if (e.key === 'Escape') setEditingNameId(null);
+                          }}
+                          onBlur={() => saveDisplayName(m.user_id, editingNameVal)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="truncate hover:underline text-left"
+                          title="Click to edit display name"
+                          onClick={() => {
+                            setEditingNameId(m.user_id);
+                            setEditingNameVal(m.name || '');
+                          }}
+                        >
+                          {m.name || m.email || m.user_id}
+                        </button>
+                      )
+                    ) : (
+                      <span className="truncate">{m.name || m.email || m.user_id}</span>
+                    )}
                   </div>
                   {m.email && (
                     <div className="text-xs text-gray-500 truncate">{m.email}</div>
@@ -644,61 +739,67 @@ export default function ManageTeamModal({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {(() => {
-                  const isCaptainRow = m.user_id === captainId;
-                  return (
-                    <select
-                      className={`border rounded-md px-2 py-1 text-sm bg-white transition-colors
-                        ${isCaptainRow ? 'opacity-60' : 'hover:bg-gray-50 cursor-pointer'}`}
-                      value={m.role}
-                      disabled={isCaptainRow}
-                      title={isCaptainRow ? 'To change Captain, promote another member.' : undefined}
-                      onChange={(e) => {
-                        const nextRole = e.target.value;
-                        if (m.inviteOnly) {
-                          updateInviteRole(m.email, nextRole);
-                          return;
-                        }
-                        if (isCaptainRow && nextRole !== 'captain') {
-                          setToast('Promote another member to Captain to change this.', 'error');
-                          return;
-                        }
-                        if (nextRole === 'captain' && m.user_id !== captainId) {
-                          setConfirmCaptain({
-                            userId: m.user_id,
-                            label: m.name || m.email || m.user_id,
-                          });
-                          return;
-                        }
-                        updateRole(m.user_id, nextRole);
-                      }}
+                {canManage ? (
+                  <>
+                    {(() => {
+                      const isCaptainRow = m.user_id === captainId;
+                      return (
+                        <select
+                          className={`border rounded-md px-2 py-1 text-sm bg-white transition-colors
+                            ${isCaptainRow ? 'opacity-60' : 'hover:bg-gray-50 cursor-pointer'}`}
+                          value={m.role}
+                          disabled={isCaptainRow}
+                          title={isCaptainRow ? 'To change Captain, promote another member.' : undefined}
+                          onChange={(e) => {
+                            const nextRole = e.target.value;
+                            if (m.inviteOnly) return updateInviteRole(m.email, nextRole);
+                            if (isCaptainRow && nextRole !== 'captain') {
+                              setToast('Promote another member to Captain to change this.', 'error');
+                              return;
+                            }
+                            if (nextRole === 'captain' && m.user_id !== captainId) {
+                              setConfirmCaptain({
+                                userId: m.user_id,
+                                label: m.name || m.email || m.user_id,
+                              });
+                              return;
+                            }
+                            updateRole(m.user_id, nextRole);
+                          }}
+                        >
+                          {(m.inviteOnly ? ROLES.filter(r => r !== 'captain') : ROLES).map(r => (
+                            <option key={r} value={r}>{cap(r)}</option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+
+                    <button
+                      onClick={() =>
+                        m.pendingInvite ? cancelInvite(m.email) : removeMember(m.user_id)
+                      }
+                      disabled={!m.pendingInvite && m.user_id === captainId}
+                      className={`w-6 h-6 flex items-center justify-center rounded-md ${
+                        (!m.pendingInvite && m.user_id === captainId)
+                          ? ''
+                          : 'cursor-pointer hover:bg-gray-100'
+                      } disabled:opacity-40`}
+                      title={
+                        m.pendingInvite
+                          ? 'Cancel invite'
+                          : (m.user_id === captainId ? 'Captain cannot be removed' : 'Remove from team')
+                      }
                     >
-                      {(m.inviteOnly ? ROLES.filter(r => r !== 'captain') : ROLES).map(r => (
-                        <option key={r} value={r}>{cap(r)}</option>
-                      ))}
-                    </select>
-                  );
-                })()}            
-                <button
-                  onClick={() =>
-                    m.pendingInvite ? cancelInvite(m.email) : removeMember(m.user_id)
-                  }
-                  disabled={!m.pendingInvite && m.user_id === captainId}
-                  className={`w-6 h-6 flex items-center justify-center rounded-md ${
-                    (!m.pendingInvite && m.user_id === captainId)
-                      ? ''
-                      : 'cursor-pointer hover:bg-gray-100'
-                  } disabled:opacity-40`}
-                  title={
-                    m.pendingInvite
-                      ? 'Cancel invite'
-                      : (m.user_id === captainId ? 'Captain cannot be removed' : 'Remove from team')
-                  }
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <span className="px-2 py-1 text-xs rounded-md border bg-gray-50 text-gray-700">
+                    {cap(m.role)}
+                  </span>
+                )}
               </div>
             </div>
           ))}

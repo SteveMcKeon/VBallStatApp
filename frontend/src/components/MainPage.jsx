@@ -302,13 +302,13 @@ const MainPage = () => {
     player: { visible: true, type: 'text' },
     action_type: { visible: true, type: 'text' },
     quality: { visible: true, type: 'numeric' },
+    set_to_player: { visible: false, type: 'text', adminOnly: true },
+    set_to_position: { visible: false, type: 'text', adminOnly: true },  
     result: { visible: false, type: 'text' },
-    notes: { visible: true, type: 'text' },
     score: { visible: false, type: 'int2' },
     our_score: { visible: false, type: 'int2' },
-    opp_score: { visible: false, type: 'int2' },
-    set_to_player: { visible: false, type: 'text', adminOnly: true },
-    set_to_position: { visible: false, type: 'text', adminOnly: true },    
+    opp_score: { visible: false, type: 'int2' },  
+    notes: { visible: true, type: 'text' },
   };
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
@@ -938,7 +938,10 @@ const MainPage = () => {
                     </button>
                   )}
                   <button
-                    onClick={() => setShowStatsView(true)}
+                    onClick={() => {
+                      if (editMode) toggleEditMode();
+                      setShowStatsView(true);
+                    }}
                     className="w-full px-4 py-2 cursor-pointer rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
                   >
                     Statistic Matrix

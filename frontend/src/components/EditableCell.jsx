@@ -95,19 +95,26 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       const next = [...prev];
       const idxInAll = next.findIndex(r => r.id === statId);
       if (idxInAll === -1) return prev;
+      const currentSet = next[idxInAll]?.set ?? null;
       next[idxInAll] = { ...next[idxInAll], [field]: parsed };
       if (field === 'result') {
-        let our = idxInAll > 0 ? Number(next[idxInAll - 1].our_score) || 0 : 0;
-        let opp = idxInAll > 0 ? Number(next[idxInAll - 1].opp_score) || 0 : 0;
-        let rally =
-          idxInAll > 0
-            ? (Number(next[idxInAll - 1][RALLY_FIELD]) || RALLY_START)
-            : RALLY_START;
-        const prevRes = idxInAll > 0 ? normalizeResult(next[idxInAll - 1].result) : null;
+        let our = (idxInAll > 0 && next[idxInAll - 1].set === currentSet)
+          ? (Number(next[idxInAll - 1].our_score) || 0)
+          : 0;
+        let opp = (idxInAll > 0 && next[idxInAll - 1].set === currentSet)
+          ? (Number(next[idxInAll - 1].opp_score) || 0)
+          : 0;
+        let rally = (idxInAll > 0 && next[idxInAll - 1].set === currentSet)
+          ? (Number(next[idxInAll - 1][RALLY_FIELD]) || RALLY_START)
+          : RALLY_START;
+        const prevRes = (idxInAll > 0 && next[idxInAll - 1].set === currentSet)
+          ? normalizeResult(next[idxInAll - 1].result)
+          : null;
         if (prevRes === 'Won Point' || prevRes === 'Lost Point') {
           rally += 1;
         }
         for (let j = idxInAll; j < next.length; j++) {
+          if (next[j].set !== currentSet) break;
           const res = j === idxInAll ? parsed : normalizeResult(next[j].result);
           const rallyForThisRow = rally;
           if (res === 'Won Point') our += 1;
@@ -122,35 +129,34 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
             rally += 1;
           }
         }
-        patchRowsRef.current = next.slice(idxInAll).map(r => ({
-          id: r.id,
-          our_score: r.our_score,
-          opp_score: r.opp_score,
-          [RALLY_FIELD]: r[RALLY_FIELD],
-        }));
+        patchRowsRef.current = next
+          .slice(idxInAll)
+          .filter(r => r.set === currentSet)
+          .map(r => ({
+            id: r.id,
+            our_score: r.our_score,
+            opp_score: r.opp_score,
+            [RALLY_FIELD]: r[RALLY_FIELD],
+          }));
       } else if (field === 'our_score' || field === 'opp_score') {
         const editKey = field;
         const incOn = field === 'our_score' ? 'Won Point' : 'Lost Point';
-        const prevOur = idxInAll > 0 ? Number(next[idxInAll - 1].our_score) || 0 : 0;
-        const prevOpp = idxInAll > 0 ? Number(next[idxInAll - 1].opp_score) || 0 : 0;
-        let editedVal = toNum(parsed) ?? 0;
-        if (editKey === 'our_score') {
-          next[idxInAll] = { ...next[idxInAll], our_score: editedVal };
-        } else {
-          next[idxInAll] = { ...next[idxInAll], opp_score: editedVal };
-        }
+        const prevVal = (idxInAll > 0 && next[idxInAll - 1].set === currentSet)
+          ? Number(next[idxInAll - 1][editKey]) || 0
+          : 0;
+        let editedVal = toNum(parsed);
+        editedVal = (editedVal == null ? prevVal : editedVal);
+        next[idxInAll] = { ...next[idxInAll], [editKey]: editedVal };
         for (let j = idxInAll + 1; j < next.length; j++) {
+          if (next[j].set !== currentSet) break;
           const res = normalizeResult(next[j].result);
           if (res === incOn) editedVal += 1;
-          next[j] = {
-            ...next[j],
-            ...(editKey === 'our_score' ? { our_score: editedVal } : { opp_score: editedVal }),
-          };
+          next[j] = { ...next[j], [editKey]: editedVal };
         }
-        patchRowsRef.current = next.slice(idxInAll).map(r => ({
-          id: r.id,
-          [editKey]: r[editKey],
-        }));
+        patchRowsRef.current = next
+          .slice(idxInAll)
+          .filter(r => r.set === currentSet)
+          .map(r => ({ id: r.id, [editKey]: r[editKey] }));
       } else if (field === 'set') {
         const setVal = toNum(parsed);
         next[idxInAll] = { ...next[idxInAll], set: setVal };
@@ -161,6 +167,23 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           id: r.id,
           set: r.set,
         }));
+      } else if (field === RALLY_FIELD) {
+        const startRally = toNum(parsed) ?? RALLY_START;
+        const currentSet = next[idxInAll]?.set ?? null;
+        next[idxInAll] = { ...next[idxInAll], [RALLY_FIELD]: startRally };
+        let rally = startRally;
+        for (let j = idxInAll + 1; j < next.length; j++) {
+          if (next[j].set !== currentSet) break;
+          const prevRes = normalizeResult(next[j - 1].result);
+          if (prevRes === 'Won Point' || prevRes === 'Lost Point') {
+            rally += 1;
+          }
+          next[j] = { ...next[j], [RALLY_FIELD]: rally };
+        }
+        patchRowsRef.current = next
+          .slice(idxInAll)
+          .filter(r => r.set === currentSet)
+          .map(r => ({ id: r.id, [RALLY_FIELD]: r[RALLY_FIELD] }));
       }
       return next;
     });

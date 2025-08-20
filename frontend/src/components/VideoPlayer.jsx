@@ -19,16 +19,14 @@ const Key = ({ combo }) => {
   const prettify = (s) =>
     s
       .trim()
-      .replace(/^\(|\)$/g, '')                 // remove ( )
+      .replace(/^\(|\)$/g, '')
       .replace(/\bctrl\b/gi, 'Ctrl')
       .replace(/\balt\b/gi, 'Alt')
       .replace(/\bshift\b/gi, 'Shift')
       .replace(/\bspace(bar)?\b/gi, 'Space')
-      .replace(/\b[a-z]\b/g, (m) => m.toUpperCase()); // single letters
-
+      .replace(/\b[a-z]\b/g, (m) => m.toUpperCase());
   return <span className="text-neutral-400">{prettify(combo)}</span>;
 };
-
 
 const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
@@ -108,6 +106,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
   const isAutoplayOnRef = useRef(isAutoplayOn);
   const autoplayTimeoutRef = useRef(null);
   const rallyTimes = useMemo(() => getRallyTimes(stats, RALLY_EXTRA_END_BUFFER), [stats]);
+  
   const rallyStartTimestamps = useMemo(
     () => rallyTimes.map((r) => r.start),
     [rallyTimes]
@@ -427,39 +426,157 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     if (!videoRef.current || !selectedVideo) return;
     const video = videoRef.current;
     const savedVolume = parseFloat(getLocal("videoVolume") ?? "1");
-    const savedTime = parseFloat(getLocal('videoTime'));
-    
+    const savedTime = parseFloat(getLocal("videoTime"));
     video.volume = savedVolume;
     video.muted = savedVolume === 0;
     setIsMuted(video.muted);
-
     setCurrentSet(null);
     setCurrentRallyNumber(null);
     setTouchBuffer([]);
     setVideoTime({ current: 0, duration: 0 });
 
+    const base = (selectedVideo || "").replace(/\.(mp4|m4v|mov)$/i, "");
+    const hlsCandidates = [
+      `/videos/${base}/out_rally.m3u8`,
+      `/videos/${base}/master.m3u8`,
+    ]; 
+    const mp4Url = `/videos/${selectedVideo}`;
+    const seekToSaved = () => {
+      const t = !isNaN(savedTime) ? savedTime : 0.001;
+      if (video.readyState >= 1) video.currentTime = t;
+      else video.addEventListener("loadedmetadata", () => (video.currentTime = t), { once: true });
+    };
+    const tryAutoplay = () =>
+      video.play().catch(err => {
+        console.warn("Autoplay failed, retrying muted:", err);
+        video.muted = true;
+        setIsMuted(true);
+        return video.play().catch(console.warn);
+      });
+    const destroyHls = () => {
+      if (video._hls) {
+        try { video._hls.destroy(); } catch {}
+        delete video._hls;
+      }
+    };
+    const loadMp4 = () => {
+      destroyHls();
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+      video.src = mp4Url;
+      video.onloadeddata = async () => {
+        seekToSaved();
+        await tryAutoplay();
+      };
+    };
+    let canceled = false;
+    const hls = window.Hls; 
+
+  const HLS_START_TIMEOUT_MS = 2000;
+  const urlExists = async (url) => {
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+  const loadHls = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const base = (selectedVideo || "").replace(/\.(mp4|m4v|mov)$/i, "");
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      for (const url of hlsCandidates) {
+        if (await urlExists(url)) {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+
+          let startTimer = setTimeout(() => {
+            //console.warn("Native HLS start timeout → fallback to MP4");
+            loadMp4();
+          }, HLS_START_TIMEOUT_MS);
+
+          video.src = url;
+          video.onloadeddata = async () => {
+            clearTimeout(startTimer);
+            seekToSaved();
+            await tryAutoplay();
+          };
+          return;
+        }
+      }
+      return loadMp4();
+    }
+    if (window.Hls && window.Hls.isSupported()) {
+      destroyHls();
+      const hls = new window.Hls({ enableWorker: true });
+      video._hls = hls;
+      let src = null;
+      for (const u of hlsCandidates) {
+        if (await urlExists(u)) { src = u; break; }
+      }
+      if (!src) {
+        //console.warn("No HLS playlist found → MP4");
+        return loadMp4();
+      }
+      let startTimer;
+      const bailToMp4 = (why) => {
+        //console.warn("Falling back to MP4:", why);
+        try { hls.destroy(); } catch {}
+        delete video._hls;
+        clearTimeout(startTimer);
+        loadMp4();
+      };
+      hls.attachMedia(video);
+      hls.on(window.Hls.Events.MEDIA_ATTACHED, () => {
+        hls.loadSource(src);
+      });
+      hls.on(window.Hls.Events.MANIFEST_PARSED, async () => {
+        clearTimeout(startTimer);
+        seekToSaved();
+        await tryAutoplay();
+      });
+      hls.on(window.Hls.Events.LEVEL_LOADED, () => {
+        // level loaded means we at least fetched a playlist; still keep the global start timer
+      });
+
+      startTimer = setTimeout(() => bailToMp4("HLS start timeout"), HLS_START_TIMEOUT_MS);
+      let triedRecover = false;
+      hls.on(window.Hls.Events.ERROR, (_evt, data) => {
+        if (!data?.fatal) return;
+        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+          //console.warn("hls.js NETWORK_ERROR (fatal) → fallback");
+          bailToMp4(data);
+          return;
+        }
+        if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+          if (!triedRecover) {
+            triedRecover = true;
+            //console.warn("hls.js MEDIA_ERROR → attempting recover...");
+            try { hls.recoverMediaError(); } catch {}
+          } else {
+            bailToMp4("MEDIA_ERROR unrecoverable");
+          }
+          return;
+        }
+        bailToMp4(data);
+      });
+      return;
+    }
+    loadMp4();
+  };
+
+    destroyHls();
     video.pause();
     video.removeAttribute("src");
     video.load();
-
-    const timeoutId = setTimeout(() => {
-      video.src = `/videos/${selectedVideo}`;
-      video.load();
-
-      video.onloadeddata = () => {
-        video.currentTime = !isNaN(savedTime) ? savedTime : 0.001;
-        video.play()
-          .catch(err => {
-            console.warn("Autoplay failed, retrying muted:", err);
-            video.muted = true;
-            setIsMuted(true);
-            return video.play().catch(console.warn);
-          });
-      };
-    }, 0); 
-
+    const timeoutId = setTimeout(loadHls, 0);
     return () => {
+      canceled = true;
       clearTimeout(timeoutId);
+      destroyHls();
       video.pause();
       video.removeAttribute("src");
       video.load();

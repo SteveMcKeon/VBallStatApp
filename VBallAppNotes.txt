@@ -10,7 +10,6 @@ Register team, invite other users to team.
 Add comments instead of notes.
 team tactics or certain rotation options - by each team captain (Ask Tamir)
 tracking sets with trajectory overlay
-If not timestamp editor role, still click rest of non-editbale cells to jump to time.
 Create welcome page, with short video and highlights of website features.
 Stats page - have entire row highlight on hover for readability or sticky row headers.
 Update index.html <head> info for SEO
@@ -22,12 +21,18 @@ let camera work when not fullscreen.
 add buttons to minisidebar
 add subscription to stats table on game_id to support concurrent users.
 switch to IDE
+investigate uploads on mobile in background
 
 #Fixes
 REFACTOR
-
+Making someone else Captain still makes you Player instead of Editor.
 make invitation email nicer.
 avatar caching breaks if >1 user on same browser
 add Google Auth to acecpt-invite
 on inputting emails, once "Add another..." pops up, enter again should submit.
-Pending badge disappeared. If augh.users last sign in at is waiting for verification, or if the invite still exists in the team_invites table, then mark as pending. changing the role should change the teams_invite table role.
+demo invite via email doesn't add to roster.
+Pending badge disappeared. If auth.users last sign in at is waiting for verification, or if the invite still exists in the team_invites table, then mark as pending. changing the role should change the teams_invite table role.
+emails going to invalid addresses -  supabase does NOT like bouncebacks.
+If new set, set rally to 1 and cascade, reset score to 0, 0, cascade.
+Update Game Settings as Editor, isscored not updating.
+if userauth fails, go to login page.

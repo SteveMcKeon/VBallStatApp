@@ -8,7 +8,7 @@ import Toast from './Toast';
 
 const ROW_HEIGHT = 28;
 const MIN_COL_PX  = 60;
-const FLEX_MIN_PX = 400;
+const DEFAULT_FLEX_MIN_PX = 400;
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
 const HSCROLL_PX = 10;
 const OuterDiv = React.forwardRef(function OuterDiv({ style, className, ...rest }, ref) {
@@ -97,7 +97,10 @@ const DBStats = ({
   const [showToast, setShowToast] = useState(false);  
   const setToast = (message, type = 'error') => { setToastMessage(message); setToastType(type); setShowToast(true); };
   const cellRefs = useRef({});
-  
+  const FLEX_MIN_PX = React.useMemo(
+    () => (visibleColumns?.notes?.visible ? DEFAULT_FLEX_MIN_PX : 170),
+    [visibleColumns?.notes?.visible]
+  );  
   const handleClearAllFilters = () => {
     window.dispatchEvent(new Event('closeAllFilters'));
     const keys = Object.keys(textColumnFilters ?? {});
@@ -205,10 +208,8 @@ const DBStats = ({
   const [measuredColPx, setMeasuredColPx] = useState({});
 
   const orderedKeys = useMemo(() => {
-    const all = Object.keys(visibleColumns).filter(k => visibleColumns[k]?.visible);
-    const withoutNotes = all.filter(k => k !== 'notes');
-    if (visibleColumns.notes?.visible) withoutNotes.push('notes');
-    return withoutNotes;
+    () => (visibleColumns?.notes?.visible ? 400 : 60);
+    return Object.keys(visibleColumns).filter(k => visibleColumns[k]?.visible);
   }, [visibleColumns]);
 
   const bodyColumns = useMemo(() => {
@@ -228,7 +229,6 @@ const DBStats = ({
     return keys.includes('notes') ? 'notes' : keys[keys.length - 1];
   }, [bodyColumns]); 
 
-  // Initial column widths based on header ths
   useLayoutEffect(() => {
     if (!headerTableRef.current) return;
     const ths = headerTableRef.current.querySelectorAll('thead th[data-key]');
@@ -313,25 +313,6 @@ const DBStats = ({
     keys.forEach(k => autofitColumn(k));
   }, [bodyColumns, flexKey]);
 
-  const totalColumnsPx = useMemo(() => {
-    const widthFor = (key) => {
-      if (key === '__insert__' || key === '__delete__') return 32;
-      if (key === flexKey) {
-        return Math.max(
-          60,
-          Math.floor(columnWidths[flexKey] ?? measuredColPx[flexKey] ?? FLEX_MIN_PX)
-        );
-      }
-      const explicit = columnWidths[key];
-      if (explicit) return Math.max(60, Math.floor(explicit));
-      const measured = measuredColPx[key];
-      if (measured) return Math.max(60, Math.floor(measured));
-      if (key === 'notes') return 200;
-      return 120;
-    };
-    return bodyColumns.reduce((sum, { key }) => sum + widthFor(key), 0);
-  }, [bodyColumns, columnWidths, measuredColPx, flexKey]);
-
   const [viewportW, setViewportW] = useState(0);
   
   useLayoutEffect(() => {
@@ -394,7 +375,7 @@ const DBStats = ({
     }).join(' ');
     const totalPxLocal = canFitLocal ? fixedPx + FLEX_MIN_PX : fixedPx + pinnedFlexPx;
     return { gridTemplate: template, canFit: canFitLocal, totalPx: totalPxLocal };
-  }, [bodyColumns, columnWidths, measuredColPx, flexKey, viewportW]);
+  }, [bodyColumns, columnWidths, measuredColPx, flexKey, viewportW, FLEX_MIN_PX]);
 
   useLayoutEffect(() => {
     listRef.current?.resetAfterIndex(0, true);
@@ -544,7 +525,7 @@ const DBStats = ({
       const prev = rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
       const prevInline = el.style.height;
       el.style.height = 'auto';
-      const next = Math.max(ROW_HEIGHT, Math.ceil(el.getBoundingClientRect().height)) + 1;
+      const next = Math.max(ROW_HEIGHT, Math.ceil(el.getBoundingClientRect().height));
       el.style.height = prevInline || `${prev}px`;
       if (next !== prev) {
         rowHeightsRef.current.set(index, next);
@@ -676,7 +657,7 @@ const DBStats = ({
           <div
             role="cell"
             data-field="timestamp"
-            className={`db-cell ${editMode === 'admin' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
+            className={`db-cell ${editMode === 'admin' || editMode === 'editor' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={editMode === 'admin' ? async (e) => {
               e.stopPropagation(); 
@@ -704,7 +685,23 @@ const DBStats = ({
                   setToast('Failed to update timestamp: ' + error.message);
                 }
               }
-            } : undefined}
+            }
+            : editMode === 'editor'
+            ? (e) => {
+                e.stopPropagation();
+                const validTimestamps = stats.slice(0, idx).map(r => r.timestamp).filter(Boolean);
+                if (s.timestamp != null) jumpToTime(s.timestamp);
+                else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);
+                if (
+                  layoutMode === 'stacked' &&
+                  !document.pictureInPictureElement &&
+                  mainContentRef.current
+                ) {
+                  mainContentRef.current.scrollTo({ top: 0 });
+                }
+              }
+            : undefined
+        }
           >
             {s.timestamp != null ? (
               <span className="leading-normal">{formatTimestamp(s.timestamp)}</span>
@@ -1047,9 +1044,39 @@ const DBStats = ({
                    r.team_id != null)
                 );
                 const resolvedGameId = lastWithData?.game_id ?? gameId;
-                const resolvedTeamId = lastWithData?.team_id ?? teamId;             
+                const resolvedTeamId = lastWithData?.team_id ?? teamId;
                 if (!resolvedGameId || !resolvedTeamId) {
-                  setToast('Missing game or team context. Please select a game and team first.');
+                  const base = {
+                    game_id: gameId,
+                    rally_id: 1,
+                    import_seq: 1,
+                    our_score: 0,
+                    opp_score: 0,
+                    set: 1,
+                    team_id: teamId,
+                  };
+                  const newRows = Array.from({ length: 10 }, (_, i) => ({
+                    ...base,
+                    import_seq: i + 1,
+                  }));
+                  if (practiceMode) {
+                    const fakeRows = newRows.map(r => ({
+                      id: `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                      ...r,
+                    }));
+                    setStats([...stats, ...fakeRows]);
+                  } else {
+                    const { data, error } = await supabase
+                      .from('stats')
+                      .insert(newRows)
+                      .select('*');
+                    if (!error && data?.length) {
+                      setStats([...stats, ...data]);
+                      setToast('Added 10 rows to bottom', 'success');
+                    } else {
+                      setToast('Failed to add rows' + (error ? `: ${error.message}` : ''));
+                    }
+                  }
                   return;
                 }
                 const lastSeq = lastWithData?.import_seq != null ? Number(lastWithData.import_seq) : null;
@@ -1073,7 +1100,7 @@ const DBStats = ({
                   }));
                   setStats([...stats, ...fakeRows]);
                   return;
-                }                
+                }
                 const { data, error } = await supabase
                   .from('stats')
                   .insert(newRows)
