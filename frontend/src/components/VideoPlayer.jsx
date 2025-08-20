@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useImperativeHandle, forwardRef } from "react";
 import { getRallyTimes } from "@/utils/getRallyTimes";
 import TooltipPortal from '../utils/tooltipPortal';
+import { getVideoTime as getSavedVideoTime, setVideoTime as saveVideoTime } from "../utils/videoTimes";
 
 const REWIND_AMOUNT = 3;
 const FORWARD_AMOUNT = 10;
@@ -28,7 +29,7 @@ const Key = ({ combo }) => {
   return <span className="text-neutral-400">{prettify(combo)}</span>;
 };
 
-const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, videoTimeKey }, ref) => {
+const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, gameId }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
   useImperativeHandle(ref, () => ({
@@ -404,10 +405,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     if (!video) return;
     const handleLoadedData = () => {
       const timeoutId = setTimeout(() => {
-        const effectiveKey = videoTimeKey || 'videoTime';
-        const saveTime = () => {
-          setLocal(effectiveKey, video.currentTime.toString());
-        };
+      const saveTime = () => {
+        if (gameId) saveVideoTime(gameId, video.currentTime);
+      };
         video.addEventListener('timeupdate', saveTime);
         video._saveTimeHandler = saveTime;
       }, 1000); 
@@ -421,29 +421,14 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         delete video._saveTimeHandler;
       }
     };
-  }, [selectedVideo, videoTimeKey]);  
+  }, [selectedVideo, gameId]);  
   
   useEffect(() => {
     if (!videoRef.current || !selectedVideo) return;
     const video = videoRef.current;
     let canceled = false;
     const savedVolume = parseFloat(getLocal("videoVolume") ?? "1");
-    let savedTime = NaN;
-    if (videoTimeKey) {
-      const keyed = parseFloat(getLocal(videoTimeKey));
-      if (!isNaN(keyed)) {
-        savedTime = keyed;
-      } else {
-        const legacy = parseFloat(getLocal("videoTime"));
-        if (!isNaN(legacy)) {
-          savedTime = legacy;
-          setLocal(videoTimeKey, legacy.toString());
-          localStorage.removeItem("videoTime");
-        }
-      }
-    } else {
-      savedTime = parseFloat(getLocal("videoTime"));
-    }
+    const savedTime = gameId ? getSavedVideoTime(gameId) : 0;
     video.volume = savedVolume;
     video.muted = savedVolume === 0;
     setIsMuted(video.muted);
@@ -599,7 +584,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       video.load();
       video.onloadeddata = null;
     };
-  }, [selectedVideo, videoTimeKey]);
+  }, [selectedVideo, gameId]);
 
   useEffect(() => {
     const video = videoRef.current;

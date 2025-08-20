@@ -141,19 +141,6 @@ const MainPage = () => {
   const [gamePlayers, setGamePlayers] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
-  const getVideoTimeKey = (gameId) => `videoTime:${gameId}`;
-  const saveVideoTime = (gameId, time) => {
-    if (!gameId) return;
-    localStorage.setItem(getVideoTimeKey(gameId), time);
-  };
-  const loadVideoTime = (gameId) => {
-    if (!gameId) return null;
-    return localStorage.getItem(getVideoTimeKey(gameId));
-  };
-  const clearVideoTime = (gameId) => {
-    if (!gameId) return;
-    localStorage.removeItem(getVideoTimeKey(gameId));
-  };  
   const [availableTeams, setAvailableTeams] = useState([]);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
 
@@ -1018,7 +1005,7 @@ const MainPage = () => {
                     videoRef={videoRef}
                     containerRef={containerRef}
                     stats={stats}
-                    videoTimeKey={selectedGameId ? `videoTime:${selectedGameId}` : null}
+                    gameId={gameId}
                   />
                 </div>
               </div>
