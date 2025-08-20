@@ -31,8 +31,5 @@ avatar caching breaks if >1 user on same browser
 add Google Auth to acecpt-invite
 on inputting emails, once "Add another..." pops up, enter again should submit.
 demo invite via email doesn't add to roster.
-Pending badge disappeared. If auth.users last sign in at is waiting for verification, or if the invite still exists in the team_invites table, then mark as pending. changing the role should change the teams_invite table role.
 emails going to invalid addresses -  supabase does NOT like bouncebacks.
-If new set, set rally to 1 and cascade, reset score to 0, 0, cascade.
-Update Game Settings as Editor, isscored not updating.
 if userauth fails, go to login page.

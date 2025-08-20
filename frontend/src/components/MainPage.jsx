@@ -14,6 +14,7 @@ import DBStats from './DBStats';
 import SidebarFooter from './SidebarFooter';
 import StatsSummary from './StatsSummary';
 import UploadGameModal from './UploadGameModal';
+import { useSupabaseAuthWatcher } from '../utils/useSupabaseAuthWatcher';
 
 const HEADER_HOVER_ZONE_PX = 50;
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
@@ -48,8 +49,13 @@ const MiniSidebar = ({ onExpand, teamId }) => {
 
 const MainPage = () => {
   const navigate = useNavigate();
+  
+  useSupabaseAuthWatcher({
+    supabase,
+    onSignOut: () => navigate('/login'),
+  });
+  
   const sidebarRef = useRef(null);
-
   const uploadModalRef = useRef();
   const [sidebarContent, setSidebarContent] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -135,6 +141,19 @@ const MainPage = () => {
   const [gamePlayers, setGamePlayers] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
+  const getVideoTimeKey = (gameId) => `videoTime:${gameId}`;
+  const saveVideoTime = (gameId, time) => {
+    if (!gameId) return;
+    localStorage.setItem(getVideoTimeKey(gameId), time);
+  };
+  const loadVideoTime = (gameId) => {
+    if (!gameId) return null;
+    return localStorage.getItem(getVideoTimeKey(gameId));
+  };
+  const clearVideoTime = (gameId) => {
+    if (!gameId) return;
+    localStorage.removeItem(getVideoTimeKey(gameId));
+  };  
   const [availableTeams, setAvailableTeams] = useState([]);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
 
@@ -165,7 +184,6 @@ const MainPage = () => {
       setSelectedVideo(mostRecent.video_url || '');
       setShowCenteredGamePicker(false);
       localStorage.setItem('selectedGameId', mostRecent.id);
-      localStorage.removeItem('videoTime');
     }
 
     return { data, error };
@@ -443,7 +461,6 @@ const MainPage = () => {
               setSelectedVideo(mostRecent.video_url || '');
               setShowCenteredGamePicker(false);
               localStorage.setItem('selectedGameId', mostRecent.id);
-              localStorage.removeItem('videoTime');
             }
           }
       } else if (teams.length === 1) {
@@ -742,7 +759,6 @@ const MainPage = () => {
                 setSelectedGameId(selectedOption.value);
                 const selectedGame = teamGames.find(g => g.id === selectedOption.value);
                 setSelectedVideo(selectedGame?.video_url || '');
-                localStorage.removeItem('videoTime');
                 setShowCenteredGamePicker(false);
               }
             }}
@@ -856,7 +872,6 @@ const MainPage = () => {
                         setSelectedGameId(selectedOption.value);
                         const selectedGame = teamGames.find(g => g.id === selectedOption.value);
                         setSelectedVideo(selectedGame?.video_url || '');
-                        localStorage.removeItem('videoTime');
                         setShowCenteredGamePicker(false);
                         setTimeout(() => {
                           videoRef.current?.focus();
@@ -1003,6 +1018,7 @@ const MainPage = () => {
                     videoRef={videoRef}
                     containerRef={containerRef}
                     stats={stats}
+                    videoTimeKey={selectedGameId ? `videoTime:${selectedGameId}` : null}
                   />
                 </div>
               </div>

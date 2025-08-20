@@ -28,7 +28,7 @@ const Key = ({ combo }) => {
   return <span className="text-neutral-400">{prettify(combo)}</span>;
 };
 
-const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }, ref) => {
+const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, videoTimeKey }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
   useImperativeHandle(ref, () => ({
@@ -404,8 +404,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     if (!video) return;
     const handleLoadedData = () => {
       const timeoutId = setTimeout(() => {
+        const effectiveKey = videoTimeKey || 'videoTime';
         const saveTime = () => {
-          setLocal('videoTime', video.currentTime.toString());
+          setLocal(effectiveKey, video.currentTime.toString());
         };
         video.addEventListener('timeupdate', saveTime);
         video._saveTimeHandler = saveTime;
@@ -420,13 +421,29 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
         delete video._saveTimeHandler;
       }
     };
-  }, [selectedVideo]);  
+  }, [selectedVideo, videoTimeKey]);  
   
   useEffect(() => {
     if (!videoRef.current || !selectedVideo) return;
     const video = videoRef.current;
+    let canceled = false;
     const savedVolume = parseFloat(getLocal("videoVolume") ?? "1");
-    const savedTime = parseFloat(getLocal("videoTime"));
+    let savedTime = NaN;
+    if (videoTimeKey) {
+      const keyed = parseFloat(getLocal(videoTimeKey));
+      if (!isNaN(keyed)) {
+        savedTime = keyed;
+      } else {
+        const legacy = parseFloat(getLocal("videoTime"));
+        if (!isNaN(legacy)) {
+          savedTime = legacy;
+          setLocal(videoTimeKey, legacy.toString());
+          localStorage.removeItem("videoTime");
+        }
+      }
+    } else {
+      savedTime = parseFloat(getLocal("videoTime"));
+    }
     video.volume = savedVolume;
     video.muted = savedVolume === 0;
     setIsMuted(video.muted);
@@ -438,10 +455,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
     const base = (selectedVideo || "").replace(/\.(mp4|m4v|mov)$/i, "");
     const hlsCandidates = [
       `/videos/${base}/out_rally.m3u8`,
-      `/videos/${base}/master.m3u8`,
+      //`/videos/${base}/master.m3u8`,
     ]; 
     const mp4Url = `/videos/${selectedVideo}`;
     const seekToSaved = () => {
+      if (canceled) return;
       const t = !isNaN(savedTime) ? savedTime : 0.001;
       if (video.readyState >= 1) video.currentTime = t;
       else video.addEventListener("loadedmetadata", () => (video.currentTime = t), { once: true });
@@ -466,11 +484,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
       video.load();
       video.src = mp4Url;
       video.onloadeddata = async () => {
+        if (canceled) return;
         seekToSaved();
         await tryAutoplay();
       };
     };
-    let canceled = false;
     const hls = window.Hls; 
 
   const HLS_START_TIMEOUT_MS = 2000;
@@ -492,14 +510,13 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
           video.pause();
           video.removeAttribute("src");
           video.load();
-
           let startTimer = setTimeout(() => {
             //console.warn("Native HLS start timeout → fallback to MP4");
             loadMp4();
           }, HLS_START_TIMEOUT_MS);
-
           video.src = url;
           video.onloadeddata = async () => {
+            if (canceled) return;
             clearTimeout(startTimer);
             seekToSaved();
             await tryAutoplay();
@@ -580,8 +597,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats }
       video.pause();
       video.removeAttribute("src");
       video.load();
+      video.onloadeddata = null;
     };
-  }, [selectedVideo]);
+  }, [selectedVideo, videoTimeKey]);
 
   useEffect(() => {
     const video = videoRef.current;
