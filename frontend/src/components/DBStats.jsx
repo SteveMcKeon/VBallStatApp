@@ -71,8 +71,6 @@ const DBStats = ({
   setSortConfig,
   textColumnFilters,
   handleTextColumnFilterChange,
-  renderCell,
-  insertButtonParentRef,
   layoutMode,
   jumpToTime,
   videoRef,
@@ -568,6 +566,7 @@ const DBStats = ({
     const idx = index;
     const isEditing = ['admin', 'editor'].includes(editMode);
     const onRowClick = !isEditing ? () => {
+      videoPlayerRef.current?.stopFilteredTouches?.();
       const validTimestamps = stats.slice(0, idx).map(r => r.timestamp).filter(Boolean);
       if (s.timestamp != null) jumpToTime(s.timestamp);
       else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);
@@ -674,6 +673,7 @@ const DBStats = ({
               : editMode === 'editor'
                 ? (e) => {
                   e.stopPropagation();
+                  videoPlayerRef.current?.stopFilteredTouches?.();
                   const validTimestamps = stats.slice(0, idx).map(r => r.timestamp).filter(Boolean);
                   if (s.timestamp != null) jumpToTime(s.timestamp);
                   else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);

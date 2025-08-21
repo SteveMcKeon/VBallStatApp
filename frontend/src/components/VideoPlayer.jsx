@@ -66,6 +66,10 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       setSettingsView("main");
       setShowControls(false);
       setHideCursor(true);
+    },
+    stopFilteredTouches: () => {
+      setIsCustomPlayback(false);
+      customPlaybackCancelledRef.current = true;
     }
   }));
   const getLocal = (key) => localStorage.getItem(key);
@@ -96,13 +100,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   }, []);
   const [isAutoplayOn, setIsAutoplayOn] = useState(() => {
     const stored = getLocal("autoplay");
-    if (stored === null) return true; // default ON if not set
+    if (stored === null) return true;
     return stored !== "false";
   });
   const isAutoplayOnRef = useRef(isAutoplayOn);
-  const autoplayTimeoutRef = useRef(null);
   const rallyTimes = useMemo(() => getRallyTimes(stats, RALLY_EXTRA_END_BUFFER), [stats]);
-
   const rallyStartTimestamps = useMemo(
     () => rallyTimes.map((r) => r.start),
     [rallyTimes]
@@ -154,21 +156,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   const [settingsView, setSettingsView] = useState("main");
   const settingsRef = useRef(null);
   const isSettingsOpenRef = useRef(isSettingsOpen);
-  const setChangeTimestamps = useMemo(() => {
-    if (!stats || stats.length === 0) return [];
-    const seenSets = new Set();
-    const changes = [];
-    for (const stat of stats) {
-      if (stat.set === 1) continue;
-      if (stat.set != null && !seenSets.has(stat.set)) {
-        seenSets.add(stat.set);
-        if (stat.timestamp != null) {
-          changes.push(stat.timestamp);
-        }
-      }
-    }
-    return changes;
-  }, [stats]);
   const requestFullscreen = async () => {
     const el = containerRef.current;
     if (!el) return;

@@ -1,10 +1,9 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import supabase from '../supabaseClient';
 import '../App.css';
 import VideoPlayer from './VideoPlayer';
 import ColumnSelector from './ColumnSelector';
 import { useSidebar } from './SidebarContext';
-import SortableFilterHeader from './SortableFilterHeader';
 import { useNavigate } from 'react-router-dom';
 import GameSelector from './GameSelector';
 import StyledSelect from './StyledSelect';
@@ -15,7 +14,6 @@ import SidebarFooter from './SidebarFooter';
 import StatsSummary from './StatsSummary';
 import UploadGameModal from './UploadGameModal';
 import { useSupabaseAuthWatcher } from '../utils/useSupabaseAuthWatcher';
-const HEADER_HOVER_ZONE_PX = 50;
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
 const MiniSidebar = ({ onExpand, teamId }) => {
   const handlePanelClick = () => onExpand();
@@ -59,10 +57,6 @@ const MainPage = () => {
       videoPlayerRef.current?.forceHideControls();
     });
     setIsUploadModalOpen(true);
-  };
-  const handleCloseUploadModal = () => {
-    videoPlayerRef.current?.allowControls();
-    setIsUploadModalOpen(false);
   };
   const handleResumeAllUploadsFromBanner = () => {
     setResumeSilently(true);
@@ -240,7 +234,6 @@ const MainPage = () => {
           : value?.toString().trim())
       );
     });
-  const [showOverlay, setShowOverlay] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const { registerToggle } = useSidebar();
   const isMobile = useMemo(() => {
@@ -323,8 +316,6 @@ const MainPage = () => {
     });
     requestAnimationFrame(() => window.dispatchEvent(new Event('db_layout_change')));
   };
-  const lastScrollY = useRef(0);
-  const suppressScrollDetection = useRef(false);
   const loadStatsForSelectedVideo = async (videoUrl) => {
     if (!videoUrl) {
       setStats([]);
@@ -459,8 +450,6 @@ const MainPage = () => {
       });
   }, []);
   const refreshStats = () => loadStatsForSelectedVideo(selectedVideo);
-  const uniqueValues = (key) =>
-    [...new Set(stats.map((s) => s[key]).filter((v) => v !== undefined && v !== null))];
   const filteredStats = stats
     .filter((s) =>
       Object.entries(visibleColumns).some(([key, col]) =>
@@ -921,8 +910,6 @@ const MainPage = () => {
                       setSortConfig={setSortConfig}
                       textColumnFilters={textColumnFilters}
                       handleTextColumnFilterChange={handleTextColumnFilterChange}
-                      renderCell={renderCell}
-                      insertButtonParentRef={insertButtonParentRef}
                       layoutMode={layoutMode}
                       jumpToTime={jumpToTime}
                       videoRef={videoRef}
