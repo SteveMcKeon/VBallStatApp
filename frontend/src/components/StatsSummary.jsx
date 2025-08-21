@@ -1,12 +1,11 @@
-import React, { useEffect, useState, useCallback  } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import supabase from '..//supabaseClient';
 import '../App.css';
 import { useSidebar } from './SidebarContext';
 import StyledSelect from './StyledSelect';
 import ColumnSelector from './ColumnSelector';
 import SidebarFooter from './SidebarFooter';
-
-const StatsSummary = ({ onBack, setSidebarContent  }) => {
+const StatsSummary = ({ onBack, setSidebarContent }) => {
   const [teamName, setTeamName] = useState('');
   const [teamId, setTeamId] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
@@ -16,8 +15,8 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   const { registerToggle } = useSidebar();
   useEffect(() => {
     registerToggle(() => setShowSidebar((prev) => !prev));
-  }, [registerToggle]);  
-  const [actions, setActions] = useState([]);  
+  }, [registerToggle]);
+  const [actions, setActions] = useState([]);
   const [stats, setStats] = useState([]);
   const [games, setGames] = useState([]);
   const [selectedGame, setSelectedGame] = useState('all');
@@ -31,15 +30,15 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
     : settingStats.filter(stat => stat.player === selectedSetter);
   const NavToHome = () => {
     if (typeof onBack === 'function') onBack();
-  };  
-  
+  };
+
   useEffect(() => {
     const savedTeamId = getLocal('teamId');
     const fetchTeams = async () => {
-    const { data, error } = await supabase
-      .from('teams')
-      .select('id, name')
-      .order('name', { ascending: true });
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name')
+        .order('name', { ascending: true });
       if (error) {
         console.error("Error fetching teams:", error);
         return;
@@ -59,8 +58,8 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
       }
     };
     fetchTeams();
-  }, []);  
-  
+  }, []);
+
   useEffect(() => {
     const fetchActions = async () => {
       if (!teamId) { setActions([]); return; }
@@ -79,8 +78,8 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
       setActions(uniqueActions);
     };
     fetchActions();
-  }, [teamId]);  
-  
+  }, [teamId]);
+
   useEffect(() => {
     const fetchGames = async () => {
       if (!teamId) return;
@@ -95,7 +94,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
         console.error('Error fetching games:', error);
       }
     };
-
     fetchGames();
   }, [teamName]);
   useEffect(() => {
@@ -108,15 +106,13 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
           .from('games')
           .select('id')
           .eq('team_id', teamId);
-
         if (selectedGame === 'scored') {
           gameQuery = gameQuery.eq('isscored', true);
         }
-
         const { data: gamesData, error: gamesError } = await gameQuery;
         if (gamesError || !gamesData) return;
         gameIds = gamesData.map(g => g.id);
-      }else {
+      } else {
         gameIds = [selectedGame];
       }
       let query = supabase.from('stats').select('*').in('game_id', gameIds);
@@ -140,13 +136,12 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
           ) {
             assistCounts[curr.player] = (assistCounts[curr.player] || 0) + 1;
           }
-        }        
-        setAssistData(assistCounts);        
+        }
+        setAssistData(assistCounts);
         const settingOnly = filteredStats.filter(
           stat => stat.set_to_position || stat.set_to_player
         );
         setSettingStats(settingOnly);
-
         // New logic: Count won/lost by player-action
         const resultCounts = {};
         filteredStats.forEach(({ player, action_type, result }) => {
@@ -159,7 +154,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
           if (result === 'Lost Point') resultCounts[key].lost += 1;
           resultCounts[key].total += 1;
         });
-
         const resultsArray = Object.entries(resultCounts).map(([key, val]) => {
           const [player, action] = key.split('__');
           return {
@@ -172,7 +166,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
             pctLost: ((val.lost / val.total) * 100).toFixed(1) + '%',
           };
         });
-
         setResultAnalysis(resultsArray);
       }
     };
@@ -216,7 +209,7 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
       ...prev,
       [key]: { visible: !prev[key]?.visible }
     }));
-  };  
+  };
   const allSubColumns = [
     { key: 'Qty', label: 'Qty', title: 'Number of touches' },
     { key: 'Avg', label: 'Avg', title: 'Average quality', disabled: selectedGame === 'all', },
@@ -227,7 +220,7 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   const [visibleSubColumns, setVisibleSubColumns] = useState(() => {
     const saved = getLocal('visibleSubColumnsStatsPage');
     let initial = {};
-   
+
     allSubColumns.forEach(col => {
       const defaultHidden = ['Success', 'Fail'];
       initial[col.key] = { visible: !defaultHidden.includes(col.key) };
@@ -249,7 +242,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   useEffect(() => {
     setVisibleSubColumns(prev => {
       const newState = { ...prev };
-
       if (selectedGame === 'all') {
         if (newState['Avg']?.visible) {
           newState['Avg'].visible = false;
@@ -265,13 +257,12 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   useEffect(() => {
     setLocal('visibleSubColumnsStatsPage', JSON.stringify(visibleSubColumns));
   }, [visibleSubColumns]);
-
   const toggleSubColumn = (key) => {
     setVisibleSubColumns(prev => ({
       ...prev,
       [key]: { visible: !prev[key]?.visible }
     }));
-  };    
+  };
   const countOccurrences = (arr, key) => {
     return arr.reduce((acc, item) => {
       const k = item[key];
@@ -290,7 +281,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
   const grouped = stats.reduce((acc, s) => {
     if (!s.player || !s.action_type) return acc;
     const { player, action_type, quality, result } = s;
-
     if (!acc[player]) acc[player] = {};
     if (!acc[player][action_type]) {
       acc[player][action_type] = {
@@ -299,21 +289,17 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
         lost: 0,
       };
     }
-
     acc[player][action_type].qualities.push(Number(quality));
     if (result === 'Won Point') acc[player][action_type].won += 1;
     if (result === 'Lost Point') acc[player][action_type].lost += 1;
-
     return acc;
   }, {});
-
   const players = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
   const actionTotals = actions.reduce((acc, action) => {
     let qty = 0;
     let sumQuality = 0;
     let won = 0;
     let lost = 0;
-
     players.forEach(player => {
       const stat = grouped[player]?.[action];
       if (stat) {
@@ -323,15 +309,12 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
         lost += stat.lost || 0;
       }
     });
-
     const avg = qty ? (sumQuality / qty).toFixed(2) : '-';
     const success = qty ? ((won / qty) * 100).toFixed(1) + '%' : '';
     const fail = qty ? ((lost / qty) * 100).toFixed(1) + '%' : '';
-
     acc[action] = { qty, avg, success, fail };
     return acc;
   }, {});
-
   const grandTotals = Object.values(actionTotals).reduce(
     (acc, val) => {
       acc.qty += val.qty || 0;
@@ -342,95 +325,94 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
     },
     { qty: 0, sum: 0, won: 0, lost: 0 }
   );
-
   const totalAvg2 = grandTotals.qty ? (grandTotals.sum / grandTotals.qty).toFixed(2) : '-';
   const totalSuccess2 = grandTotals.qty ? ((grandTotals.won / grandTotals.qty) * 100).toFixed(1) + '%' : '';
   const totalFail2 = grandTotals.qty ? ((grandTotals.lost / grandTotals.qty) * 100).toFixed(1) + '%' : '';
   const renderSidebar = useCallback(() => (
-      <div className="space-y-4 flex flex-col h-full">
+    <div className="space-y-4 flex flex-col h-full">
+      <div>
+        <label className="font-semibold block mb-1">Your Team:</label>
+        <StyledSelect
+          options={availableTeams.map(t => ({ label: t.name, value: t.id, color: 'blue' }))}
+          value={teamId}
+          onChange={(selected) => {
+            const id = selected?.value || '';
+            setTeamId(id);
+            const t = availableTeams.find(tt => String(tt.id) === String(id));
+            setTeamName(t?.name || '');
+            setLocal('teamId', id);
+            setLocal('teamName', t?.name || '');
+            setSelectedGame('all');
+          }}
+          placeholder="Select a team"
+          showStatus={false}
+        />
+      </div>
+      <div>
+        <label className="font-semibold block mb-1">Select Game:</label>
+        <StyledSelect
+          options={[
+            { value: 'all', label: 'All Games' },
+            { value: 'scored', label: 'All Scored Games' },
+            ...games
+              .filter((game) => game.processed)
+              .sort((a, b) => new Date(b.date) - new Date(a.date))
+              .map((game) => ({
+                value: game.id,
+                label: game.title,
+                color: game.isscored ? 'green' : 'red',
+                tooltip: game.isscored ? 'Scored' : 'Not yet scored',
+              })),
+          ]}
+          value={selectedGame}
+          onChange={(selected) => setSelectedGame(selected?.value || 'all')}
+          placeholder="Select a game"
+          showStatus={true}
+          showTooltip={true}
+        />
+      </div>
+      {selectedGame && (
         <div>
-          <label className="font-semibold block mb-1">Your Team:</label>
-          <StyledSelect
-            options={availableTeams.map(t => ({ label: t.name, value: t.id, color: 'blue' }))}
-            value={teamId}
-            onChange={(selected) => {
-              const id = selected?.value || '';
-              setTeamId(id);
-              const t = availableTeams.find(tt => String(tt.id) === String(id));
-              setTeamName(t?.name || '');
-              setLocal('teamId', id);
-              setLocal('teamName', t?.name || '');
-              setSelectedGame('all');
-            }}
-            placeholder="Select a team"
-            showStatus={false}
-          />
-        </div>            
-        <div>
-          <label className="font-semibold block mb-1">Select Game:</label>
+          <label className="font-semibold block mb-1">Select Set:</label>
           <StyledSelect
             options={[
-              { value: 'all', label: 'All Games' },
-              { value: 'scored', label: 'All Scored Games' },
-              ...games
-                .filter((game) => game.processed)
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .map((game) => ({
-                  value: game.id,
-                  label: game.title,
-                  color: game.isscored ? 'green' : 'red',
-                  tooltip: game.isscored ? 'Scored' : 'Not yet scored',
-                })),
+              { value: 'all', label: 'All Sets' },
+              { value: '1', label: 'Set 1' },
+              { value: '2', label: 'Set 2' },
+              { value: '3', label: 'Set 3' },
             ]}
-            value={selectedGame}
-            onChange={(selected) => setSelectedGame(selected?.value || 'all')}
-            placeholder="Select a game"
-            showStatus={true}
-            showTooltip={true}
+            value={selectedSet}
+            onChange={(selected) => setSelectedSet(selected?.value || 'all')}
+            placeholder="Select Set"
+            showStatus={false}
           />
         </div>
-        {selectedGame && (
-          <div>
-            <label className="font-semibold block mb-1">Select Set:</label>
-            <StyledSelect
-              options={[
-                { value: 'all', label: 'All Sets' },
-                { value: '1', label: 'Set 1' },
-                { value: '2', label: 'Set 2' },
-                { value: '3', label: 'Set 3' },
-              ]}
-              value={selectedSet}
-              onChange={(selected) => setSelectedSet(selected?.value || 'all')}
-              placeholder="Select Set"
-              showStatus={false}
-            />
-          </div>
-        )}
+      )}
       <div>
         <label className="font-semibold block mb-1">Visible Columns:</label>
-          <ColumnSelector
-            columns={allColumns}
-            visibleColumns={visibleColumns}
-            toggleColumn={toggleColumn}
-          />
-      </div>    
+        <ColumnSelector
+          columns={allColumns}
+          visibleColumns={visibleColumns}
+          toggleColumn={toggleColumn}
+        />
+      </div>
       <div>
         <label className="font-semibold block mb-1">Visible SubColumns:</label>
-          <ColumnSelector
-            columns={allSubColumns}
-            visibleColumns={visibleSubColumns}
-            toggleColumn={toggleSubColumn}
-          />
-      </div>             
-        <div className="mt-auto p-4 space-y-4">
-          <button
-            onClick={NavToHome}
-            className="w-full px-4 py-2 cursor-pointer rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-          >
-            Return to Home
-          </button>               
-        </div>
+        <ColumnSelector
+          columns={allSubColumns}
+          visibleColumns={visibleSubColumns}
+          toggleColumn={toggleSubColumn}
+        />
       </div>
+      <div className="mt-auto p-4 space-y-4">
+        <button
+          onClick={NavToHome}
+          className="w-full px-4 py-2 cursor-pointer rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03] bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+        >
+          Return to Home
+        </button>
+      </div>
+    </div>
   ), [
     teamName,
     setTeamName,
@@ -448,7 +430,7 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
     toggleSubColumn,
     NavToHome
   ]);
-  
+
   useEffect(() => {
     setSidebarContent(renderSidebar());
     return () => setSidebarContent(null);
@@ -462,7 +444,7 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
     visibleColumns,
     visibleSubColumns,
   ]);
-  
+
   return (
     <div className="flex flex-col overflow-hidden">
       {/* Main Content */}
@@ -517,9 +499,8 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
                   .map((sub, i, arr) => (
                     <th
                       key={`total-${sub.key}`}
-                      className={`border bg-gray-100 p-1 text-xs ${
-                        i === 0 ? 'border-l-2' : ''
-                      } ${i === arr.length - 1 ? 'border-r-2' : ''}`}
+                      className={`border bg-gray-100 p-1 text-xs ${i === 0 ? 'border-l-2' : ''
+                        } ${i === arr.length - 1 ? 'border-r-2' : ''}`}
                       title={sub.title}
                     >
                       {sub.label}
@@ -539,52 +520,48 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
                 const rawTotalFail = totalQty ? ((totalLost / totalQty) * 100).toFixed(1) : null;
                 const totalSuccess = rawTotalSuccess && rawTotalSuccess !== '0.0' ? `${rawTotalSuccess}%` : '-';
                 const totalFail = rawTotalFail && rawTotalFail !== '0.0' ? `${rawTotalFail}%` : '-';
-
                 return (
                   <tr key={player}>
                     <td className="border p-1 bg-gray-200 font-semibold">{player}</td>
-                      {actions.filter(action => visibleColumns[action]?.visible).map(action => {
-                        const actionStats = grouped[player]?.[action];
-                        const qty = actionStats?.qualities.length ?? 0;
-                        const avg = qty ? (actionStats.qualities.reduce((a, b) => a + b, 0) / qty).toFixed(2) : '-';
-                        const rawSuccess = qty ? ((actionStats.won / qty) * 100).toFixed(1) : null;
-                        const rawFail = qty ? ((actionStats.lost / qty) * 100).toFixed(1) : null;
-                        const success = rawSuccess && rawSuccess !== '0.0' ? `${rawSuccess}%` : '-';
-                        const fail = rawFail && rawFail !== '0.0' ? `${rawFail}%` : '-';
-
-                        return (
-                          <React.Fragment key={action}>
-                            {allSubColumns
-                              .filter(
-                                sub =>
-                                  visibleSubColumns[sub.key]?.visible &&
-                                  (!sub.actionOnly || sub.actionOnly === action)
-                              )
-                              .map(sub => {
-                                let value = '-';
-                                if (sub.key === 'Qty') value = qty || '-';
-                                else if (sub.key === 'Avg') value = avg;
-                                else if (sub.key === 'Success') value = success;
-                                else if (sub.key === 'Fail') value = fail;
-                                else if (sub.key === 'Assists') {
-                                  value = assistData?.[player] || 0;
-                                }
-
-                                const colorClass =
-                                  sub.key === 'Success' && value !== '-' ? 'text-green-600' :
+                    {actions.filter(action => visibleColumns[action]?.visible).map(action => {
+                      const actionStats = grouped[player]?.[action];
+                      const qty = actionStats?.qualities.length ?? 0;
+                      const avg = qty ? (actionStats.qualities.reduce((a, b) => a + b, 0) / qty).toFixed(2) : '-';
+                      const rawSuccess = qty ? ((actionStats.won / qty) * 100).toFixed(1) : null;
+                      const rawFail = qty ? ((actionStats.lost / qty) * 100).toFixed(1) : null;
+                      const success = rawSuccess && rawSuccess !== '0.0' ? `${rawSuccess}%` : '-';
+                      const fail = rawFail && rawFail !== '0.0' ? `${rawFail}%` : '-';
+                      return (
+                        <React.Fragment key={action}>
+                          {allSubColumns
+                            .filter(
+                              sub =>
+                                visibleSubColumns[sub.key]?.visible &&
+                                (!sub.actionOnly || sub.actionOnly === action)
+                            )
+                            .map(sub => {
+                              let value = '-';
+                              if (sub.key === 'Qty') value = qty || '-';
+                              else if (sub.key === 'Avg') value = avg;
+                              else if (sub.key === 'Success') value = success;
+                              else if (sub.key === 'Fail') value = fail;
+                              else if (sub.key === 'Assists') {
+                                value = assistData?.[player] || 0;
+                              }
+                              const colorClass =
+                                sub.key === 'Success' && value !== '-' ? 'text-green-600' :
                                   sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
-                                  sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
-                                  '';
-
-                                return (
-                                  <td key={`${action}-${sub.key}`} className={`border border-black p-1 ${colorClass}`}>
-                                    {value}
-                                  </td>
-                                );
-                              })}
-                          </React.Fragment>
-                        );
-                      })}
+                                    sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
+                                      '';
+                              return (
+                                <td key={`${action}-${sub.key}`} className={`border border-black p-1 ${colorClass}`}>
+                                  {value}
+                                </td>
+                              );
+                            })}
+                        </React.Fragment>
+                      );
+                    })}
                     <td className={`border border-l-2 p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalQty}</td>
                     <td className={`border p-1 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalAvg}</td>
                     <td className={`border p-1 border-black text-green-600 font-semibold ${isLastRow ? 'border-b-2' : ''}`}>{totalSuccess}</td>
@@ -613,13 +590,11 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
                           else if (sub.key === 'Success') value = totals.success;
                           else if (sub.key === 'Fail') value = totals.fail;
                           else if (sub.key === 'Assists') value = Object.values(assistData).reduce((a, b) => a + b, 0);
-
                           const colorClass =
                             sub.key === 'Success' && value !== '-' ? 'text-green-600' :
-                            sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
-                            sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
-                            '';
-
+                              sub.key === 'Assists' && value !== '-' ? 'text-green-600' :
+                                sub.key === 'Fail' && value !== '-' ? 'text-red-600' :
+                                  '';
                           return (
                             <td
                               key={`${action}-${sub.key}`}
@@ -643,7 +618,6 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
           {settingStats.length > 0 && (
             <div className="mt-8">
               <h3 className="text-lg font-bold mb-2">Setting Statistics - Who Got Set?</h3>
-
               {/* Setter Filter */}
               <div className="mb-4">
                 <label className="font-semibold block mb-1">Filter by Setter:</label>
@@ -707,17 +681,16 @@ const StatsSummary = ({ onBack, setSidebarContent  }) => {
                             <td className="border border-black p-1">{row.count}</td>
                             <td className="border border-black p-1">{row.percent}</td>
                           </tr>
-                      ))}
+                        ))}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
-          )}       
+          )}
         </div>
       </div>
     </div>
   );
 };
-
 export default StatsSummary;

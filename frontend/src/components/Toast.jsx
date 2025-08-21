@@ -1,21 +1,17 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-
 const Toast = ({ message, show, duration = 5000, onClose, type = 'success' }) => {
   useEffect(() => {
     if (!show) return;
     const t = setTimeout(onClose, duration);
     return () => clearTimeout(t);
   }, [show, duration, onClose]);
-
   if (!show) return null;
-
   const typeStyles = {
     success: 'border-green-700 bg-green-700',
     error: 'border-red-700 bg-red-700',
     neutral: 'border-yellow-600 bg-yellow-500 text-black'
   };
-
   const node = (
     <div
       className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] flex justify-center pointer-events-none"
@@ -36,8 +32,6 @@ const Toast = ({ message, show, duration = 5000, onClose, type = 'success' }) =>
       </div>
     </div>
   );
-
   return createPortal(node, document.body);
 };
-
 export default Toast;

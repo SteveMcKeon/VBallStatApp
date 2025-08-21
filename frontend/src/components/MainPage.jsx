@@ -15,13 +15,11 @@ import SidebarFooter from './SidebarFooter';
 import StatsSummary from './StatsSummary';
 import UploadGameModal from './UploadGameModal';
 import { useSupabaseAuthWatcher } from '../utils/useSupabaseAuthWatcher';
-
 const HEADER_HOVER_ZONE_PX = 50;
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
 const MiniSidebar = ({ onExpand, teamId }) => {
   const handlePanelClick = () => onExpand();
   const stopPropagation = (e) => e.stopPropagation();
-
   return (
     <div
       onClick={handlePanelClick}
@@ -38,23 +36,19 @@ const MiniSidebar = ({ onExpand, teamId }) => {
         </button>
         <div className="h-px bg-gray-300 w-6 mx-auto" />
       </div>
-
       {/* Bottom: user icon/footer */}
       <div onClick={stopPropagation}>
-        <SidebarFooter mini  teamId={teamId}/>
+        <SidebarFooter mini teamId={teamId} />
       </div>
     </div>
   );
 };
-
 const MainPage = () => {
   const navigate = useNavigate();
-  
   useSupabaseAuthWatcher({
     supabase,
     onSignOut: () => navigate('/login'),
   });
-  
   const sidebarRef = useRef(null);
   const uploadModalRef = useRef();
   const [sidebarContent, setSidebarContent] = useState(null);
@@ -70,14 +64,12 @@ const MainPage = () => {
     videoPlayerRef.current?.allowControls();
     setIsUploadModalOpen(false);
   };
-
   const handleResumeAllUploadsFromBanner = () => {
     setResumeSilently(true);
     setIsUploadModalOpen(true);
     uploadModalRef.current?.triggerResumeAllUploads?.();
     setShowResumeBanner(false);
   };
-
   const handleCancelAllUploadsFromBanner = async () => {
     if (uploadModalRef.current?.cancelUploads) {
       await uploadModalRef.current.cancelUploads();
@@ -86,13 +78,11 @@ const MainPage = () => {
     }
     setShowResumeBanner(false);
   };
-
   const [currentUserId, setCurrentUserId] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [teamId, setTeamId] = useState('');
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [showStatsView, setShowStatsView] = useState(false);
-
   useEffect(() => {
     const fetchSession = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -106,7 +96,6 @@ const MainPage = () => {
     fetchSession();
   }, [teamName]);
   const [incompleteUploadCount, setIncompleteUploadCount] = useState(0);
-
   useEffect(() => {
     if (!currentUserId) return;
     const scanIncompleteUploads = () => {
@@ -135,7 +124,6 @@ const MainPage = () => {
     window.addEventListener('storage', checkForIncompleteUpload);
     return () => window.removeEventListener('storage', checkForIncompleteUpload);
   }, [currentUserId]);
-
   const [isAppLoading, setIsAppLoading] = useState(true);
   const videoPlayerRef = useRef(null);
   const [gamePlayers, setGamePlayers] = useState([]);
@@ -143,7 +131,6 @@ const MainPage = () => {
   const getLocal = (key) => localStorage.getItem(key);
   const [availableTeams, setAvailableTeams] = useState([]);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
-
   const handleTeamChange = async (e, { force = false } = {}) => {
     const selectedId = e.target.value;
     if (!force && String(selectedId) === String(teamId)) {
@@ -152,7 +139,6 @@ const MainPage = () => {
     setTeamId(selectedId);
     setLocal('teamId', selectedId);
     const t = availableTeams.find(tt => String(tt.id) === String(selectedId));
-
     setTeamName(t?.name ?? '');
     setLocal('teamName', t?.name ?? '');
     setSelectedGameId(null);
@@ -172,10 +158,8 @@ const MainPage = () => {
       setShowCenteredGamePicker(false);
       localStorage.setItem('selectedGameId', mostRecent.id);
     }
-
     return { data, error };
   };
-
   const refreshGames = async (id = teamId) => {
     if (!id) return { data: [], error: null };
     const { data, error } = await supabase
@@ -190,7 +174,6 @@ const MainPage = () => {
     }
     return { data, error };
   };
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -198,11 +181,9 @@ const MainPage = () => {
       }
     });
   }, [navigate]);
-
   const [teamGames, setTeamGames] = useState([]);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [textColumnFilters, setTextColumnFilters] = useState({});
-
   const handleTextColumnFilterChange = (column, value) => {
     const colType = visibleColumns[column]?.type;
     setTextColumnFilters((prev) => {
@@ -224,10 +205,8 @@ const MainPage = () => {
       window.dispatchEvent(new Event('db_layout_change'))
     );
   };
-
   const [containerHeight, setContainerHeight] = useState(0);
   const insertButtonParentRef = useRef(null);
-
   useEffect(() => {
     const updateHeight = () => {
       if (insertButtonParentRef.current) {
@@ -238,7 +217,6 @@ const MainPage = () => {
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
   }, []);
-
   const savedVisibleColumns = getLocal('visibleColumnsMainPage');
   const savedLayout = getLocal('layoutMode');
   const videoRef = useRef(null);
@@ -249,11 +227,9 @@ const MainPage = () => {
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
   const { editMode, toggleEditMode, allowedRole } = EditMode(teamId);
-
   const handleEditModeToggle = () => {
     toggleEditMode();
   };
-
   const isFiltered =
     Object.values(textColumnFilters).some((filter) => {
       const conditions = filter?.conditions ?? [];
@@ -264,7 +240,6 @@ const MainPage = () => {
           : value?.toString().trim())
       );
     });
-
   const [showOverlay, setShowOverlay] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const { registerToggle } = useSidebar();
@@ -289,7 +264,6 @@ const MainPage = () => {
       });
     });
   }, [registerToggle]);
-
   const [layoutMode, setLayoutMode] = useState(() => {
     try {
       return savedLayout ? decodeURIComponent(savedLayout) : 'stacked';
@@ -297,9 +271,7 @@ const MainPage = () => {
       return 'stacked';
     }
   });
-
   const [sortConfig, setSortConfig] = useState({ key: 'import_seq', direction: 'asc' });
-
   const defaultColumnConfig = {
     timestamp: { visible: false, type: 'float8' },
     set: { visible: false, type: 'int2' },
@@ -308,11 +280,11 @@ const MainPage = () => {
     action_type: { visible: true, type: 'text' },
     quality: { visible: true, type: 'numeric' },
     set_to_player: { visible: false, type: 'text' },
-    set_to_position: { visible: false, type: 'text' },  
+    set_to_position: { visible: false, type: 'text' },
     result: { visible: false, type: 'text' },
     score: { visible: false, type: 'int2' },
     our_score: { visible: false, type: 'int2' },
-    opp_score: { visible: false, type: 'int2' },  
+    opp_score: { visible: false, type: 'int2' },
     notes: { visible: true, type: 'text' },
   };
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -351,10 +323,8 @@ const MainPage = () => {
     });
     requestAnimationFrame(() => window.dispatchEvent(new Event('db_layout_change')));
   };
-
   const lastScrollY = useRef(0);
   const suppressScrollDetection = useRef(false);
-
   const loadStatsForSelectedVideo = async (videoUrl) => {
     if (!videoUrl) {
       setStats([]);
@@ -376,7 +346,6 @@ const MainPage = () => {
       .select('players')
       .eq('id', existing.id)
       .single();
-
     if (gameError) {
       console.error('Error fetching game players:', gameError);
       setGamePlayers([]);
@@ -388,7 +357,6 @@ const MainPage = () => {
       .select('*')
       .eq('game_id', existing.id)
       .order('import_seq', { ascending: true });
-
     if (statError || !statData) {
       console.error('Failed to fetch stats:', statError);
       setStats([]);
@@ -396,34 +364,29 @@ const MainPage = () => {
       setStats(statData);
     }
   };
-
   useEffect(() => {
     loadStatsForSelectedVideo(selectedVideo);
   }, [selectedVideo]);
-
   useEffect(() => {
     if (selectedGameId) {
       localStorage.setItem('selectedGameId', selectedGameId);
     }
   }, [selectedGameId]);
-
   const fetchTeamNames = async () => {
     const { data, error } = await supabase
       .from('teams')
       .select('id, name')
       .order('name', { ascending: true });
-
     if (error) {
       console.error('Error fetching teams:', error);
       return [];
     }
     return data ?? [];
   };
-
   useEffect(() => {
     setIsAppLoading(true);
     const savedTeamId = getLocal('teamId');
-    const savedGame   = getLocal('selectedGameId');
+    const savedGame = getLocal('selectedGameId');
     (async () => {
       const teams = await fetchTeamNames();
       setAvailableTeams(teams);
@@ -434,22 +397,22 @@ const MainPage = () => {
         setLocal('teamId', savedTeamId);
         setLocal('teamName', t?.name ?? '');
         const { data: gamesData, error: gamesError } =
-          await handleTeamChange({ target: { value: savedTeamId } , force: true });
-          if (!gamesError && gamesData) {
-            const byId = (g) => String(g.id) === String(savedGame);
-            if (savedGame && gamesData.some(byId)) {
-              const selectedGame = gamesData.find(byId);
-              setSelectedGameId(savedGame);
-              setSelectedVideo(selectedGame?.video_url || '');
-              setShowCenteredGamePicker(false);
-            } else if (gamesData.length > 0) {
-              const mostRecent = gamesData[0];
-              setSelectedGameId(mostRecent.id);
-              setSelectedVideo(mostRecent.video_url || '');
-              setShowCenteredGamePicker(false);
-              localStorage.setItem('selectedGameId', mostRecent.id);
-            }
+          await handleTeamChange({ target: { value: savedTeamId }, force: true });
+        if (!gamesError && gamesData) {
+          const byId = (g) => String(g.id) === String(savedGame);
+          if (savedGame && gamesData.some(byId)) {
+            const selectedGame = gamesData.find(byId);
+            setSelectedGameId(savedGame);
+            setSelectedVideo(selectedGame?.video_url || '');
+            setShowCenteredGamePicker(false);
+          } else if (gamesData.length > 0) {
+            const mostRecent = gamesData[0];
+            setSelectedGameId(mostRecent.id);
+            setSelectedVideo(mostRecent.video_url || '');
+            setShowCenteredGamePicker(false);
+            localStorage.setItem('selectedGameId', mostRecent.id);
           }
+        }
       } else if (teams.length === 1) {
         const only = teams[0];
         setTeamId(only.id);
@@ -466,11 +429,9 @@ const MainPage = () => {
       setIsAppLoading(false);
     })();
   }, []);
-
   useEffect(() => {
     setLocal('visibleColumnsMainPage', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
-
   const handleHeaderClick = (columnKey) => {
     setSortConfig((prev) => {
       if (prev.key === columnKey) {
@@ -480,11 +441,9 @@ const MainPage = () => {
       return { key: columnKey, direction: 'asc' };
     });
   };
-
   useEffect(() => {
     setLocal('layoutMode', layoutMode);
   }, [layoutMode]);
-
   useEffect(() => {
     fetch('/api/videos')
       .then(async res => {
@@ -499,9 +458,7 @@ const MainPage = () => {
         console.error('Failed to load videos:', err.message);
       });
   }, []);
-
   const refreshStats = () => loadStatsForSelectedVideo(selectedVideo);
-
   const uniqueValues = (key) =>
     [...new Set(stats.map((s) => s[key]).filter((v) => v !== undefined && v !== null))];
   const filteredStats = stats
@@ -592,25 +549,20 @@ const MainPage = () => {
         return result ?? true;
       })
     );
-
   const sortedStats = [...filteredStats].sort((a, b) => {
     const { key, direction } = sortConfig;
     const aVal = a[key];
     const bVal = b[key];
-
     if (aVal == null && bVal == null) return 0;
     if (aVal == null) return 1;
     if (bVal == null) return -1;
-
     if (aVal < bVal) return direction === 'asc' ? -1 : 1;
     if (aVal > bVal) return direction === 'asc' ? 1 : -1;
     return 0;
   });
-
   const jumpToTime = (t) => {
     videoRef.current.currentTime = t - 1;
   };
-
   const renderCell = (field, s, idx, prevRow = null) => {
     if (!visibleColumns[field]?.visible) return null;
     return (
@@ -631,12 +583,10 @@ const MainPage = () => {
       </td>
     );
   };
-
   const formatTimestamp = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 100);
-
     if (mins === 0) {
       return ms > 0 ? `${secs}.${String(ms).padStart(2, '0')}` : `${secs}`;
     } else {
@@ -645,7 +595,6 @@ const MainPage = () => {
       return `${mins}:${paddedSecs}${msPart}`;
     }
   };
-
   const renderHeaderCell = (label, key) => {
     const isTextColumn = visibleColumns[key]?.type === 'text';
     return (
@@ -668,7 +617,6 @@ const MainPage = () => {
       </th>
     );
   };
-
   const handleSidebarToggle = (value) => {
     setShowSidebar(value);
     const fire = (tag) => {
@@ -687,7 +635,6 @@ const MainPage = () => {
     };
     el.addEventListener('transitionend', onEnd);
   };
-  
   const effectiveVisibleColumns = useMemo(() => {
     if (allowedRole === 'admin') return visibleColumns;
     const next = { ...visibleColumns };
@@ -700,7 +647,6 @@ const MainPage = () => {
     }
     return next;
   }, [visibleColumns, editMode, allowedRole]);
-  
   if (isAppLoading) {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
@@ -713,19 +659,19 @@ const MainPage = () => {
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
         <div className="text-lg font-semibold mb-4">Please select your team to begin</div>
-          <StyledSelect
-            options={availableTeams.map(t => ({
-              label: t.name,
-              value: t.id,
-              color: 'blue',
-            }))}
-            value={teamId}
-            onChange={(selected) =>
-              handleTeamChange({ target: { value: selected.value } })
-            }
-            placeholder="Click here to select a team"
-            showStatus={false}
-          />
+        <StyledSelect
+          options={availableTeams.map(t => ({
+            label: t.name,
+            value: t.id,
+            color: 'blue',
+          }))}
+          value={teamId}
+          onChange={(selected) =>
+            handleTeamChange({ target: { value: selected.value } })
+          }
+          placeholder="Click here to select a team"
+          showStatus={false}
+        />
       </div>
     );
   }
@@ -773,7 +719,6 @@ const MainPage = () => {
       </>
     );
   }
-
   const selectedGame = teamGames.find(g => g.id === selectedGameId);
   return (
     <div className="flex flex-col h-[100svh] overflow-hidden">
@@ -787,13 +732,12 @@ const MainPage = () => {
           `}
         >
           {!showSidebar && (
-          <MiniSidebar
-            onExpand={() => handleSidebarToggle(true)} 
-            teamId={teamId}
-          />
+            <MiniSidebar
+              onExpand={() => handleSidebarToggle(true)}
+              teamId={teamId}
+            />
           )}
         </div>
-
         {/* Sliding full sidebar (overlay). GPU-accelerated transform only. */}
         <div
           ref={sidebarRef}
@@ -802,15 +746,13 @@ const MainPage = () => {
             transform-gpu will-change-transform transition-transform ease-out
             ${isMobile
               ? `absolute top-0 left-0 h-full w-64
-            transform-gpu will-change-transform transition-transform duration-300 ease-out ${
-                  showSidebar
-                    ? 'translate-x-0'
-                    : '-translate-x-[16.25rem] opacity-0 pointer-events-none'
-                }`
+            transform-gpu will-change-transform transition-transform duration-300 ease-out ${showSidebar
+                ? 'translate-x-0'
+                : '-translate-x-[16.25rem] opacity-0 pointer-events-none'
+              }`
               : `relative overflow-x-auto ${showSidebar ? 'w-64' : 'w-0'}`}
           `}
         >
-      
           <div className="h-full flex flex-col">
             <div className="w-full">
               {/* Collapse button aligned right */}
@@ -825,7 +767,6 @@ const MainPage = () => {
               </div>
               <div className="h-px bg-gray-300 mx-2" />
             </div>
-
             {sidebarContent ? (
               <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
                 {sidebarContent}
@@ -833,17 +774,17 @@ const MainPage = () => {
             ) : (
               <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
                 <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
-                  <StyledSelect
-                    options={availableTeams.map(t => ({
-                      label: t.name,
-                      value: t.id,
-                      color: 'blue',
-                    }))}
-                    value={teamId}
-                    onChange={(opt) => handleTeamChange({ target: { value: opt.value } })}
-                    placeholder="Click here to select a team"
-                    showStatus={false}
-                  />
+                <StyledSelect
+                  options={availableTeams.map(t => ({
+                    label: t.name,
+                    value: t.id,
+                    color: 'blue',
+                  }))}
+                  value={teamId}
+                  onChange={(opt) => handleTeamChange({ target: { value: opt.value } })}
+                  placeholder="Click here to select a team"
+                  showStatus={false}
+                />
                 <div>
                   <label className={`font-semibold block mb-1 ${!selectedGameId ? "text-blue-700" : ""}`}>
                     {!selectedGameId ? "🎯 Select Game:" : "Select Game:"}
@@ -901,23 +842,23 @@ const MainPage = () => {
                   <ColumnSelector
                     columns={[
                       { key: 'timestamp', label: 'Timestamp' },
-                      ...(allowedRole  === 'admin'
+                      ...(allowedRole === 'admin'
                         ? [
-                            { key: 'set', label: 'Set' },
-                            { key: 'rally_id', label: 'Rally' },
-                          ]
-                        : []),                         
+                          { key: 'set', label: 'Set' },
+                          { key: 'rally_id', label: 'Rally' },
+                        ]
+                        : []),
                       { key: 'player', label: 'Player' },
                       { key: 'action_type', label: 'Action Type' },
                       { key: 'quality', label: 'Quality' },
                       ...(allowedRole === 'admin' || allowedRole === 'editor'
                         ? [
-                            { key: 'set_to_player', label: 'Set To Player' },
-                            { key: 'set_to_position', label: 'Set To Position' },
-                            { key: 'result', label: 'Result' },
-                          ]
+                          { key: 'set_to_player', label: 'Set To Player' },
+                          { key: 'set_to_position', label: 'Set To Position' },
+                          { key: 'result', label: 'Result' },
+                        ]
                         : []),
-                      { key: 'score', label: 'Score' },            
+                      { key: 'score', label: 'Score' },
                       { key: 'notes', label: 'Notes' },
                     ]}
                     visibleColumns={visibleColumns}
@@ -928,11 +869,10 @@ const MainPage = () => {
                   {allowedRole && (
                     <button
                       onClick={handleEditModeToggle}
-                      className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform cursor-pointer transition hover:scale-[1.03] ${
-                        editMode
-                          ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
-                          : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
-                      }`}
+                      className={`w-full px-4 py-2 rounded-xl text-white font-semibold shadow-md transform cursor-pointer transition hover:scale-[1.03] ${editMode
+                        ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800'
+                        : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
+                        }`}
                     >
                       {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
                     </button>
@@ -949,7 +889,7 @@ const MainPage = () => {
                 </div>
               </div>
             )}
-            <SidebarFooter teamId={teamId}/>
+            <SidebarFooter teamId={teamId} />
           </div>
         </div>
         <div
@@ -1013,7 +953,6 @@ const MainPage = () => {
           </div>
         </div>
       </div>
-
       {showResumeBanner && (
         <div
           className={`fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-900 p-3 z-50 shadow
@@ -1024,7 +963,6 @@ const MainPage = () => {
               ? `You have ${incompleteUploadCount} incomplete uploads.`
               : 'You have an incomplete upload.'}
           </span>
-
           <div className={`${isMobile ? 'flex w-full justify-end gap-2' : 'flex gap-2'}`}>
             <button
               onClick={handleResumeAllUploadsFromBanner}
@@ -1047,7 +985,6 @@ const MainPage = () => {
           </div>
         </div>
       )}
-
       <UploadGameModal
         ref={uploadModalRef}
         isOpen={isUploadModalOpen}
@@ -1066,5 +1003,4 @@ const MainPage = () => {
     </div>
   );
 };
-
 export default MainPage;

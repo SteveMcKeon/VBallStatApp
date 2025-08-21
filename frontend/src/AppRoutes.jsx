@@ -5,19 +5,16 @@ import LoginPage from './components/LoginPage';
 import NotFound from './components/NotFound';
 import ResetPassword from './components/ResetPassword';
 import AcceptInvite from './components/AcceptInvite';
-
 const AppRoutes = () => {
   const location = useLocation();
-
   const routes = [
     { path: '/' },
     { path: '/login' },
     { path: '/reset-password' },
     { path: '/accept-invite' },
   ];
-  
-  const isKnownRoute = matchRoutes(routes, location) !== null;
 
+  const isKnownRoute = matchRoutes(routes, location) !== null;
   return (
     <div className="App">
       <Routes>
@@ -30,5 +27,4 @@ const AppRoutes = () => {
     </div>
   );
 };
-
 export default AppRoutes;

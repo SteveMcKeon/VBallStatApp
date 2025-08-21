@@ -1,12 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchTeamMembers, fetchTeamInvites } from '../utils/supabaseTeamClient';
-
 export function TeamRoster(supabase, teamId) {
   const [members, setMembers] = useState(null);
   const [invites, setInvites] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
-
   const refresh = useCallback(async () => {
     if (!teamId) return;
     setLoading(true);
@@ -24,8 +22,6 @@ export function TeamRoster(supabase, teamId) {
       setLoading(false);
     }
   }, [supabase, teamId]);
-
   useEffect(() => { refresh(); }, [refresh]);
-
   return { members, invites, loading, errorMsg, refresh };
 }

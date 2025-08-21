@@ -2,13 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import StyledSelect from './StyledSelect';
 import UploadGameModal from './UploadGameModal';
 import supabase from '../supabaseClient';
-
 const getStatusColor = (game) => {
   if (game.hastimestamps && game.isscored) return 'green';
   if (game.hastimestamps) return 'yellow';
   return 'red';
 };
-
 const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, currentUserId, isUploadModalOpen, setIsUploadModalOpen, setResumeSilently, resumeSilently, hideUploadOption = false }) => {
   const processedGames = games.filter((game) => game.processed);
   const options = processedGames.map((game) => ({
@@ -21,16 +19,16 @@ const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, curren
       red: 'No stats or timestamps',
     }[getStatusColor(game)],
   }));
-  
+
   if (!hideUploadOption) {
     options.push({
       value: 'upload-new',
       label: <em>Upload New Game...</em>,
     });
   }
- 
+
   const modalRef = useRef();
-  
+
   const handleChange = (selected) => {
     if (selected.value === 'upload-new') {
       setResumeSilently(false);
@@ -39,13 +37,13 @@ const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, curren
       onChange(selected);
     }
   };
-  
+
   useEffect(() => {
     if (resumeSilently && isUploadModalOpen && modalRef.current) {
       modalRef.current.triggerResumeAllUploads();
     }
   }, [resumeSilently, isUploadModalOpen]);
-  
+
   return (
     <>
       <StyledSelect
@@ -59,5 +57,4 @@ const GameSelector = ({ games, onChange, value, videoPlayerRef, teamName, curren
     </>
   );
 };
-
 export default GameSelector;

@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-
 const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, onChange, className = '' }) => {
   const [isFocused, setIsFocused] = useState(false);
   const shouldFloat = isFocused || value.length > 0;
-
   return (
     <div className="relative w-full mt-6">
       <input
@@ -22,8 +20,7 @@ const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, on
       <label
         htmlFor={id}
         className={`absolute left-4 px-1 transition-all pointer-events-none duration-300 ease-in-out
-          ${shouldFloat ? 'top-1 text-xs' : 'top-3.5 text-base'} ${
-            isError ? 'text-red-500' : shouldFloat ? 'text-blue-500' : 'text-gray-400'
+          ${shouldFloat ? 'top-1 text-xs' : 'top-3.5 text-base'} ${isError ? 'text-red-500' : shouldFloat ? 'text-blue-500' : 'text-gray-400'
           }`}
       >
         {label}
@@ -31,5 +28,4 @@ const FloatingLabelInput = ({ label, type = 'text', id, name, isError, value, on
     </div>
   );
 };
-
 export default FloatingLabelInput;

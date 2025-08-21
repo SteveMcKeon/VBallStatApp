@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-
 const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
   const [open, setOpen] = useState(false);
   const selectorRef = useRef();
-
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (selectorRef.current && !selectorRef.current.contains(e.target)) {
@@ -13,7 +11,6 @@ const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
   return (
     <div className="relative" ref={selectorRef}>
       <button
@@ -31,9 +28,8 @@ const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
           {columns.map(({ key, label, disabled }) => (
             <label
               key={key}
-              className={`flex items-center space-x-2 px-2 text-base rounded cursor-pointer transition-colors ${
-                disabled ? 'opacity-50 cursor-not-allowed' : 'bg-white hover:bg-gray-100'
-              }`}
+              className={`flex items-center space-x-2 px-2 text-base rounded cursor-pointer transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'bg-white hover:bg-gray-100'
+                }`}
             >
               <input
                 type="checkbox"
@@ -51,5 +47,4 @@ const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
     </div>
   );
 };
-
 export default ColumnSelector;

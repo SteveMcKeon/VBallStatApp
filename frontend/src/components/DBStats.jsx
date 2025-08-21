@@ -5,9 +5,8 @@ import SortableFilterHeader from './SortableFilterHeader';
 import EditableCell from './EditableCell';
 import TooltipPortal from '../utils/tooltipPortal';
 import Toast from './Toast';
-
 const ROW_HEIGHT = 28;
-const MIN_COL_PX  = 60;
+const MIN_COL_PX = 60;
 const DEFAULT_FLEX_MIN_PX = 400;
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
 const HSCROLL_PX = 10;
@@ -57,12 +56,11 @@ const IconWithTooltip = ({ children, tooltip }) => {
     </>
   );
 };
-
 const DBStats = ({
   canEdit,
   editMode,
   hastimestamps,
-  isscored,  
+  isscored,
   stats,
   refreshStats,
   setStats,
@@ -87,20 +85,20 @@ const DBStats = ({
   supabase,
   teamId,
   isMobile,
-}) => { 
+}) => {
   const practiceMode = teamId === DEMO_TEAM_ID;
   const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('error');
-  const [showToast, setShowToast] = useState(false);  
+  const [showToast, setShowToast] = useState(false);
   const setToast = (message, type = 'error') => { setToastMessage(message); setToastType(type); setShowToast(true); };
   const cellRefs = useRef({});
   const FLEX_MIN_PX = React.useMemo(
     () => (visibleColumns?.notes?.visible ? DEFAULT_FLEX_MIN_PX : 170),
     [visibleColumns?.notes?.visible]
-  );  
+  );
   const handleClearAllFilters = () => {
     window.dispatchEvent(new Event('closeAllFilters'));
     const keys = Object.keys(textColumnFilters ?? {});
@@ -110,7 +108,6 @@ const DBStats = ({
       listRef.current?.resetAfterIndex?.(0, true);
     });
   };
-
   const isFiltered = useMemo(() => {
     const filtersObj = textColumnFilters ?? {};
     return Object.values(filtersObj).some((filter) => {
@@ -123,22 +120,19 @@ const DBStats = ({
       );
     });
   }, [textColumnFilters]);
-  
+
   const [gameSettings, setGameSettings] = useState({ hastimestamps: null, isscored: null });
   useEffect(() => {
     if (typeof hastimestamps === 'boolean' || typeof isscored === 'boolean') {
       setGameSettings({ hastimestamps, isscored });
     }
   }, [hastimestamps, isscored]);
-
   const handlePlayFiltered = async () => {
     const timestamps = filteredStats
       .filter(s => s.timestamp != null)
       .map(s => s.timestamp)
       .sort((a, b) => a - b);
-
     if (timestamps.length === 0 || !videoPlayerRef.current) return;
-
     const sequences = [];
     let lastEnd = -Infinity;
     for (let i = 0; i < timestamps.length; i++) {
@@ -146,7 +140,6 @@ const DBStats = ({
       const next = timestamps[i + 1];
       const start = current - HIGHLIGHT_PRE_BUFFER;
       if (start < lastEnd) continue;
-
       const defaultEnd = current + HIGHLIGHT_PLAY_DURATION;
       const nextClipStart = next != null ? next - HIGHLIGHT_PRE_BUFFER : Infinity;
       const end = nextClipStart < defaultEnd ? next + HIGHLIGHT_PLAY_DURATION : defaultEnd;
@@ -167,26 +160,22 @@ const DBStats = ({
     }
     await videoPlayerRef.current.playCustomSequences(sequences);
   };
-
   const headerTableRef = useRef(null);
   const headerScrollRef = useRef(null);
-  const listOuterRef = useRef(null); 
- const setHeaderScrollEl = React.useCallback((el) => {
-   headerScrollRef.current = el;
- }, []);
-
- const setBodyOuterEl = React.useCallback((el) => {
-   listOuterRef.current = el;
- }, []);
+  const listOuterRef = useRef(null);
+  const setHeaderScrollEl = React.useCallback((el) => {
+    headerScrollRef.current = el;
+  }, []);
+  const setBodyOuterEl = React.useCallback((el) => {
+    listOuterRef.current = el;
+  }, []);
   const listRef = useRef(null);
-
   const rowHeightsRef = useRef(new Map());
   const getItemSize = (index) => {
     const hasSpacer = totalPx > viewportW;
     if (hasSpacer && index === filteredStats.length) return HSCROLL_PX;
     return rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
   };
-
   const getTotalListHeight = () => {
     let sum = 0;
     const map = rowHeightsRef.current;
@@ -194,24 +183,20 @@ const DBStats = ({
     const unknownCount = Math.max(0, filteredStats.length - map.size);
     sum += unknownCount * ROW_HEIGHT;
     return sum;
-  };  
-
+  };
   const [vh60, setVh60] = useState(() => Math.round(window.innerHeight * 0.60));
   useEffect(() => {
     const onResize = () => setVh60(Math.round(window.innerHeight * 0.60));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);  
-
+  }, []);
   const [columnWidths, setColumnWidths] = useState({});
   const [listNonce, setListNonce] = useState(0);
   const [measuredColPx, setMeasuredColPx] = useState({});
-
   const orderedKeys = useMemo(() => {
     () => (visibleColumns?.notes?.visible ? 400 : 60);
     return Object.keys(visibleColumns).filter(k => visibleColumns[k]?.visible);
   }, [visibleColumns]);
-
   const bodyColumns = useMemo(() => {
     const cols = [];
     if (editMode === 'admin') cols.push({ key: '__insert__' });
@@ -223,12 +208,10 @@ const DBStats = ({
     if (editMode === 'admin') cols.push({ key: '__delete__' });
     return cols;
   }, [orderedKeys, visibleColumns, editMode]);
-
   const flexKey = useMemo(() => {
     const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__');
     return keys.includes('notes') ? 'notes' : keys[keys.length - 1];
-  }, [bodyColumns]); 
-
+  }, [bodyColumns]);
   useLayoutEffect(() => {
     if (!headerTableRef.current) return;
     const ths = headerTableRef.current.querySelectorAll('thead th[data-key]');
@@ -244,8 +227,7 @@ const DBStats = ({
       }
     });
     setColumnWidths(next);
-  }, [flexKey, orderedKeys]);  
-
+  }, [flexKey, orderedKeys]);
   useEffect(() => {
     if (!headerTableRef.current) return;
     const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__');
@@ -260,7 +242,7 @@ const DBStats = ({
     });
     setColumnWidths(next);
   }, [bodyColumns, flexKey]);
-  
+
   // Track live measured header cell widths
   useLayoutEffect(() => {
     const table = headerTableRef.current;
@@ -284,7 +266,7 @@ const DBStats = ({
     ths.forEach((th) => ro.observe(th));
     return () => ro.disconnect();
   }, [visibleColumns, sortConfig, textColumnFilters, editMode]);
-  
+
   const didInitialAutofit = useRef(false);
   useLayoutEffect(() => {
     if (didInitialAutofit.current) return;
@@ -306,18 +288,16 @@ const DBStats = ({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [bodyColumns, flexKey]);
-
   useEffect(() => {
     if (!headerTableRef.current || !listOuterRef.current) return;
     const keys = bodyColumns.map(c => c.key).filter(k => k !== '__insert__' && k !== '__delete__' && k !== flexKey);
     keys.forEach(k => autofitColumn(k));
   }, [bodyColumns, flexKey]);
-
   const [viewportW, setViewportW] = useState(0);
-  
+
   useLayoutEffect(() => {
     const headerEl = headerScrollRef.current;
-    const bodyEl   = listOuterRef.current;
+    const bodyEl = listOuterRef.current;
     const containerEl = mainContentRef?.current || bodyEl || headerEl;
     const read = () => {
       const w = (bodyEl?.clientWidth ?? headerEl?.clientWidth ?? 0);
@@ -335,25 +315,20 @@ const DBStats = ({
     };
     window.addEventListener('resize', onLayout);
     window.addEventListener('db_layout_change', onLayout);
-
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', onLayout);
       window.removeEventListener('db_layout_change', onLayout);
     };
   }, [mainContentRef]);
-
   const { gridTemplate, canFit, totalPx } = useMemo(() => {
     const available = viewportW;
     const widthForFixed = (key) => {
       if (key === '__insert__' || key === '__delete__') return 32;
-
       const explicit = columnWidths[key];
       if (explicit != null) return Math.max(MIN_COL_PX, Math.floor(explicit));
-
       const measured = measuredColPx[key];
       if (measured != null) return Math.max(MIN_COL_PX, Math.floor(measured));
-
       if (key === 'notes') return 200;
       return 120;
     };
@@ -376,13 +351,12 @@ const DBStats = ({
     const totalPxLocal = canFitLocal ? fixedPx + FLEX_MIN_PX : fixedPx + pinnedFlexPx;
     return { gridTemplate: template, canFit: canFitLocal, totalPx: totalPxLocal };
   }, [bodyColumns, columnWidths, measuredColPx, flexKey, viewportW, FLEX_MIN_PX]);
-
   useLayoutEffect(() => {
     listRef.current?.resetAfterIndex(0, true);
   }, [gridTemplate, columnWidths, viewportW]);
-  
+
   const [isResizingCol, setIsResizingCol] = useState(false);
-  
+
   useEffect(() => {
     const onStart = () => setIsResizingCol(true);
     const onEnd = () => {
@@ -398,7 +372,7 @@ const DBStats = ({
       window.removeEventListener('db_col_resize_end', onEnd);
     };
   }, []);
-  
+
   useEffect(() => {
     rowHeightsRef.current.clear();
     requestAnimationFrame(() => {
@@ -406,17 +380,15 @@ const DBStats = ({
     });
   }, [orderedKeys, gridTemplate]);
 
-  
   const filteredKey = React.useMemo(
     () => filteredStats.map(r => r.id).join('|'),
     [filteredStats]
   );
-  
+
   useEffect(() => {
     rowHeightsRef.current.clear();
     listRef.current?.resetAfterIndex(0, true);
-  }, [filteredStats, gridTemplate]);  
-
+  }, [filteredStats, gridTemplate]);
   const toggleGameField = async (field, value) => {
     if (!gameId) return;
     try {
@@ -443,7 +415,7 @@ const DBStats = ({
         refreshStats();
         if (refreshGames) refreshGames();
         return;
-      }      
+      }
       const { error } = await supabase
         .from('games')
         .update({ [field]: value })
@@ -458,7 +430,6 @@ const DBStats = ({
       setToast(`Error updating ${field}`);
     }
   };
-
   const navigateToEditableCell = ({ idx, field, direction }) => {
     const keys = orderedKeys.filter((k) => k !== 'timestamp' && k !== 'score');
     const isEditable = (fieldName) => {
@@ -498,17 +469,16 @@ const DBStats = ({
       }
     }
   };
-
   const scrollSyncRef = useRef({ header: null, body: null, onHeader: null, onBody: null });
   useLayoutEffect(() => {
     const headerEl = headerScrollRef.current;
-    const bodyEl   = listOuterRef.current;
+    const bodyEl = listOuterRef.current;
     const prev = scrollSyncRef.current;
     const headerChanged = prev.header !== headerEl;
-    const bodyChanged   = prev.body   !== bodyEl;
+    const bodyChanged = prev.body !== bodyEl;
     if (!headerChanged && !bodyChanged) return;
     if (prev.header && prev.onHeader) prev.header.removeEventListener('scroll', prev.onHeader);
-    if (prev.body   && prev.onBody)   prev.body.removeEventListener('scroll',   prev.onBody);
+    if (prev.body && prev.onBody) prev.body.removeEventListener('scroll', prev.onBody);
     if (!headerEl || !bodyEl) {
       scrollSyncRef.current = { header: headerEl, body: bodyEl, onHeader: null, onBody: null };
       return;
@@ -521,26 +491,23 @@ const DBStats = ({
       requestAnimationFrame(() => { isSyncing = false; });
     };
     const onHeader = () => sync(headerEl, bodyEl);
-    const onBody   = () => sync(bodyEl, headerEl);
-
+    const onBody = () => sync(bodyEl, headerEl);
     headerEl.addEventListener('scroll', onHeader, { passive: true });
-    bodyEl.addEventListener('scroll',   onBody,   { passive: true });
+    bodyEl.addEventListener('scroll', onBody, { passive: true });
     headerEl.scrollLeft = bodyEl.scrollLeft;
     scrollSyncRef.current = { header: headerEl, body: bodyEl, onHeader, onBody };
   });
-
   useEffect(() => {
     return () => {
       const { header, body, onHeader, onBody } = scrollSyncRef.current;
       if (header && onHeader) header.removeEventListener('scroll', onHeader);
-      if (body   && onBody)   body.removeEventListener('scroll',   onBody);
+      if (body && onBody) body.removeEventListener('scroll', onBody);
     };
   }, []);
-
   const Row = ({ index, style }) => {
     if (totalPx > viewportW && index === filteredStats.length) {
       return <div style={{ ...style, height: HSCROLL_PX }} />;
-    }    
+    }
     const rowRef = useRef(null);
     const measureAndCommit = useCallback(() => {
       const el = rowRef.current;
@@ -557,7 +524,6 @@ const DBStats = ({
         });
       }
     }, [index]);
-
     useEffect(() => {
       const onMaybeGrow = (e) => {
         if (e?.detail?.index !== index) return;
@@ -565,19 +531,18 @@ const DBStats = ({
       };
       window.addEventListener('db_row_maybe_grow', onMaybeGrow);
       return () => window.removeEventListener('db_row_maybe_grow', onMaybeGrow);
-    }, [index, measureAndCommit]);   
-    
+    }, [index, measureAndCommit]);
+
     useLayoutEffect(() => {
       if (!rowRef.current) return;
       const measure = () => {
         const el = rowRef.current;
         if (!el) return;
-
-    const prevInline = el.style.height;
-    el.style.height = 'auto';
-    const natural = Math.ceil(el.getBoundingClientRect().height);
-    el.style.height = prevInline;
-    const h = Math.max(ROW_HEIGHT, natural) + 1;
+        const prevInline = el.style.height;
+        el.style.height = 'auto';
+        const natural = Math.ceil(el.getBoundingClientRect().height);
+        el.style.height = prevInline;
+        const h = Math.max(ROW_HEIGHT, natural) + 1;
         const prev = rowHeightsRef.current.get(index) ?? ROW_HEIGHT;
         const DIFF_THRESHOLD = 2;
         if (Math.abs(h - prev) > DIFF_THRESHOLD) {
@@ -585,7 +550,6 @@ const DBStats = ({
           listRef.current?.resetAfterIndex(index, true);
         }
       };
-
       measure();
       const ro = new ResizeObserver(measure);
       ro.observe(rowRef.current);
@@ -598,7 +562,7 @@ const DBStats = ({
         if (raf) cancelAnimationFrame(raf);
       };
     }, [index, filteredStats, gridTemplate, isResizingCol]);
-    
+
     const s = filteredStats[index];
     const prevRow = index > 0 ? filteredStats[index - 1] : null;
     const idx = index;
@@ -615,7 +579,6 @@ const DBStats = ({
         mainContentRef.current.scrollTo({ top: 0 });
       }
     } : undefined;
-
     return (
       <div
         ref={rowRef}
@@ -629,7 +592,7 @@ const DBStats = ({
             <button
               className="w-6 h-6 flex items-center justify-center rounded-full hover:scale-110 transition-transform"
               onClick={async (e) => {
-                e.stopPropagation();            
+                e.stopPropagation();
                 const newRow = {
                   game_id: s.game_id,
                   rally_id: s.rally_id,
@@ -649,7 +612,7 @@ const DBStats = ({
                   updated.splice(i + 1, 0, inserted);
                   setStats(updated);
                   return;
-                }                
+                }
                 const { data, error } = await supabase
                   .from('stats')
                   .insert([newRow])
@@ -675,7 +638,6 @@ const DBStats = ({
             </button>
           </div>
         )}
-
         {visibleColumns.timestamp?.visible && (
           <div
             role="cell"
@@ -683,7 +645,7 @@ const DBStats = ({
             className={`db-cell ${editMode === 'admin' || editMode === 'editor' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={editMode === 'admin' ? async (e) => {
-              e.stopPropagation(); 
+              e.stopPropagation();
               const currentTimestamp = videoRef.current?.currentTime ?? 0;
               if (practiceMode) {
                 const statIndex = stats.findIndex(row => row.id === s.id);
@@ -709,22 +671,22 @@ const DBStats = ({
                 }
               }
             }
-            : editMode === 'editor'
-            ? (e) => {
-                e.stopPropagation();
-                const validTimestamps = stats.slice(0, idx).map(r => r.timestamp).filter(Boolean);
-                if (s.timestamp != null) jumpToTime(s.timestamp);
-                else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);
-                if (
-                  layoutMode === 'stacked' &&
-                  !document.pictureInPictureElement &&
-                  mainContentRef.current
-                ) {
-                  mainContentRef.current.scrollTo({ top: 0 });
+              : editMode === 'editor'
+                ? (e) => {
+                  e.stopPropagation();
+                  const validTimestamps = stats.slice(0, idx).map(r => r.timestamp).filter(Boolean);
+                  if (s.timestamp != null) jumpToTime(s.timestamp);
+                  else if (validTimestamps.length > 0) jumpToTime(validTimestamps[validTimestamps.length - 1]);
+                  if (
+                    layoutMode === 'stacked' &&
+                    !document.pictureInPictureElement &&
+                    mainContentRef.current
+                  ) {
+                    mainContentRef.current.scrollTo({ top: 0 });
+                  }
                 }
-              }
-            : undefined
-        }
+                : undefined
+            }
           >
             {s.timestamp != null ? (
               <span className="leading-normal">{formatTimestamp(s.timestamp)}</span>
@@ -733,15 +695,14 @@ const DBStats = ({
             )}
           </div>
         )}
-
         {orderedKeys.map((field) => {
           if (!visibleColumns[field]?.visible || field === 'score' || field === 'timestamp') return null;
           const highlightClass =
             field === 'our_score' && prevRow && s[field] > prevRow[field]
               ? 'bg-green-100 hover:bg-green-200 text-green-800'
               : field === 'opp_score' && prevRow && s[field] > prevRow[field]
-              ? 'bg-red-100 hover:bg-red-200 text-red-800'
-              : '';
+                ? 'bg-red-100 hover:bg-red-200 text-red-800'
+                : '';
           const editableFieldsInEditorMode = [
             'player',
             'action_type',
@@ -776,7 +737,6 @@ const DBStats = ({
             </div>
           );
         })}
-
         {editMode === 'admin' && (
           <div role="cell" className="db-cell" style={{ alignItems: 'center' }}>
             <button
@@ -787,7 +747,7 @@ const DBStats = ({
                   const updated = stats.filter(row => row.id !== s.id);
                   setStats(updated);
                   return;
-                }             
+                }
                 const { error } = await supabase
                   .from('stats')
                   .delete()
@@ -816,11 +776,9 @@ const DBStats = ({
       </div>
     );
   };
-
   const renderHeader = () => (
     <tr>
       {editMode === 'admin' && <th data-key="__insert__" className="border-b border-gray-300" style={{ width: 32 }} />}
-
       {orderedKeys.map((key) => {
         const config = visibleColumns[key];
         if (key === 'score') {
@@ -862,7 +820,6 @@ const DBStats = ({
           );
         }
         if (["our_score", "opp_score"].includes(key) && visibleColumns.score?.visible) return null;
-
         return (
           <SortableFilterHeader
             key={key}
@@ -884,11 +841,9 @@ const DBStats = ({
           />
         );
       })}
-
       {editMode === 'admin' && <th data-key="__delete__" className="border-b border-gray-300" style={{ width: 32 }} />}
     </tr>
   );
-
   const autofitColumn = (key) => {
     const th = headerTableRef.current?.querySelector(`thead th[data-key="${key}"]`);
     const current = th?.getBoundingClientRect().width ?? 0;
@@ -935,7 +890,6 @@ const DBStats = ({
     });
   };
   const EMPTY_MIN = 160;
-
   useLayoutEffect(() => {
     didInitialAutofit.current = false;
     setMeasuredColPx({});
@@ -950,7 +904,6 @@ const DBStats = ({
       listRef.current?.resetAfterIndex?.(0, true);
     });
   }, [layoutMode, flexKey]);
-
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar shown when filters are active */}
@@ -1004,19 +957,18 @@ const DBStats = ({
             : filteredStats.length === 0
               ? { height: Math.min(vh60, EMPTY_MIN), minHeight: EMPTY_MIN, zIndex: 0 }
               : {
-                  height: Math.min(
-                    vh60,
-                    getTotalListHeight() + (totalPx > viewportW ? HSCROLL_PX : 0)
-                  ),
-                  zIndex: 0,
-                } }
+                height: Math.min(
+                  vh60,
+                  getTotalListHeight() + (totalPx > viewportW ? HSCROLL_PX : 0)
+                ),
+                zIndex: 0,
+              }}
       >
         {filteredStats.length > 0 ? (
           <AutoSizer>
             {({ height, width }) => {
               const contentHeight = getTotalListHeight() + (totalPx > viewportW ? HSCROLL_PX : 0);
               const listHeight = Math.min(height, contentHeight);
-
               return (
                 <List
                   key={listRef}
@@ -1026,7 +978,7 @@ const DBStats = ({
                   itemCount={filteredStats.length + (totalPx > viewportW ? 1 : 0)}
                   itemSize={getItemSize}
                   overscanCount={10}
-                  estimatedItemSize={ROW_HEIGHT} 
+                  estimatedItemSize={ROW_HEIGHT}
                   outerElementType={OuterDiv}
                   innerElementType={InnerDiv}
                   outerRef={setBodyOuterEl}
@@ -1054,16 +1006,16 @@ const DBStats = ({
         >
           {editMode === 'admin' && (
             <button className={`bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow mt-1 ${isMobile ? 'w-full mt-4' : 'w-auto'}`}
-              onClick={async () => {               
+              onClick={async () => {
                 const lastWithData = [...stats].reverse().find(r =>
                   r &&
                   (r.game_id != null ||
-                   r.rally_id != null ||
-                   r.import_seq != null ||
-                   r.our_score != null ||
-                   r.opp_score != null ||
-                   r.set != null ||
-                   r.team_id != null)
+                    r.rally_id != null ||
+                    r.import_seq != null ||
+                    r.our_score != null ||
+                    r.opp_score != null ||
+                    r.set != null ||
+                    r.team_id != null)
                 );
                 const resolvedGameId = lastWithData?.game_id ?? gameId;
                 const resolvedTeamId = lastWithData?.team_id ?? teamId;
@@ -1136,51 +1088,51 @@ const DBStats = ({
               }}
             >
               ➕ Add 10 Rows to Bottom
-          </button>
-        )}
-        <div className={`${isMobile ? 'w-full' : 'w-auto'} mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md`}>
-          <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">🛠 Update Game Settings</h3>
-          <div className="flex flex-col space-y-3">
-            <div className="flex justify-between items-center w-full">
-              <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
-              <select
-                disabled={editMode !== 'admin'}
-                className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${editMode !== 'admin' ? 'opacity-50' : ''}`}
-                value={gameSettings.hastimestamps ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value === 'true';
-                  setGameSettings(prev => ({ ...prev, hastimestamps: value }));
-                  toggleGameField('hastimestamps', value);
-                }}
-              >
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
-            </div>
-            <div className="flex justify-between items-center w-full">
-              <label className="text-sm font-medium text-gray-700">Is Scored:</label>
-              <select
-                disabled={!(editMode === 'admin' || editMode === 'editor')}
-                className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
-                value={gameSettings.isscored ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value === 'true';
-                  const prev = gameSettings.isscored;
-                  setGameSettings((p) => ({ ...p, isscored: value }));
-                  toggleGameField('isscored', value, prev);
-                }}
-              >
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
+            </button>
+          )}
+          <div className={`${isMobile ? 'w-full' : 'w-auto'} mt-1 px-4 py-3 border rounded bg-gray-50 shadow-md`}>
+            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-1">🛠 Update Game Settings</h3>
+            <div className="flex flex-col space-y-3">
+              <div className="flex justify-between items-center w-full">
+                <label className="text-sm font-medium text-gray-700">Has Timestamps:</label>
+                <select
+                  disabled={editMode !== 'admin'}
+                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${editMode !== 'admin' ? 'opacity-50' : ''}`}
+                  value={gameSettings.hastimestamps ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value === 'true';
+                    setGameSettings(prev => ({ ...prev, hastimestamps: value }));
+                    toggleGameField('hastimestamps', value);
+                  }}
+                >
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+              <div className="flex justify-between items-center w-full">
+                <label className="text-sm font-medium text-gray-700">Is Scored:</label>
+                <select
+                  disabled={!(editMode === 'admin' || editMode === 'editor')}
+                  className={`border border-gray-300 bg-white rounded px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${!(editMode === 'admin' || editMode === 'editor') ? 'opacity-50' : ''}`}
+                  value={gameSettings.isscored ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value === 'true';
+                    const prev = gameSettings.isscored;
+                    setGameSettings((p) => ({ ...p, isscored: value }));
+                    toggleGameField('isscored', value, prev);
+                  }}
+                >
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
             </div>
           </div>
+          <button className={`${isMobile ? 'w-full' : 'w-auto'} mb-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1`} onClick={refreshStats}>🔄 Refresh Table from Database</button>
         </div>
-        <button className={`${isMobile ? 'w-full' : 'w-auto'} mb-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 shadow mt-1`} onClick={refreshStats}>🔄 Refresh Table from Database</button>
-      </div>     
-    )}  
-    <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />         
-    <style>{`
+      )}
+      <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />
+      <style>{`
       .db-row { border-bottom: 1px solid #e5e7eb; }
       .db-cell { padding: 2px 4px; display: flex; align-items: center; justify-content: center; }
       .db-cell input, .db-cell select { height: auto; }
@@ -1188,7 +1140,6 @@ const DBStats = ({
       .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
       table { table-layout: fixed; border-collapse: collapse; width: 100%; }
       thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 200; }
-
       .db-x-scroll::-webkit-scrollbar { height: 0px; }
       .db-x-scroll { scrollbar-width: none; overflow-y: visible; position: relative; }
       .db-list-outer {
@@ -1225,8 +1176,7 @@ const DBStats = ({
         border-radius: 9999px;
       }        
     `}</style>
-  </div>
+    </div>
   );
 };
-
 export default DBStats;

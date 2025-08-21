@@ -2,7 +2,6 @@ import React from 'react';
 import Select from 'react-select';
 import { FaCircle } from 'react-icons/fa';
 import TooltipPortal from '../utils/tooltipPortal';
-
 export const selectStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
   control: (base) => ({
@@ -40,13 +39,11 @@ export const selectStyles = {
     textOverflow: 'ellipsis',
   }),
 };
-
 // Tooltip-aware icon
 const TooltipIcon = ({ color, tooltip }) => {
   const [hovered, setHovered] = React.useState(false);
   const iconRef = React.useRef(null);
   const [coords, setCoords] = React.useState({ top: 0, left: 0 });
-
   React.useEffect(() => {
     if (hovered && iconRef.current) {
       const rect = iconRef.current.getBoundingClientRect();
@@ -56,7 +53,6 @@ const TooltipIcon = ({ color, tooltip }) => {
       });
     }
   }, [hovered]);
-
   return (
     <>
       <div
@@ -84,7 +80,6 @@ const TooltipIcon = ({ color, tooltip }) => {
     </>
   );
 };
-
 // Value renderer
 const CustomSingleValue = ({ data, selectProps }) => (
   <div className="flex w-full items-center justify-between text-sm">
@@ -100,7 +95,6 @@ const CustomSingleValue = ({ data, selectProps }) => (
     )}
   </div>
 );
-
 // Option renderer
 const CustomOption = ({ data, innerRef, innerProps, selectProps }) => (
   <div
@@ -120,7 +114,6 @@ const CustomOption = ({ data, innerRef, innerProps, selectProps }) => (
     )}
   </div>
 );
-
 // Main component
 const StyledSelect = ({
   options,
@@ -149,5 +142,4 @@ const StyledSelect = ({
     />
   );
 };
-
 export default StyledSelect;

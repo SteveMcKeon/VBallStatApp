@@ -3,30 +3,25 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import FloatingLabelInput from './FloatingLabelInput';
 import Toast from './Toast';
-
 function useQuery() {
   return new URLSearchParams(useLocation().search);
 }
-
 const Center = ({ children, max = 'max-w-sm' }) => (
   <div className="min-h-screen w-full flex items-center justify-center px-4">
     <div className={`w-full ${max}`}>{children}</div>
   </div>
 );
-
 export default function AcceptInvite() {
   const q = useQuery();
   const navigate = useNavigate();
   const inviteToken = q.get('token');
-  const teamId      = q.get('team');
-  const confirmUrl  = q.get('confirmation_url');
-
+  const teamId = q.get('team');
+  const confirmUrl = q.get('confirmation_url');
   const [status, setStatus] = useState('working');
   const [err, setErr] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [teamName, setTeamName] = useState('');
-
   // Toast state (match Login/Register API)
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
@@ -55,15 +50,13 @@ export default function AcceptInvite() {
         .eq('id', tid)
         .maybeSingle();
       if (team?.name) setTeamName(team.name);
-    } catch {/* ignore */}
+    } catch {/* ignore */ }
   }
-
   useEffect(() => {
     (async () => {
       setStatus('working');
       setErr('');
       loadTeamName({ teamIdArg: teamId, tokenArg: inviteToken });
-
       // Ensure we have a session (verify invite confirmation link when needed)
       let { data: { session } } = await supabase.auth.getSession();
       if (!session && confirmUrl) {
@@ -89,14 +82,12 @@ export default function AcceptInvite() {
           return;
         }
       }
-
       if (!session) {
         setErr('Missing or invalid authentication token');
         setStatus('need-auth');
         showToastMsg('Missing or invalid authentication token', 'error');
         return;
       }
-
       // Try accepting invite (non-fatal if already accepted)
       if (inviteToken) {
         const { error } = await supabase.rpc('accept_invite', { p_token: inviteToken });
@@ -108,14 +99,12 @@ export default function AcceptInvite() {
           persistTeamToLocal(teamId, teamName);
         }
       }
-
       const { data: { user } } = await supabase.auth.getUser();
       const hasName = !!(
         user?.user_metadata?.display_name ||
         user?.user_metadata?.full_name ||
         user?.user_metadata?.name
       );
-
       if (!hasName) {
         setStatus('profile');
       } else {
@@ -126,7 +115,6 @@ export default function AcceptInvite() {
       }
     })();
   }, []);
-
   const saveProfile = async (e) => {
     e.preventDefault();
     setErr('');
@@ -153,7 +141,6 @@ export default function AcceptInvite() {
       showToastMsg(msg, 'error');
     }
   };
-
   if (status === 'working') {
     return (
       <>
@@ -173,7 +160,6 @@ export default function AcceptInvite() {
       </>
     );
   }
-
   if (status === 'need-auth') {
     return (
       <>
@@ -209,7 +195,6 @@ export default function AcceptInvite() {
       </>
     );
   }
-
   if (status === 'profile') {
     return (
       <>
@@ -260,7 +245,6 @@ export default function AcceptInvite() {
       </>
     );
   }
-
   return (
     <>
       <Center>

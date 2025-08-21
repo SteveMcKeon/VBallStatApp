@@ -1,14 +1,13 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect  } from 'react';
-
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
 const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase, practiceMode = false, parentHasHighlight = false }, ref) => {
   const RALLY_FIELD = 'rally_id';
-  const SET_FIELD = 'set';  
+  const SET_FIELD = 'set';
   const RALLY_START = 1;
   const RESULT_OPTIONS = ['Won Point', 'Lost Point'];
   const POSITION_OPTIONS = ['Power', 'Middle', 'Opposite', 'Backrow'];
   const ACTION_TYPE_OPTIONS = [
     'Serve', 'Pass', 'Set', 'Tip', 'Hit', 'Block', 'Dig', 'Free'
-  ];  
+  ];
   const [interactionMode, setInteractionMode] = useState('keyboard');
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -16,12 +15,12 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value ?? '');
   const inputRef = useRef(null);
-  const wrapperRef = useRef(null); 
+  const wrapperRef = useRef(null);
   const [cellHeight, setCellHeight] = useState(null);
-  const [cellWidth, setCellWidth] = useState(null);  
+  const [cellWidth, setCellWidth] = useState(null);
   const displayRef = useRef(null);
   const ghostRef = useRef(null);
-  const lastAnnouncedH = useRef(0);  
+  const lastAnnouncedH = useRef(0);
   const isValidValue = () => {
     if ((value == null || value === '') && field !== 'set_to_position' && field !== 'set_to_player') return true;
     if (field === 'set_to_player') {
@@ -71,24 +70,24 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     if (s === 'l' || s === 'loss' || s.startsWith('lost')) return 'Lost Point';
     return null;
   };
-  const commitEdit = async (rawNext) => {   
+  const commitEdit = async (rawNext) => {
     let parsed = rawNext;
     const isBlank =
-      ['int2','int4','int8','float4','float8','numeric'].includes(type)
+      ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric'].includes(type)
         ? rawNext?.trim?.() === '' : rawNext === '';
-    if (['int2','int4','int8'].includes(type)) parsed = isBlank ? null : parseInt(rawNext);
-    else if (['float4','float8','numeric'].includes(type)) parsed = isBlank ? null : parseFloat(rawNext);
+    if (['int2', 'int4', 'int8'].includes(type)) parsed = isBlank ? null : parseInt(rawNext);
+    else if (['float4', 'float8', 'numeric'].includes(type)) parsed = isBlank ? null : parseFloat(rawNext);
     else parsed = isBlank ? null : rawNext;
     if (field === 'result') parsed = normalizeResult(parsed);
     const toNum = v => (v === null || v === undefined || v === '' ? null : Number(v));
     const prevComparable =
       field === 'result' ? normalizeResult(value)
-      : (field === 'our_score' || field === 'opp_score') ? toNum(value)
-      : (value ?? '');
+        : (field === 'our_score' || field === 'opp_score') ? toNum(value)
+          : (value ?? '');
     const nextComparable =
       field === 'result' ? normalizeResult(parsed)
-      : (field === 'our_score' || field === 'opp_score') ? toNum(parsed)
-      : (parsed ?? '');
+        : (field === 'our_score' || field === 'opp_score') ? toNum(parsed)
+          : (parsed ?? '');
     if (prevComparable === nextComparable) return;
     patchRowsRef.current = null;
     setStats(prev => {
@@ -189,7 +188,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     });
     if (practiceMode) {
       return;
-    }    
+    }
     const { error: updErr } = await supabase
       .from('stats')
       .update({ [field]: parsed })
@@ -221,7 +220,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       await batch(patchRows);
     }
   };
-  
+
   const handleBlur = async (e) => {
     if (!editing) return;
     if (e?.relatedTarget && wrapperRef.current?.contains(e.relatedTarget)) return;
@@ -230,7 +229,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       commitEdit(tempValue);
     }, 0);
   };
-
   const handleKeyDown = async (e) => {
     e.stopPropagation();
     const key = e.key;
@@ -285,7 +283,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
         setTempValue(selected);
         setEditing(false);
         setTimeout(() => commitEdit(selected), 0);
-
         if (setEditingCell) {
           setTimeout(() => {
             setEditingCell({
@@ -304,7 +301,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       const end = e.target.selectionEnd;
       const newValue = tempValue.substring(0, start) + '\n' + tempValue.substring(end);
       setTempValue(newValue);
-
       requestAnimationFrame(() => {
         inputRef.current.selectionStart = inputRef.current.selectionEnd = start + 1;
       });
@@ -313,7 +309,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     if (!e.shiftKey && !e.altKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
       const { selectionStart, selectionEnd } = e.target;
       const cursorPos = selectionStart;
-      const text = (tempValue ?? '').toString();    
+      const text = (tempValue ?? '').toString();
       const isMultiline = text.includes('\n');
       const lines = text.split('\n');
       const lineIndex = text.slice(0, cursorPos).split('\n').length - 1;
@@ -323,19 +319,19 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       const isAtEnd = isCollapsed && cursorPos === text.length;
       const direction =
         (key === 'ArrowLeft' && isAtStart) ? 'prev' :
-        (key === 'ArrowRight' && isAtEnd) ? 'next' :
-        (key === 'ArrowUp' && lineIndex === 0) ? 'up' :
-        (key === 'ArrowDown' && lineIndex === lines.length - 1) ? 'down' :
-        null;
+          (key === 'ArrowRight' && isAtEnd) ? 'next' :
+            (key === 'ArrowUp' && lineIndex === 0) ? 'up' :
+              (key === 'ArrowDown' && lineIndex === lines.length - 1) ? 'down' :
+                null;
       if (direction && setEditingCell) {
         e.preventDefault();
-        handleBlur(); 
+        handleBlur();
         setTimeout(() => {
           setEditingCell({ idx, field, direction });
         }, 0);
         return;
       }
-    }    
+    }
     if (key === 'Enter' || key === 'Tab') {
       e.preventDefault();
       const direction = key === 'Tab'
@@ -351,7 +347,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       return;
     }
   };
-  
+
   useImperativeHandle(ref, () => ({
     focusInput: () => {
       inputRef.current?.focus();
@@ -362,12 +358,12 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     },
     element: inputRef.current || wrapperRef.current
   }));
-  
+
   useLayoutEffect(() => {
     if (!editing) return;
     measureGhost();
   }, [editing, tempValue]);
-  
+
   useEffect(() => {
     if (!editing) return;
     let options = [];
@@ -377,7 +373,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       options = RESULT_OPTIONS;
     } else if (field === 'action_type') {
       options = ACTION_TYPE_OPTIONS;
-    } else if (field === 'set_to_position') {  
+    } else if (field === 'set_to_position') {
       options = POSITION_OPTIONS;
     }
     const trimmedInput = (tempValue ?? '').toString().trim().toLowerCase();
@@ -398,7 +394,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       el.select();
     }
   }, [editing]);
-
   return (
     editing ? (
       <div ref={wrapperRef} className="relative w-full editable-cell-wrapper">
@@ -428,8 +423,8 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
             outline: 'none',
             boxSizing: 'border-box',
             overflow: 'hidden',
-          }}   
-           value={tempValue}
+          }}
+          value={tempValue}
           onChange={(e) => {
             setTempValue(e.target.value);
             requestAnimationFrame(measureGhost);
@@ -452,34 +447,33 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
               }
             }}
           >
-          {suggestions.map((sug, i) => (
-            <li
-              key={i}
-              className={`px-2 py-1 cursor-pointer ${
-                i === selectedSuggestionIndex
-                  ? 'bg-blue-100 text-black'
-                  : interactionMode === 'mouse'
-                    ? 'hover:bg-blue-100'
-                    : ''
-              }`}
-              onMouseEnter={() => {
-                if (interactionMode === 'mouse') {
-                  setSelectedSuggestionIndex(i);
-                }
-              }}
-              onMouseDown={async (e) => {
-                e.preventDefault();
-                setShowSuggestions(false);
-                setTempValue(sug);
-                await commitEdit(sug);
-                setTimeout(() => inputRef.current?.focus(), 0);
-              }}
-            >
-              {sug}
-            </li>
-          ))}
+            {suggestions.map((sug, i) => (
+              <li
+                key={i}
+                className={`px-2 py-1 cursor-pointer ${i === selectedSuggestionIndex
+                    ? 'bg-blue-100 text-black'
+                    : interactionMode === 'mouse'
+                      ? 'hover:bg-blue-100'
+                      : ''
+                  }`}
+                onMouseEnter={() => {
+                  if (interactionMode === 'mouse') {
+                    setSelectedSuggestionIndex(i);
+                  }
+                }}
+                onMouseDown={async (e) => {
+                  e.preventDefault();
+                  setShowSuggestions(false);
+                  setTempValue(sug);
+                  await commitEdit(sug);
+                  setTimeout(() => inputRef.current?.focus(), 0);
+                }}
+              >
+                {sug}
+              </li>
+            ))}
           </ul>
-        )}      
+        )}
         <div
           ref={ghostRef}
           aria-hidden
@@ -491,10 +485,10 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
             padding: 0,
             margin: 0,
           }}
-        >     
-        {(tempValue || ' ') + '\n'}      
+        >
+          {(tempValue || ' ') + '\n'}
+        </div>
       </div>
-    </div>
     ) : (
       <div
         ref={wrapperRef}
@@ -518,7 +512,5 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       </div>
     )
   );
-
 });
-
 export default EditableCell;

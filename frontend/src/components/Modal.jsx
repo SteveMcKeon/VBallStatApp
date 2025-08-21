@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-
 const Modal = ({
   isOpen,
   onClose,
@@ -9,7 +8,6 @@ const Modal = ({
   closeOnEsc = true,
 }) => {
   const overlayRef = useRef(null);
-
   useEffect(() => {
     if (!isOpen || !closeOnEsc) return;
     const onKeyDown = (e) => {
@@ -21,14 +19,11 @@ const Modal = ({
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [isOpen, closeOnEsc, onClose]);
-
   if (!isOpen) return null;
-
   const handleBackdropPointerDown = (e) => {
     if (!closeOnBackdrop) return;
     if (e.target === overlayRef.current) onClose?.();
   };
-
   const modal = (
     <div
       ref={overlayRef}
@@ -54,5 +49,4 @@ const Modal = ({
   );
   return createPortal(modal, document.body);
 };
-
 export default Modal;
