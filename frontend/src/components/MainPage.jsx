@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import supabase from '../supabaseClient';
 import '../App.css';
 import VideoPlayer from './VideoPlayer';
@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom';
 import GameSelector from './GameSelector';
 import StyledSelect from './StyledSelect';
 import EditMode from './EditMode';
-import EditableCell from './EditableCell';
 import DBStats from './DBStats';
 import SidebarFooter from './SidebarFooter';
 import StatsSummary from './StatsSummary';
@@ -47,6 +46,8 @@ const MainPage = () => {
     supabase,
     onSignOut: () => navigate('/login'),
   });
+  const [filterFrozen, setFilterFrozen] = useState(false);
+  const [frozenRowIds, setFrozenRowIds] = useState([]);
   const sidebarRef = useRef(null);
   const uploadModalRef = useRef();
   const [sidebarContent, setSidebarContent] = useState(null);
@@ -217,7 +218,7 @@ const MainPage = () => {
   const mainContentRef = useRef(null);
   const containerRef = useRef(null);
   const [stats, setStats] = useState([]);
-  const [videoList, setVideoList] = useState([]);
+  const idToRow = useMemo(() => new Map(stats.map(r => [r.id, r])), [stats]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [gameId, setGameId] = useState(null);
   const { editMode, toggleEditMode, allowedRole } = EditMode(teamId);
@@ -444,13 +445,12 @@ const MainPage = () => {
         }
         return res.json();
       })
-      .then(setVideoList)
       .catch(err => {
         console.error('Failed to load videos:', err.message);
       });
   }, []);
   const refreshStats = () => loadStatsForSelectedVideo(selectedVideo);
-  const filteredStats = stats
+  const baseFilteredStats = useMemo(() => stats
     .filter((s) =>
       Object.entries(visibleColumns).some(([key, col]) =>
         col.visible && s[key] !== undefined && s[key] !== null && s[key] !== ''
@@ -537,7 +537,13 @@ const MainPage = () => {
         }
         return result ?? true;
       })
-    );
+    ), [stats, visibleColumns, textColumnFilters]);
+
+  const filteredStats = useMemo(() => {
+    if (!filterFrozen) return baseFilteredStats;
+    return frozenRowIds.map(id => idToRow.get(id)).filter(Boolean);
+  }, [filterFrozen, frozenRowIds, idToRow, baseFilteredStats]);
+
   const sortedStats = [...filteredStats].sort((a, b) => {
     const { key, direction } = sortConfig;
     const aVal = a[key];
@@ -552,26 +558,16 @@ const MainPage = () => {
   const jumpToTime = (t) => {
     videoRef.current.currentTime = t - 1;
   };
-  const renderCell = (field, s, idx, prevRow = null) => {
-    if (!visibleColumns[field]?.visible) return null;
-    return (
-      <td key={field} className={highlightClass}>
-        {editMode ? (
-          <EditableCell
-            value={s[field]}
-            type={visibleColumns[field].type}
-            statId={s.id}
-            field={field}
-            idx={idx}
-            stats={stats}
-            setStats={setStats}
-          />
-        ) : (
-          s[field] ?? ''
-        )}
-      </td>
-    );
-  };
+  const setFilterFrozenSafe = useCallback((next) => {
+    if (next === true) {
+      setFrozenRowIds(baseFilteredStats.map(r => r.id));
+      setFilterFrozen(true);
+    } else if (next === false) {
+      setFilterFrozen(false);
+    } else {
+      setFilterFrozen(!!next);
+    }
+  }, [baseFilteredStats]);
   const formatTimestamp = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -904,6 +900,9 @@ const MainPage = () => {
                       refreshStats={refreshStats}
                       setStats={setStats}
                       filteredStats={sortedStats}
+                      isFiltered={isFiltered}
+                      filterFrozen={filterFrozen}
+                      setFilterFrozen={setFilterFrozenSafe}
                       gamePlayers={gamePlayers}
                       visibleColumns={effectiveVisibleColumns}
                       sortConfig={sortConfig}

@@ -29,6 +29,8 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
   const [isPiP, setIsPiP] = useState(false);
+  const playbackSessionRef = useRef(0);
+
   useImperativeHandle(ref, () => ({
     playCustomSequences: async (sequences) => {
       setIsCustomPlayback(true);
@@ -36,16 +38,24 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       setIsAutoplayOn(false);
       const video = videoRef.current;
       if (!video) return;
+      const sessionId = ++playbackSessionRef.current;
+      video.removeEventListener('timeupdate', video._customPlaybackListener);
+      delete video._customPlaybackListener;
       for (const [start, end] of sequences) {
         if (customPlaybackCancelledRef.current) break;
         await new Promise((resolve) => {
           const onTimeUpdate = () => {
+            if (playbackSessionRef.current !== sessionId) {
+              video.removeEventListener('timeupdate', onTimeUpdate);
+              return;
+            }
             if (video.currentTime >= end) {
               video.removeEventListener('timeupdate', onTimeUpdate);
               video.pause();
               resolve();
             }
           };
+          video._customPlaybackListener = onTimeUpdate;
           video.currentTime = start;
           video.play().then(() => {
             video.addEventListener('timeupdate', onTimeUpdate);
@@ -55,6 +65,8 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           });
         });
       }
+      video.removeEventListener('timeupdate', video._customPlaybackListener);
+      delete video._customPlaybackListener;
       setIsCustomPlayback(false);
     },
     closeControlsOverlay: () => {
@@ -70,6 +82,12 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     stopFilteredTouches: () => {
       setIsCustomPlayback(false);
       customPlaybackCancelledRef.current = true;
+      playbackSessionRef.current++;
+      const video = videoRef.current;
+      if (video && video._customPlaybackListener) {
+        video.removeEventListener('timeupdate', video._customPlaybackListener);
+        delete video._customPlaybackListener;
+      }
     }
   }));
   const getLocal = (key) => localStorage.getItem(key);

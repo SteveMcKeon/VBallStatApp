@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
-const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, setToast, supabase, practiceMode = false, parentHasHighlight = false }, ref) => {
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, onStartEditing, setToast, supabase, practiceMode = false, parentHasHighlight = false }, ref) => {
   const RALLY_FIELD = 'rally_id';
   const SET_FIELD = 'set';
   const RALLY_START = 1;
@@ -156,7 +156,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           .slice(idxInAll)
           .filter(r => r.set === currentSet)
           .map(r => ({ id: r.id, [editKey]: r[editKey] }));
-      } else if (field === 'set') {
+      } else if (field === SET_FIELD) {
         const setVal = toNum(parsed);
         next[idxInAll] = { ...next[idxInAll], set: setVal };
         for (let j = idxInAll + 1; j < next.length; j++) {

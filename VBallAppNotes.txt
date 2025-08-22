@@ -6,7 +6,6 @@ Add resize video option (drag) in side-by-side mode.
 	Shift + -> and <- for seek to set.
 	Shift + n for next video (by date).
 Add contact / bug report / suggestions email?
-Register team, invite other users to team.
 Add comments instead of notes.
 team tactics or certain rotation options - by each team captain (Ask Tamir)
 tracking sets with trajectory overlay
@@ -16,11 +15,9 @@ Update index.html <head> info for SEO
 Ability to draw an overlay on the screen
 Play Filtered Touches should full screen on mobile. delay by a second as well.
 Encode videos like youtube
-combine two docker environments.
 let camera work when not fullscreen.
 add buttons to minisidebar
 add subscription to stats table on game_id to support concurrent users.
-switch to IDE
 investigate uploads on mobile in background
 
 #Fixes

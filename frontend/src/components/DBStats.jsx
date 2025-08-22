@@ -65,6 +65,9 @@ const DBStats = ({
   refreshStats,
   setStats,
   filteredStats,
+  isFiltered,
+  filterFrozen,
+  setFilterFrozen,
   gamePlayers,
   visibleColumns,
   sortConfig,
@@ -106,7 +109,7 @@ const DBStats = ({
       listRef.current?.resetAfterIndex?.(0, true);
     });
   };
-  const isFiltered = useMemo(() => {
+  const isFilteredDBStats = useMemo(() => {
     const filtersObj = textColumnFilters ?? {};
     return Object.values(filtersObj).some((filter) => {
       const conditions = Array.isArray(filter?.conditions) ? filter.conditions : [];
@@ -132,17 +135,24 @@ const DBStats = ({
       .sort((a, b) => a - b);
     if (timestamps.length === 0 || !videoPlayerRef.current) return;
     const sequences = [];
-    let lastEnd = -Infinity;
-    for (let i = 0; i < timestamps.length; i++) {
-      const current = timestamps[i];
-      const next = timestamps[i + 1];
-      const start = current - HIGHLIGHT_PRE_BUFFER;
-      if (start < lastEnd) continue;
-      const defaultEnd = current + HIGHLIGHT_PLAY_DURATION;
-      const nextClipStart = next != null ? next - HIGHLIGHT_PRE_BUFFER : Infinity;
-      const end = nextClipStart < defaultEnd ? next + HIGHLIGHT_PLAY_DURATION : defaultEnd;
+    const PRE = HIGHLIGHT_PRE_BUFFER;
+    const DUR = HIGHLIGHT_PLAY_DURATION;
+    let i = 0;
+    while (i < timestamps.length) {
+      const start = Math.max(0, timestamps[i] - PRE);
+      let end = timestamps[i] + DUR;
+      let j = i + 1;
+      while (j < timestamps.length) {
+        const nextStart = timestamps[j] - PRE;
+        if (nextStart <= end) {
+          end = timestamps[j] + DUR;
+          j++;
+        } else {
+          break;
+        }
+      }
       sequences.push([start, end]);
-      lastEnd = end;
+      i = j;
     }
     if (
       layoutMode === 'stacked' &&
@@ -726,6 +736,9 @@ const DBStats = ({
                   setStats={setStats}
                   gamePlayers={gamePlayers}
                   setEditingCell={navigateToEditableCell}
+                  onStartEditing={() => {
+                    if (isFiltered) setFilterFrozen(true);
+                  }}
                   setToast={setToast}
                   supabase={supabase}
                   practiceMode={practiceMode}
@@ -907,7 +920,7 @@ const DBStats = ({
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar shown when filters are active */}
-      {isFiltered && (
+      {isFilteredDBStats && (
         <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
           <div className="db-toolbar flex items-center gap-3 flex-wrap">
             {filteredStats.length > 0 && (
@@ -921,6 +934,17 @@ const DBStats = ({
               </button>
             )}
             <div className="db-toolbar-spacer flex-1" />
+            {editMode ? (
+            <button
+              className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+                 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700"
+              style={{ minWidth: 0 }}
+              onClick={() => setFilterFrozen(!filterFrozen)}
+              aria-label="Pause filters while editing"
+            >
+              {filterFrozen ? "Resume Filters" : "Pause Filters"}
+            </button>
+            ) : null}
             <button
               onClick={handleClearAllFilters}
               className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
