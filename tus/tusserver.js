@@ -36,8 +36,8 @@ const tusServer = new Server({
 });
 
 const options = {
-  key: fs.readFileSync('./cert/key.pem'),
-  cert: fs.readFileSync('./cert/cert.pem'),
+  key: fs.readFileSync('cert/key.pem'),
+  cert: fs.readFileSync('cert/cert.pem'),
 };
 
 https.createServer(options, (req, res) => {
@@ -45,5 +45,5 @@ https.createServer(options, (req, res) => {
   tusServer.handle(req, res);
 }).listen(3002, '0.0.0.0', () => {
   console.log('TUS HTTPS Server running on port 3002');
-});
+}); 
 

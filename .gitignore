@@ -3,3 +3,5 @@ cert/
 *.exe
 node_modules/
 videos/
+dist/
+nginx.conf

@@ -27,7 +27,6 @@ investigate uploads on mobile in background
 REFACTOR
 Making someone else Captain still makes you Player instead of Editor.
 make invitation email nicer.
-avatar caching breaks if >1 user on same browser
 add Google Auth to acecpt-invite
 on inputting emails, once "Add another..." pops up, enter again should submit.
 demo invite via email doesn't add to roster.
