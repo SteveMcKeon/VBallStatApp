@@ -8,7 +8,6 @@ const RALLY_NAVIGATION_BUFFER = 2;
 const RALLY_EXTRA_END_BUFFER = 3;
 const DOUBLE_TAP_THRESHOLD_MS = 300;
 const SCROLL_THRESHOLD_PX = 15;
-const AUTOPLAY_DELAY_MS = 0;
 const VOLUME_OVERLAY_TIMEOUT_MS = 1000;
 const CONTROLS_TIMEOUT_MS = 3000;
 const INTRO_SKIP_THRESHOLD = 0.5;
@@ -29,6 +28,7 @@ const Key = ({ combo }) => {
 const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, gameId }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
+  const [isPiP, setIsPiP] = useState(false);
   useImperativeHandle(ref, () => ({
     playCustomSequences: async (sequences) => {
       setIsCustomPlayback(true);
@@ -191,6 +191,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   const resetControlsTimer = () => {
     setShowControls(true);
     setHideCursor(false);
+    if (isPiP) return;
     if (controlTimeoutRef.current) clearTimeout(controlTimeoutRef.current);
     controlTimeoutRef.current = setTimeout(() => {
       setShowControls(false);
@@ -339,13 +340,16 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     const container = containerRef.current;
     if (!container) return;
     const events = ["mousemove", "mousedown", "keydown", "touchstart"];
-    events.forEach((event) => container.addEventListener(event, resetControlsTimer));
-    resetControlsTimer();
+    const maybeResetControls = () => {
+      if (!isPiP) resetControlsTimer();
+    };
+    events.forEach((event) => container.addEventListener(event, maybeResetControls));
+    if (!isPiP) resetControlsTimer();
     return () => {
-      events.forEach((event) => container.removeEventListener(event, resetControlsTimer));
+      events.forEach((event) => container.removeEventListener(event, maybeResetControls));
       clearTimeout(controlTimeoutRef.current);
     };
-  }, []);
+  }, [isPiP]);
   useEffect(() => {
     showOverlayRef.current = showOverlay;
   }, [showOverlay]);
@@ -551,11 +555,27 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         duration: video.duration || 0,
       });
     };
+    const handleEnterPiP = () => {
+      setIsPiP(true);
+      setShowControls(true);
+      if (controlTimeoutRef.current) {
+        clearTimeout(controlTimeoutRef.current);
+        controlTimeoutRef.current = null;
+      }
+    };
+    const handleLeavePiP = () => {
+      setIsPiP(false);
+      resetControlsTimer();
+    };
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("enterpictureinpicture", handleEnterPiP);
+    video.addEventListener("leavepictureinpicture", handleLeavePiP);
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("enterpictureinpicture", handleEnterPiP);
+      video.removeEventListener("leavepictureinpicture", handleLeavePiP);
     };
   }, [videoRef]);
   useEffect(() => {
@@ -651,11 +671,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     let lastSpacePress = 0;
     let autoplayInterval;
     let singleTapTimeout;
-    let doubleTapDetected = false;
-    let startX = 0;
-    let startY = 0;
-    let lastTapTime = 0;
-    let didScroll = false;
     // ---- KEYBOARD LISTENER ----
     const handleKeyDown = async (e) => {
       const activeElement = document.activeElement;
@@ -727,15 +742,15 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         case "a":
         case "A":
           setIsAutoplayOn((prev) => !prev);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "ArrowLeft":
           video.currentTime = Math.max(0, video.currentTime - REWIND_AMOUNT);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "ArrowRight":
           video.currentTime += FORWARD_AMOUNT;
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -746,7 +761,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
             setIsMuted(false);
           }
           showVolumeOverlay(video.volume);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "ArrowDown":
           e.preventDefault();
@@ -757,7 +772,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
             setIsMuted(true);
           }
           showVolumeOverlay(video.volume);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case " ":
         case "Spacebar": {
@@ -766,24 +781,24 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           lastSpacePress = now;
           e.preventDefault();
           video.paused ? video.play() : video.pause();
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         }
         case "f":
         case "F":
           document.fullscreenElement ? document.exitFullscreen() : requestFullscreen();
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "c":
         case "C":
           setShowOverlay(!showOverlayRef.current);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "m":
         case "M":
           video.muted = !video.muted;
           setIsMuted(video.muted);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         case "p":
         case "P":
@@ -792,12 +807,10 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
               await document.exitPictureInPicture();
             } else {
               await video.requestPictureInPicture();
-              setShowOverlay(false);
             }
           } catch (err) {
             console.error("PiP failed:", err);
           }
-          resetControlsTimer();
           break;
         case "0":
         case "1":
@@ -812,14 +825,19 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           const percent = parseInt(e.key, 10) / 10;
           video.currentTime = percent * video.duration;
           setIsAutoplayOn(false);
-          resetControlsTimer();
+          if (!isPiP) resetControlsTimer();
           break;
         }
         case "Escape":
           if (document.fullscreenElement) {
             document.exitFullscreen();
           }
-          ref.current?.closeControlsOverlay();
+          if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+          } else {
+            ref.current?.closeControlsOverlay();
+          }
+          resetControlsTimer();
           break;
         default:
           break;
@@ -1267,7 +1285,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
                         await document.exitPictureInPicture();
                       } else if (videoRef.current) {
                         await videoRef.current.requestPictureInPicture();
-                        setShowOverlay(false);
                       }
                     } catch (err) {
                       console.error("PiP failed:", err);
