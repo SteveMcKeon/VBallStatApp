@@ -920,42 +920,66 @@ const DBStats = ({
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar shown when filters are active */}
-      {isFilteredDBStats && (
-        <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
-          <div className="db-toolbar flex items-center gap-3 flex-wrap">
-            {filteredStats.length > 0 && (
-              <button
-                onClick={handlePlayFiltered}
-                className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
-                           bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
-                aria-label="Play filtered touches"
-              >
-                Play Filtered Touches ({filteredStats.length})
-              </button>
-            )}
-            <div className="db-toolbar-spacer flex-1" />
-            {editMode ? (
-            <button
-              className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
-                 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700"
-              style={{ minWidth: 0 }}
-              onClick={() => setFilterFrozen(!filterFrozen)}
-              aria-label="Pause filters while editing"
-            >
-              {filterFrozen ? "Resume Filters" : "Pause Filters"}
-            </button>
-            ) : null}
-            <button
-              onClick={handleClearAllFilters}
-              className="px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
-                         bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800"
-              aria-label="Clear all filters"
-            >
-              Clear All Filters
-            </button>
-          </div>
-        </div>
+{isFilteredDBStats && (
+  <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
+    <div
+      className={
+        (isMobile && layoutMode === 'side-by-side')
+          ? 'db-toolbar grid grid-cols-2 gap-2 items-stretch'
+          : 'db-toolbar flex items-center gap-3 flex-wrap'
+      }
+    >
+      {filteredStats.length > 0 && (
+        <button
+          onClick={handlePlayFiltered}
+          className={
+            `px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+             bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 ` +
+            ((isMobile && layoutMode === 'side-by-side') ? 'col-span-2 w-full' : '')
+          }
+          aria-label="Play filtered touches"
+        >
+          Play Filtered Touches ({filteredStats.length})
+        </button>
       )}
+
+      {/* spacer hidden in grid mode */}
+      <div
+        className={
+          (isMobile && layoutMode === 'side-by-side') ? 'hidden' : 'db-toolbar-spacer flex-1'
+        }
+      />
+
+      {editMode ? (
+        <button
+          className={
+            `px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+             bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 ` +
+            ((isMobile && layoutMode === 'side-by-side') ? 'w-full' : '')
+          }
+          style={{ minWidth: 0 }}
+          onClick={() => setFilterFrozen(!filterFrozen)}
+          aria-label="Pause filters while editing"
+        >
+          {filterFrozen ? 'Resume Filters' : 'Pause Filters'}
+        </button>
+      ) : null}
+
+      <button
+        onClick={handleClearAllFilters}
+        className={
+          `px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+           bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 ` +
+          ((isMobile && layoutMode === 'side-by-side') ? 'w-full' : '')
+        }
+        aria-label="Clear all filters"
+      >
+        Clear All Filters
+      </button>
+    </div>
+  </div>
+)}
+
       <div
         ref={setHeaderScrollEl}
         className="db-x-scroll"
