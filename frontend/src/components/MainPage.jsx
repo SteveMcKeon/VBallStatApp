@@ -14,7 +14,7 @@ import StatsSummary from './StatsSummary';
 import UploadGameModal from './UploadGameModal';
 import { useSupabaseAuthWatcher } from '../utils/useSupabaseAuthWatcher';
 const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
-const MiniSidebar = ({ onExpand, teamId }) => {
+const MiniSidebar = ({ onExpand, teamId, isMobile }) => {
   const handlePanelClick = () => onExpand();
   const stopPropagation = (e) => e.stopPropagation();
   return (
@@ -35,7 +35,7 @@ const MiniSidebar = ({ onExpand, teamId }) => {
       </div>
       {/* Bottom: user icon/footer */}
       <div onClick={stopPropagation}>
-        <SidebarFooter mini teamId={teamId} />
+        <SidebarFooter mini teamId={teamId} isMobile={isMobile} />
       </div>
     </div>
   );
@@ -720,6 +720,7 @@ const MainPage = () => {
             <MiniSidebar
               onExpand={() => handleSidebarToggle(true)}
               teamId={teamId}
+              isMobile={isMobile}
             />
           )}
         </div>
@@ -874,14 +875,14 @@ const MainPage = () => {
                 </div>
               </div>
             )}
-            <SidebarFooter teamId={teamId} />
+            <SidebarFooter teamId={teamId} isMobile={isMobile} />
           </div>
         </div>
         <div
           ref={mainContentRef}
           onPointerDown={handleMainInteract}
           onFocusCapture={handleMainInteract}
-          className={`relative flex-1 overflow-y-auto transform-gpu will-change-transform transition-transform duration-300 ease-out
+          className={`db-list-outer relative flex-1 overflow-y-auto transform-gpu will-change-transform transition-transform duration-300 ease-out
             ${editMode ? 'bg-yellow-50 transition-colors' : ''}`}
         >
           <div className="h-full">

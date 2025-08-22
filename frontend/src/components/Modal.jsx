@@ -6,6 +6,8 @@ const Modal = ({
   children,
   closeOnBackdrop = true,
   closeOnEsc = true,
+  contentClassName,
+  closeXLeft = false,
 }) => {
   const overlayRef = useRef(null);
   useEffect(() => {
@@ -33,13 +35,13 @@ const Modal = ({
       onPointerDown={handleBackdropPointerDown}
     >
       <div
-        className="bg-white rounded-xl shadow-xl p-6 relative w-full max-w-lg"
+        className={contentClassName ?? "nice-scroll bg-white rounded-xl shadow-xl p-6 relative w-full max-w-lg"}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 rounded-md hover:bg-gray-200 transition-colors w-8 h-8 flex items-center justify-center cursor-pointer"
-          aria-label="Close"
+          className={`absolute top-3 ${closeXLeft ? 'left-3' : 'right-3'} rounded-md hover:bg-gray-200 transition-colors w-8 h-8 flex items-center justify-center cursor-pointer`}
+           aria-label="Close"
         >
           <span className="text-gray-500 hover:text-black">✕</span>
         </button>

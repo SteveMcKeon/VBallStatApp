@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import supabase from '../supabaseClient';
 import Toast from './Toast';
-import ManageTeamModal from './ManageTeamModal';
-const SidebarFooter = ({ mini = false, teamId }) => {
+import SettingsModal from './SettingsModal';
+const SidebarFooter = ({ mini = false, teamId, isMobile = false }) => {
   const [user, setUser] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [isManageOpen, setIsManageOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const popupRef = useRef(null);
   const [showToast, setShowToast] = useState(false);
   const getAvatarFromCacheOrFetch = async (userId, remoteUrl) => {
@@ -100,8 +100,8 @@ const SidebarFooter = ({ mini = false, teamId }) => {
       <button
         onClick={() => setIsPopupOpen((prev) => !prev)}
         className={`mt-auto cursor-pointer focus:outline-none ${mini
-            ? 'p-1 rounded hover:bg-gray-200'
-            : 'block w-full px-2 py-2 flex items-center justify-between'
+          ? 'p-1 rounded hover:bg-gray-200'
+          : 'block w-full px-2 py-2 flex items-center justify-between'
           }`}
       >
         {mini ? (
@@ -158,8 +158,8 @@ const SidebarFooter = ({ mini = false, teamId }) => {
         <div
           ref={popupRef}
           className={`absolute z-50 shadow-lg border border-gray-300 rounded-[12px] p-2 bg-white ${mini
-              ? 'fixed bottom-[60px] left-[10px] w-48'
-              : 'bottom-[60px] left-[10px] right-[10px] w-[calc(100%-20px)]'
+            ? 'fixed bottom-[60px] left-[10px] w-48'
+            : 'bottom-[60px] left-[10px] right-[10px] w-[calc(100%-20px)]'
             }`}
         >
           <div className="p-4 flex items-center space-x-2 w-full overflow-hidden">
@@ -177,14 +177,14 @@ const SidebarFooter = ({ mini = false, teamId }) => {
           <div className="border-t border-gray-200 pb-2" />
           {teamId && (
             <button
-              onClick={() => setIsManageOpen(true)}
+              onClick={() => { setIsPopupOpen(false); setIsSettingsOpen(true); }}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-800 rounded-md hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/10 transition-colors"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
                 className="shrink-0 text-gray-600 group-hover:text-gray-900 transition-colors">
                 <path d="M10.3227 1.62663C11.1514 1.62663 11.9182 2.066 12.3373 2.78092L13.1586 4.18131L13.2123 4.25065C13.2735 4.31105 13.3565 4.34658 13.4448 4.34733L15.06 4.36002L15.2143 4.36686C15.9825 4.4239 16.6774 4.85747 17.0649 5.53092L17.393 6.10221L17.4662 6.23795C17.7814 6.88041 17.7842 7.63306 17.4741 8.27799L17.4028 8.41373L16.6 9.83561C16.5426 9.93768 16.5425 10.0627 16.6 10.1647L17.4028 11.5856L17.4741 11.7223C17.7841 12.3673 17.7815 13.1199 17.4662 13.7624L17.393 13.8981L17.0649 14.4694C16.6774 15.1427 15.9824 15.5764 15.2143 15.6335L15.06 15.6393L13.4448 15.653C13.3565 15.6537 13.2736 15.6892 13.2123 15.7497L13.1586 15.818L12.3373 17.2194C11.9182 17.9342 11.1513 18.3737 10.3227 18.3737H9.6762C8.8995 18.3735 8.17705 17.9874 7.74456 17.3503L7.66253 17.2194L6.84124 15.818C6.79652 15.7418 6.72408 15.6876 6.64105 15.6647L6.55511 15.653L4.93987 15.6393C4.16288 15.633 3.44339 15.2413 3.01605 14.6003L2.93499 14.4694L2.60687 13.8981C2.19555 13.1831 2.1916 12.3039 2.5971 11.5856L3.39886 10.1647L3.43206 10.0846C3.44649 10.0293 3.44644 9.97102 3.43206 9.91569L3.39886 9.83561L2.5971 8.41373C2.19175 7.6955 2.19562 6.8171 2.60687 6.10221L2.93499 5.53092L3.01605 5.40006C3.44337 4.75894 4.1628 4.36636 4.93987 4.36002L6.55511 4.34733L6.64105 4.33561C6.72418 4.31275 6.79651 4.25762 6.84124 4.18131L7.66253 2.78092L7.74456 2.65006C8.17704 2.01277 8.89941 1.62678 9.6762 1.62663H10.3227ZM9.6762 2.9567C9.36439 2.95685 9.07299 3.10138 8.88421 3.34342L8.80999 3.45377L7.9887 4.85416C7.72933 5.29669 7.28288 5.59093 6.78265 5.6608L6.56585 5.67741L4.95062 5.6901C4.63868 5.69265 4.34845 5.84001 4.16155 6.08366L4.08733 6.19401L3.75921 6.7653C3.58227 7.073 3.5808 7.45131 3.7553 7.76041L4.55706 9.18131L4.65179 9.37663C4.81309 9.77605 4.81294 10.2232 4.65179 10.6227L4.55706 10.819L3.7553 12.2399C3.58083 12.549 3.5822 12.9273 3.75921 13.235L4.08733 13.8053L4.16155 13.9157C4.34844 14.1596 4.6385 14.3067 4.95062 14.3092L6.56585 14.3229L6.78265 14.3385C7.28292 14.4084 7.72931 14.7036 7.9887 15.1462L8.80999 16.5465L8.88421 16.6559C9.07298 16.8982 9.36422 17.0435 9.6762 17.0436H10.3227C10.6793 17.0436 11.0095 16.8542 11.1899 16.5465L12.0112 15.1462L12.1332 14.9655C12.4432 14.5668 12.9212 14.3271 13.434 14.3229L15.0492 14.3092L15.1811 14.2995C15.4854 14.2567 15.7569 14.076 15.9125 13.8053L16.2407 13.235L16.2983 13.1169C16.3983 12.8745 16.3999 12.6023 16.3022 12.359L16.2446 12.2399L15.4418 10.819C15.1551 10.311 15.1551 9.6893 15.4418 9.18131L16.2446 7.76041L16.3022 7.64127C16.4 7.39806 16.3982 7.12584 16.2983 6.88346L16.2407 6.7653L15.9125 6.19401C15.7568 5.92338 15.4855 5.74264 15.1811 5.69987L15.0492 5.6901L13.434 5.67741C12.9212 5.67322 12.4432 5.43341 12.1332 5.03483L12.0112 4.85416L11.1899 3.45377C11.0095 3.14604 10.6794 2.9567 10.3227 2.9567H9.6762ZM11.5854 9.99967C11.5852 9.12461 10.8755 8.41497 10.0004 8.41471C9.12516 8.41471 8.41466 9.12445 8.41448 9.99967C8.41448 10.875 9.12505 11.5846 10.0004 11.5846C10.8756 11.5844 11.5854 10.8749 11.5854 9.99967ZM12.9145 9.99967C12.9145 11.6094 11.6101 12.9145 10.0004 12.9147C8.39051 12.9147 7.08538 11.6096 7.08538 9.99967C7.08556 8.38991 8.39062 7.08463 10.0004 7.08463C11.61 7.08489 12.9143 8.39007 12.9145 9.99967Z"></path>
               </svg>
-              <span>{user?.role === 'captain' ? 'Manage Team' : 'My Team'}</span>
+              <span>Settings</span>
             </button>
           )}
           <button
@@ -211,13 +211,14 @@ const SidebarFooter = ({ mini = false, teamId }) => {
         onClose={() => setShowToast(false)}
         type="success"
       />
-      <ManageTeamModal
+      <SettingsModal
         key={teamId}
-        isOpen={isManageOpen}
-        onClose={() => setIsManageOpen(false)}
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
         teamId={teamId}
         currentUserId={user?.id}
         canManage={user?.role === 'captain'}
+        isMobile={isMobile}
       />
     </div>
   );

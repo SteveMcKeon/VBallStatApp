@@ -41,6 +41,7 @@ export default function ManageTeamModal({
   teamId,
   currentUserId,
   canManage = false,
+  embedded = false,
 }) {
   const {
     members: rosterMembers,
@@ -446,8 +447,9 @@ export default function ManageTeamModal({
       setSavingName(false);
     }
   };
+  const actuallyOpen = embedded ? true : isOpen; // NEW
   useEffect(() => {
-    if (!isOpen) return;
+    if (!actuallyOpen) return;
     setInviteQuery('');
     setSuggestions([]);
     setSuggestOpen(false);
@@ -456,7 +458,7 @@ export default function ManageTeamModal({
     if (isDemoTeam) {
       setDemoMembers(DEMO_MEMBERS);
     }
-  }, [isOpen, teamId, isDemoTeam, refresh]);
+  }, [actuallyOpen, teamId, isDemoTeam, refresh]);
   useEffect(() => {
     const t = setTimeout(() => searchActiveUsers(inviteQuery), 250);
     return () => clearTimeout(t);
@@ -511,8 +513,8 @@ export default function ManageTeamModal({
 
   const typedIsValid = EMAIL_RX.test(inviteQuery.trim());
   const hasAnythingToSend = emailChips.length > 0 || typedIsValid;
-  return (
-    <Modal isOpen={isOpen} onClose={onClose}>
+  const body = (
+    <>
       <div className="text-center">
         <h2 className="text-xl font-semibold mb-2">{canManage ? 'Manage Team' : 'My Team'}</h2>
         <p className="text-sm text-gray-600">    {canManage ? 'Invite players, rename your team, and set member roles.' : 'View your team roster and roles.'}</p>
@@ -673,7 +675,9 @@ export default function ManageTeamModal({
       {/* Members & roles */}
       <div className="mt-6">
         <div className="font-medium text-gray-700 mb-2 mx-auto text-center">Team members</div>
-        <div className="divide-y border rounded-md max-h-72 overflow-y-auto">
+        <div className={`divide-y border rounded-md` + 
+            (embedded ? '' : ' max-h-72 overflow-y-auto') }
+        >
           {visibleMembers.length === 0 && (
             <div className="p-3 text-sm text-gray-500">No members yet.</div>
           )}
@@ -764,8 +768,8 @@ export default function ManageTeamModal({
                       }
                       disabled={!m.pendingInvite && m.user_id === captainId}
                       className={`w-6 h-6 flex items-center justify-center rounded-md ${(!m.pendingInvite && m.user_id === captainId)
-                          ? ''
-                          : 'cursor-pointer hover:bg-gray-100'
+                        ? ''
+                        : 'cursor-pointer hover:bg-gray-100'
                         } disabled:opacity-40`}
                       title={
                         m.pendingInvite
@@ -827,6 +831,18 @@ export default function ManageTeamModal({
         onClose={() => setShowToast(false)}
         type={toastType}
       />
+    </>
+  );
+  if (embedded) {
+    return (
+      <div className="max-w-2xl pr-2">
+        {body}
+      </div>
+    );
+  }
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      {body}
     </Modal>
   );
 }

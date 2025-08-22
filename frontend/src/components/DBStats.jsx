@@ -920,65 +920,63 @@ const DBStats = ({
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar shown when filters are active */}
-{isFilteredDBStats && (
-  <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
-    <div
-      className={
-        (isMobile && layoutMode === 'side-by-side')
-          ? 'db-toolbar grid grid-cols-2 gap-2 items-stretch'
-          : 'db-toolbar flex items-center gap-3 flex-wrap'
-      }
-    >
-      {filteredStats.length > 0 && (
-        <button
-          onClick={handlePlayFiltered}
-          className={
-            `px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+      {isFilteredDBStats && (
+        <div className={`px-4 pb-4 -mx-4 ${editMode ? 'bg-yellow-50' : ''}`}>
+          <div
+            className={
+              (isMobile && editMode && layoutMode === 'side-by-side')
+                ? 'db-toolbar grid grid-cols-2 gap-2 pt-1 px-1 items-stretch'
+                : 'db-toolbar flex items-center gap-1 pt-1 px-1 flex-wrap'
+            }
+          >
+            {filteredStats.length > 0 && (
+              <button
+                onClick={handlePlayFiltered}
+                className={
+                  `px-4 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
              bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 ` +
-            ((isMobile && layoutMode === 'side-by-side') ? 'col-span-2 w-full' : '')
-          }
-          aria-label="Play filtered touches"
-        >
-          Play Filtered Touches ({filteredStats.length})
-        </button>
-      )}
-
-      {/* spacer hidden in grid mode */}
-      <div
-        className={
-          (isMobile && layoutMode === 'side-by-side') ? 'hidden' : 'db-toolbar-spacer flex-1'
-        }
-      />
-
-      {editMode ? (
-        <button
-          className={
-            `px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+                  ((isMobile  && layoutMode === 'side-by-side') ? 'col-span-2 w-full' : 'py-1')
+                }
+                aria-label="Play filtered touches"
+              >
+                Play Filtered Touches ({filteredStats.length})
+              </button>
+            )}
+            {/* spacer hidden in grid mode */}
+            <div
+              className={
+                (isMobile && editMode && layoutMode === 'side-by-side') ? 'hidden' : 'db-toolbar-spacer flex-1'
+              }
+            />
+            {editMode ? (
+              <button
+                className={
+                  `px-4 py-1 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
              bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 ` +
-            ((isMobile && layoutMode === 'side-by-side') ? 'w-full' : '')
-          }
-          style={{ minWidth: 0 }}
-          onClick={() => setFilterFrozen(!filterFrozen)}
-          aria-label="Pause filters while editing"
-        >
-          {filterFrozen ? 'Resume Filters' : 'Pause Filters'}
-        </button>
-      ) : null}
+                  ((isMobile && layoutMode === 'side-by-side') ? 'w-full' : '')
+                }
+                style={{ minWidth: 0 }}
+                onClick={() => setFilterFrozen(!filterFrozen)}
+                aria-label="Pause filters while editing"
+              >
+                {filterFrozen ? 'Resume Filters' : 'Pause Filters'}
+              </button>
+            ) : null}
 
-      <button
-        onClick={handleClearAllFilters}
-        className={
-          `px-4 py-2 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
+            <button
+              onClick={handleClearAllFilters}
+              className={
+                `py-1 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
            bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 ` +
-          ((isMobile && layoutMode === 'side-by-side') ? 'w-full' : '')
-        }
-        aria-label="Clear all filters"
-      >
-        Clear All Filters
-      </button>
-    </div>
-  </div>
-)}
+                ((isMobile && layoutMode === 'side-by-side') ? 'w-full' : 'px-4 ')
+              }
+              aria-label="Clear all filters"
+            >
+              Clear All Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       <div
         ref={setHeaderScrollEl}
@@ -1180,50 +1178,6 @@ const DBStats = ({
         </div>
       )}
       <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} type={toastType} />
-      <style>{`
-      .db-row { border-bottom: 1px solid #e5e7eb; }
-      .db-cell { padding: 2px 4px; display: flex; align-items: center; justify-content: center; }
-      .db-cell input, .db-cell select { height: auto; }
-      .db-cell textarea { height: auto; min-height: 21px; resize: none; }
-      .db-cell, .db-cell * { white-space: pre-wrap; word-break: break-word; }
-      table { table-layout: fixed; border-collapse: collapse; width: 100%; }
-      thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 200; }
-      .db-x-scroll::-webkit-scrollbar { height: 0px; }
-      .db-x-scroll { scrollbar-width: none; overflow-y: visible; position: relative; }
-      .db-list-outer {
-        -webkit-overflow-scrolling: touch;
-        touch-action: pan-x pan-y;
-        overscroll-behavior: auto;
-        background: transparent;
-        scrollbar-color: auto transparent;
-      }
-      .db-list-outer::-webkit-scrollbar { width: 0px; height: 0px; }
-      .db-list-outer::-webkit-scrollbar-track { background: transparent; }
-      .db-toolbar
-      .db-toolbar-spacer { flex: 1 1 auto; }
-      @media (max-width: 360px) {
-        .db-toolbar {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 8px;
-        }
-        .db-toolbar-spacer {
-          display: none;
-        }
-      }
-      .db-list-outer {
-        /* Firefox */
-        scrollbar-width: 0px;
-        scrollbar-color: auto transparent;
-      }
-      .db-list-outer::-webkit-scrollbar:vertical { width: 0px; }
-      .db-list-outer::-webkit-scrollbar:horizontal { height: 10px; }
-      .db-list-outer::-webkit-scrollbar-thumb:horizontal {
-        background-clip: padding-box;
-        background-color: rgba(0,0,0,.3);
-        border-radius: 9999px;
-      }        
-    `}</style>
     </div>
   );
 };
