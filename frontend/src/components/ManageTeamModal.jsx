@@ -257,7 +257,7 @@ export default function ManageTeamModal({
         id: u.id,
         label: u.display_name || u.full_name || u.email || u.id,
         email: u.email,
-        avatar: u.avatar_url || u.user_metadata?.avatar_url || null,
+        avatar: u.avatar_custom_url || u.user_metadata?.avatar_custom_url || u.avatar_url || u.user_metadata?.avatar_url || null,
       }));
       setSuggestions(out);
       setSelectedIdx(0);
@@ -737,7 +737,7 @@ export default function ManageTeamModal({
           {visibleMembers.map(m => (
             <div key={m.user_id} className="flex items-center justify-between px-3 py-2">
               <div className="min-w-0 flex items-center gap-3">
-                <Avatar src={m.avatar_url} label={m.name || m.email || m.user_id} />
+                <Avatar src={m.avatar_custom_url || m.avatar_url} label={m.name || m.email || m.user_id} />
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">
                     {canManage && !m.inviteOnly ? (

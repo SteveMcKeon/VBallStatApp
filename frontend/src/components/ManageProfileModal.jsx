@@ -63,7 +63,7 @@ export default function ManageProfileModal({
             const md = u?.user_metadata || {};
             setDisplayName(md.display_name || md.full_name || md.name || '');
             setPhone(u?.phone || md.phone || '');
-            setAvatarUrl(md.avatar_url || md.picture || '');
+            setAvatarUrl(md.avatar_custom_url || md.avatar_url || md.picture || '');
             setPendingPhone('');
             setOtp('');
         })();
@@ -87,7 +87,7 @@ export default function ManageProfileModal({
             const url = pub?.publicUrl ? `${pub.publicUrl}?t=${Date.now()}` : '';
             if (!url) throw new Error('Could not get public URL.');
             const { error: updErr } = await supabase.auth.updateUser({
-                data: { avatar_url: url },
+                data: { avatar_custom_url: url },
             });
             if (updErr) throw updErr;
             setAvatarUrl(url);
@@ -103,7 +103,7 @@ export default function ManageProfileModal({
         setBusy(true);
         try {
             const { error } = await supabase.auth.updateUser({
-                data: { avatar_url: null, picture: null },
+                data: { avatar_custom_url: null },
             });
             if (error) throw error;
             setAvatarUrl('');

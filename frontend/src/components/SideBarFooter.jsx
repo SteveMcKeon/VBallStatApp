@@ -56,7 +56,7 @@ const SidebarFooter = ({ mini = false, teamId, isMobile = false }) => {
     }
     const avatarUrl = await getAvatarFromCacheOrFetch(
       sessUser.id,
-      sessUser.user_metadata?.avatar_url
+      sessUser.user_metadata?.avatar_custom_url || sessUser.user_metadata?.avatar_url || sessUser.user_metadata?.picture
     );
     const meta = sessUser.user_metadata || {};
     const providerName =
@@ -70,7 +70,7 @@ const SidebarFooter = ({ mini = false, teamId, isMobile = false }) => {
         meta.name ||
         providerName ||
         (sessUser.email ? sessUser.email.split('@')[0] : 'User'),
-      avatarUrl: meta.avatar_url || meta.picture || avatarUrl || null,
+      avatarUrl: meta.avatar_custom_url || meta.avatar_url || meta.picture || avatarUrl || null,
       user_metadata: meta,
       role: teamRole || 'viewer',
     });
