@@ -46,10 +46,19 @@ export default function ManageTeamModal({
   const {
     members: rosterMembers,
     invites: rosterInvites,
-    loading: rosterLoading,
-    errorMsg: rosterError,
     refresh,
   } = TeamRoster(supabase, teamId);
+  const submitInvites = () => {
+    const typed = inviteQuery.trim();
+    const payload = [...emailChips];
+    if (EMAIL_RX.test(typed)) payload.push(typed.toLowerCase());
+    if (payload.length === 0) return false;
+    setInviteQuery('');
+    setEmailChips([]);
+    inviteMany(payload);
+    return true;
+  };
+
   const isDemoTeam = teamId === DEMO_TEAM_ID;
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('error');
@@ -246,7 +255,7 @@ export default function ManageTeamModal({
       const json = await res.json().catch(() => ({ users: [] }));
       const out = (json.users || []).map(u => ({
         id: u.id,
-        label: u.full_name || u.display_name || u.email || u.id,
+        label: u.display_name || u.full_name || u.email || u.id,
         email: u.email,
         avatar: u.avatar_url || u.user_metadata?.avatar_url || null,
       }));
@@ -309,15 +318,21 @@ export default function ManageTeamModal({
       setDemoMembers(prev => {
         const lower = (email || '').toLowerCase();
         if (prev.some(m => (m.email || '').toLowerCase() === lower)) return prev;
-        return [...prev, {
-          user_id: `invite:${email}`,
-          role: 'player',
-          email,
-          name: null,
-          pendingInvite: true,
-          inviteOnly: true,
-        }];
+        return [
+          ...prev,
+          {
+            user_id: `invite:${email}`,
+            role: 'player',
+            email,
+            name: null,
+            pendingInvite: true,
+            inviteOnly: true,
+          }
+        ];
       });
+      if (typeof rosterInvites !== "undefined") {
+        rosterInvites.push({ email, role: 'player' });
+      }
       setToast('Invite created (demo)', 'success');
       return;
     }
@@ -352,7 +367,26 @@ export default function ManageTeamModal({
     const list = (emailsOverride ?? emailChips)
       .map(e => (e || '').toLowerCase().trim())
       .filter(Boolean);
-    if (isDemoTeam || list.length === 0) return;
+    if (list.length === 0) return;
+    if (isDemoTeam) {
+      setDemoMembers(prev => {
+        const existing = new Set(prev.map(m => (m.email || '').toLowerCase()).filter(Boolean));
+        const adds = list
+          .filter(e => EMAIL_RX.test(e) && !existing.has(e))
+          .map(email => ({
+            user_id: `invite:${email}`,
+            role: 'player',
+            email,
+            name: null,
+            pendingInvite: true,
+            inviteOnly: true,
+          }));
+        if (adds.length === 0) return prev;
+        return [...prev, ...adds];
+      });
+      setToast('Invite created (demo)', 'success');
+      return;
+    }
     setBusy(true);
     let invited = 0, added = 0, dupes = 0, invalid = 0, errors = 0;
     const existingEmails = new Set(
@@ -463,18 +497,14 @@ export default function ManageTeamModal({
     const t = setTimeout(() => searchActiveUsers(inviteQuery), 250);
     return () => clearTimeout(t);
   }, [inviteQuery]);
-  const isEmail = useMemo(
-    () => EMAIL_RX.test(inviteQuery.trim()),
-    [inviteQuery]
-  );
   const baseMembers = useMemo(() => {
     if (isDemoTeam) return demoMembers;
     const rows = rosterMembers ?? [];
     return rows.map(m => {
       const preferredName =
-        m.full_name && m.email && m.full_name === m.email
-          ? (m.display_name || null)
-          : (m.full_name || m.display_name || null);
+        m.display_name ||
+        m.full_name ||
+        null;
       return {
         ...m,
         name: preferredName,
@@ -482,11 +512,10 @@ export default function ManageTeamModal({
     });
   }, [isDemoTeam, demoMembers, rosterMembers]);
   const visibleMembers = useMemo(() => {
-    const pendingEmails = new Set(
-      (rosterInvites ?? [])
-        .map(i => (i.email || '').toLowerCase())
-        .filter(Boolean)
-    );
+    const pendingEmails = new Set([
+      ...(rosterInvites ?? []).map(i => (i.email || '').toLowerCase()),
+      ...(isDemoTeam ? demoMembers.filter(m => m.inviteOnly).map(m => (m.email || '').toLowerCase()) : [])
+    ].filter(Boolean));
     const list = baseMembers.map(m => {
       const email = (m.email || '').toLowerCase();
       return {
@@ -494,10 +523,11 @@ export default function ManageTeamModal({
         pendingInvite: email && pendingEmails.has(email),
       };
     });
-    const memberEmails = new Set(
-      list.map(m => (m.email || '').toLowerCase()).filter(Boolean)
-    );
-    const inviteOnly = (rosterInvites ?? [])
+    const memberEmails = new Set(list.map(m => (m.email || '').toLowerCase()).filter(Boolean));
+    const inviteOnly = [
+      ...(rosterInvites ?? []),
+      ...(isDemoTeam ? demoMembers.filter(m => m.inviteOnly) : [])
+    ]
       .filter(i => !memberEmails.has((i.email || '').toLowerCase()))
       .map(i => ({
         user_id: `invite:${i.email}`,
@@ -507,10 +537,10 @@ export default function ManageTeamModal({
         pendingInvite: true,
         inviteOnly: true,
       }));
+
     const full = [...list, ...inviteOnly];
     return canManage ? full : full.filter(m => !m.inviteOnly);
-  }, [baseMembers, rosterInvites, canManage]);
-
+  }, [baseMembers, rosterInvites, canManage, isDemoTeam, demoMembers]);
   const typedIsValid = EMAIL_RX.test(inviteQuery.trim());
   const hasAnythingToSend = emailChips.length > 0 || typedIsValid;
   const body = (
@@ -599,6 +629,21 @@ export default function ManageTeamModal({
                 }}
                 onKeyDown={(e) => {
                   const { key } = e;
+                  if (key === 'Enter' && !inviteQuery.trim() && emailChips.length > 0) {
+                    e.preventDefault();
+                    submitInvites();
+                    return;
+                  }
+                  if (
+                    key === 'Enter' &&
+                    inviteQuery.trim() &&
+                    EMAIL_RX.test(inviteQuery.trim()) &&
+                    emailChips.length === 0
+                  ) {
+                    e.preventDefault();
+                    submitInvites();
+                    return;
+                  }
                   if ((key === 'Enter' || key === 'Tab' || key === ',' || key === ';' || key === ' ') && inviteQuery.trim()) {
                     const ok = addChip(inviteQuery.trim());
                     if (ok) {
@@ -622,6 +667,7 @@ export default function ManageTeamModal({
                     }
                   }
                 }}
+
               />
             </div>
             {suggestOpen && suggestions.length > 0 && (
@@ -650,7 +696,7 @@ export default function ManageTeamModal({
               </div>
             )}
           </div>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-1 flex items-center gap-3">
             <button
               onClick={() => {
                 const typed = inviteQuery.trim();
@@ -666,17 +712,24 @@ export default function ManageTeamModal({
             >
               Invite {emailChips.length > 0 ? `(${emailChips.length})` : ''}
             </button>
-            <span className="block w-fit mx-auto text-xs text-gray-500 self-center">
-              New players are immediately given the <b>Player</b> role.
-            </span>
+            <div className="flex-1 flex justify-center">
+              <p className="text-center text-xs text-gray-500 leading-snug">
+                Suggestions show people you already share a team with.<br />
+                New players are immediately given the <b>Player</b> role.
+              </p>
+            </div>
           </div>
         </div>
-      )}
+      )
+      }
       {/* Members & roles */}
       <div className="mt-6">
-        <div className="font-medium text-gray-700 mb-2 mx-auto text-center">Team members</div>
-        <div className={`divide-y border rounded-md` + 
-            (embedded ? '' : ' max-h-72 overflow-y-auto') }
+        <div className="font-medium text-gray-700  mx-auto text-center">Team members</div>
+        <p className="text-center text-xs text-gray-500 leading-snug mb-2">
+          Emails are only ever visible to Team Members.
+        </p>
+        <div className={`divide-y border rounded-md` +
+          (embedded ? '' : ' max-h-72 overflow-y-auto')}
         >
           {visibleMembers.length === 0 && (
             <div className="p-3 text-sm text-gray-500">No members yet.</div>
@@ -797,34 +850,36 @@ export default function ManageTeamModal({
           Done
         </button>
       </div>
-      {confirmCaptain && (
-        <Modal isOpen onClose={() => setConfirmCaptain(null)}>
-          <div className="text-left">
-            <h3 className="text-lg font-semibold mb-2">Make {confirmCaptain.label} Captain?</h3>
-            <p className="text-sm text-gray-600">
-              This will transfer the Captain role to <b>{confirmCaptain.label}</b>.
-              You’ll be downgraded to <b>Editor</b> and won’t be able to make yourself Captain again.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmCaptain(null)}
-                className="px-4 py-2 rounded-md border hover:bg-gray-50 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  await updateRole(confirmCaptain.userId, 'captain');
-                  setConfirmCaptain(null);
-                }}
-                className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 cursor-pointer"
-              >
-                Yes, transfer Captain
-              </button>
+      {
+        confirmCaptain && (
+          <Modal isOpen onClose={() => setConfirmCaptain(null)}>
+            <div className="text-left">
+              <h3 className="text-lg font-semibold mb-2">Make {confirmCaptain.label} Captain?</h3>
+              <p className="text-sm text-gray-600">
+                This will transfer the Captain role to <b>{confirmCaptain.label}</b>.
+                You’ll be downgraded to <b>Editor</b> and won’t be able to make yourself Captain again.
+              </p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmCaptain(null)}
+                  className="px-4 py-2 rounded-md border hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await updateRole(confirmCaptain.userId, 'captain');
+                    setConfirmCaptain(null);
+                  }}
+                  className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 cursor-pointer"
+                >
+                  Yes, transfer Captain
+                </button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        )
+      }
       <Toast
         message={toastMessage}
         show={showToast}

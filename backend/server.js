@@ -16,7 +16,6 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 function requireInternal(req, res, next) {
   const headerKey = req.headers['x-internal-key'] || '';
   const envLen = (process.env.INTERNAL_API_KEY || '').length;
@@ -43,8 +42,6 @@ app.use('/videos', express.static(VIDEO_DIR, {
     res.setHeader('Accept-Ranges', 'bytes');
   }
 }));
-
-
 const options = {
   key: fs.readFileSync('./cert/key.pem'),
   cert: fs.readFileSync('./cert/cert.pem'),
@@ -104,21 +101,18 @@ function buildInviteEmail({ inviterLabel, teamName, actionLink, siteUrl }) {
     </body>
   </html>`.trim();
   const text =
-`${inviterLabel} invited you to join ${prettyTeam} on VBallTracker.
-
+    `${inviterLabel} invited you to join ${prettyTeam} on VBallTracker.
 Accept invite: ${actionLink}
-
 If you didn’t request this, you can ignore this email.`;
   return { subject, html, text };
 }
-
 async function readSidecar(id) {
   for (const sfx of ['.json', '.info']) {
     const p = path.join(TUS_DIR, id + sfx);
     try {
       const raw = await fsp.readFile(p, 'utf8');
       return { path: p, data: JSON.parse(raw) };
-    } catch (_) {}
+    } catch (_) { }
   }
   return null;
 }
@@ -130,8 +124,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const readJsonSafe = async (p) => {
   try { return JSON.parse(await fsp.readFile(p, "utf8")); }
   catch { return null; }
-}; 
-
+};
 async function findTusBasesForGame(gameId) {
   const names = await fsp.readdir(TUS_DIR).catch(() => []);
   const bases = new Set();
@@ -158,7 +151,7 @@ async function deleteTusBase(base, extHint = ".mp4") {
     path.join(TUS_DIR, `${base}_READY${extHint}`),
   ];
   for (const p of candidates) {
-    try { await fsp.unlink(p); } catch {}
+    try { await fsp.unlink(p); } catch { }
   }
 }
 async function userCanDeleteGame(userId, teamId) {
@@ -190,7 +183,7 @@ async function userCanManageTeam(userId, teamId) {
       .eq('id', teamId)
       .maybeSingle();
     if (!error && team?.captain_id === userId) return true;
-  } catch {}
+  } catch { }
   return false;
 }
 async function sendTransactionalEmail({ to, subject, html, text }) {
@@ -235,7 +228,6 @@ app.post('/api/set-display-name', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.get('/api/team-invites', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -259,7 +251,6 @@ app.get('/api/team-invites', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.post('/api/team-invites', async (req, res) => {
   try {
     const token = (req.headers.authorization || '').split(' ')[1];
@@ -317,7 +308,7 @@ app.post('/api/team-invites', async (req, res) => {
           inviter?.user_metadata?.name ||
           inviter?.email ||
           'the team captain';
-      } catch {}
+      } catch { }
       let teamNameForEmail = '';
       try {
         const { data: teamRow } = await supabase
@@ -326,7 +317,7 @@ app.post('/api/team-invites', async (req, res) => {
           .eq('id', teamId)
           .maybeSingle();
         teamNameForEmail = teamRow?.name || '';
-      } catch {}
+      } catch { }
       const { subject, html, text } = buildInviteEmail({
         inviterLabel,
         teamName: teamNameForEmail,
@@ -359,7 +350,6 @@ app.post('/api/team-invites', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.get('/api/team-members', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -412,7 +402,6 @@ app.get('/api/team-members', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.get('/api/search-users', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -428,38 +417,44 @@ app.get('/api/search-users', async (req, res) => {
     if (!allowed) return res.status(403).json({ error: 'Forbidden' });
     const qLower = q.toLowerCase();
     const limit = 8;
-    const perPage = 1000;
-    let page = 1;
     const [{ data: memberRows }, { data: inviteRows }] = await Promise.all([
       supabase.from('team_members').select('user_id').eq('team_id', teamId),
       supabase.from('team_invites').select('email').eq('team_id', teamId),
     ]);
     const memberIds = new Set((memberRows || []).map(r => r.user_id));
-    const inviteEmails = new Set(
-      (inviteRows || []).map(r => (r.email || '').toLowerCase()).filter(Boolean)
-    );
+    const inviteEmails = new Set((inviteRows || [])
+      .map(r => (r.email || '').toLowerCase())
+      .filter(Boolean));
+    const { data: myTeams } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', requesterId);
+    const myTeamIds = (myTeams || []).map(r => r.team_id);
+    if (myTeamIds.length === 0) return res.json({ users: [] });
+    const { data: coRows } = await supabase
+      .from('team_members')
+      .select('user_id')
+      .in('team_id', myTeamIds);
+    const candidateIds = [...new Set((coRows || [])
+      .map(r => r.user_id)
+      .filter(uid => uid && uid !== requesterId))];
     const matches = [];
-    while (matches.length < limit) {
-      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-      if (error) {
-        console.error('listUsers error:', error);
-        break;
-      }
-      const users = data?.users || [];
-      if (!users.length) break;
-      for (const u of users) {
+    for (const uid of candidateIds) {
+      if (matches.length >= limit) break;
+      if (memberIds.has(uid)) continue;
+      try {
+        const userRes = await supabase.auth.admin.getUserById(uid);
+        const u = userRes.user || userRes.data?.user || null;
+        if (!u) continue;
         const email = (u.email || '').toLowerCase();
-        const full  = (u.user_metadata?.full_name || u.user_metadata?.name || '').toLowerCase();
-        const disp  = (u.user_metadata?.display_name || '').toLowerCase();
-        if (!(email.includes(qLower) || full.includes(qLower) || disp.includes(qLower))) {
-          continue;
-        }
+        const full = (u.user_metadata?.full_name || u.user_metadata?.name || '').toLowerCase();
+        const disp = (u.user_metadata?.display_name || '').toLowerCase();
+        if (!(email.includes(qLower) || full.includes(qLower) || disp.includes(qLower))) continue;
         const verified = Boolean(
           u.email_confirmed_at || u.confirmed_at || u.last_sign_in_at || (u.identities?.length)
         );
         if (!verified) continue;
         if (!email) continue;
-        if (memberIds.has(u.id)) continue;
         if (inviteEmails.has(email)) continue;
         matches.push({
           id: u.id,
@@ -475,10 +470,8 @@ app.get('/api/search-users', async (req, res) => {
             u.identities?.[0]?.identity_data?.avatar_url ||
             null,
         });
-        if (matches.length >= limit) break;
+      } catch {
       }
-      if (users.length < perPage) break;
-      page += 1;
     }
     return res.json({ users: matches.slice(0, limit) });
   } catch (e) {
@@ -486,7 +479,6 @@ app.get('/api/search-users', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.delete("/api/delete-game/:gameId", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -526,7 +518,6 @@ app.delete("/api/delete-game/:gameId", async (req, res) => {
     return res.status(500).json({ success: false, message: "Unexpected server error" });
   }
 });
-
 app.delete('/api/admin/games/:id', requireInternal, async (req, res) => {
   try {
     const id = req.params.id;
@@ -539,7 +530,6 @@ app.delete('/api/admin/games/:id', requireInternal, async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.delete('/api/admin/games', requireInternal, async (req, res) => {
   try {
     const { date, team_id, game_number } = req.body || {};
@@ -558,7 +548,6 @@ app.delete('/api/admin/games', requireInternal, async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
-
 app.post('/api/mark-processed', requireInternal, async (req, res) => {
   const { gameId } = req.body;
   console.log(`Got Game ID ${gameId} for mark as processed.`);
@@ -572,7 +561,6 @@ app.post('/api/mark-processed', requireInternal, async (req, res) => {
       .eq('id', gameId)
       .select('id')
       .maybeSingle();
-
     if (error) {
       console.error('Failed to mark video as processed:', error);
       return res.status(500).json({ success: false, message: 'Database update failed' });
@@ -587,7 +575,6 @@ app.post('/api/mark-processed', requireInternal, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Unexpected server error' });
   }
 });
-
 app.post('/api/finalize-upload', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -623,7 +610,7 @@ app.post('/api/finalize-upload', async (req, res) => {
       if (err.code === 'EEXIST') {
       } else if (err.code === 'EXDEV') {
         await fsp.copyFile(src, dest);
-        await fsp.unlink(src).catch(() => {});
+        await fsp.unlink(src).catch(() => { });
       } else {
         throw err;
       }
@@ -634,7 +621,6 @@ app.post('/api/finalize-upload', async (req, res) => {
     return res.status(500).json({ error: 'Finalize failed' });
   }
 });
-
 app.get('/api/videos', (req, res) => {
   console.log('Reading video directory:', VIDEO_DIR);
   fs.readdir(VIDEO_DIR, (err, files) => {
@@ -646,7 +632,6 @@ app.get('/api/videos', (req, res) => {
     res.json(mp4s);
   });
 });
-
 app.delete('/api/delete-upload/:id', (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ success: false, message: 'Missing token' });
@@ -672,7 +657,6 @@ app.delete('/api/delete-upload/:id', (req, res) => {
   console.log(`Deleted upload ${uploadId} by user ${userId}`);
   res.json({ success: true });
 });
-
 https.createServer(options, app).listen(EXPRESSPORT, '0.0.0.0', () => {
   console.log(`HTTPS server running on port ${EXPRESSPORT}`);
 });

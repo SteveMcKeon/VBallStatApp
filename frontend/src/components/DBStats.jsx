@@ -977,7 +977,14 @@ const DBStats = ({
           </div>
         </div>
       )}
-
+      {/* Tiny banner so it’s obvious */}
+      {practiceMode && editMode && (
+        <div className="bg-yellow-50 pb-4">
+          <div className="px-4 p-2 text-sm text-amber-900 bg-amber-100 border border-amber-200 rounded">
+            Demo mode: edits update the table locally but are <strong>not</strong> saved.
+          </div>
+        </div>
+      )}
       <div
         ref={setHeaderScrollEl}
         className="db-x-scroll"
@@ -1038,14 +1045,6 @@ const DBStats = ({
           <div className="py-20 text-gray-500 italic text-center border-t">No matching data.</div>
         )}
       </div>
-      {/* Tiny banner so it’s obvious */}
-      {practiceMode && (
-        <div className="bg-yellow-50 py-2">
-          <div className="px-4 p-2 text-sm text-amber-900 bg-amber-100 border border-amber-200 rounded">
-            Demo mode: edits update the table locally but are <strong>not</strong> saved.
-          </div>
-        </div>
-      )}
       {['admin', 'editor'].includes(editMode) && !(isMobile && layoutMode === 'side-by-side') && (
         <div
           className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'items-start'} px-4 gap-3 ${!isMobile ? 'md:gap-6' : ''} ${editMode ? 'bg-yellow-50 transition-colors rounded' : ''}`}

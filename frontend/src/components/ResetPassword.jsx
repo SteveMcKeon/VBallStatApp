@@ -1,31 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import supabase from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-const FloatingLabelInput = ({ label, type = 'text', id, name, value, onChange }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const shouldFloat = isFocused || value.length > 0;
-  return (
-    <div className="relative w-full mt-6">
-      <input
-        type={type}
-        id={id}
-        name={name}
-        value={value}
-        onChange={onChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        className="w-full px-4 pt-6 pb-2 text-sm text-black border border-gray-400 rounded-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-      />
-      <label
-        htmlFor={id}
-        className={`absolute left-4 px-1 transition-all bg-white pointer-events-none duration-300 ease-in-out
-          ${shouldFloat ? 'top-1 text-xs text-blue-500' : 'top-3.5 text-base text-gray-400'}`}
-      >
-        {label}
-      </label>
-    </div>
-  );
-};
+import FloatingLabelInput from './FloatingLabelInput';
+
 const ResetPassword = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState('send');

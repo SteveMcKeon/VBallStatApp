@@ -121,28 +121,62 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
       }
       const { data, error } = await query;
       if (!error && data) {
-        const filteredStats = data
-          .filter(stat => stat.player !== null)
-          .sort((a, b) => a.import_seq - b.import_seq);
+        const filteredStats = (data || [])
+          .filter(stat => stat.player !== null && String(stat.team_id) === String(teamId))
+          .sort((a, b) =>
+            String(a.game_id).localeCompare(String(b.game_id)) ||
+            Number(a.set ?? 0) - Number(b.set ?? 0) ||
+            Number(a.import_seq ?? 0) - Number(b.import_seq ?? 0) ||
+            String(a.id).localeCompare(String(b.id))
+          );
         setStats(filteredStats);
         const assistCounts = {};
-        for (let i = 0; i < filteredStats.length - 1; i++) {
-          const curr = filteredStats[i];
-          const next = filteredStats[i + 1];
-          if (
-            curr.action_type === 'Set' &&
-            curr.player &&
-            next.result === 'Won Point'
-          ) {
-            assistCounts[curr.player] = (assistCounts[curr.player] || 0) + 1;
+        if (selectedGame !== 'all' && selectedGame !== 'scored') {
+          const gameStats = filteredStats
+            .filter(stat => stat.game_id === selectedGame)
+            .sort((a, b) => Number(a.import_seq ?? 0) - Number(b.import_seq ?? 0));
+          for (let i = 0; i < gameStats.length - 1; i++) {
+            const curr = gameStats[i];
+            const next = gameStats[i + 1];
+            if (
+              String(curr.action_type).toLowerCase() === 'set' &&
+              curr.player &&
+              (next && curr.rally_id === next.rally_id) &&
+              String(next.result).toLowerCase() === 'won point'
+            ) {
+              assistCounts[curr.player] = (assistCounts[curr.player] || 0) + 1;
+            }
           }
+        } else {
+          let relevantGames = [];
+          if (selectedGame === 'scored') {
+            relevantGames = games.filter(g => g.isscored).map(g => g.id);
+          } else {
+            relevantGames = games.map(g => g.id);
+          }
+          relevantGames.forEach(gameId => {
+            const gameStats = filteredStats
+              .filter(stat => stat.game_id === gameId)
+              .sort((a, b) => Number(a.import_seq ?? 0) - Number(b.import_seq ?? 0));
+            for (let i = 0; i < gameStats.length - 1; i++) {
+              const curr = gameStats[i];
+              const next = gameStats[i + 1];
+              if (
+                String(curr.action_type).toLowerCase() === 'set' &&
+                curr.player &&
+                next && curr.rally_id === next.rally_id &&
+                String(next.result).toLowerCase() === 'won point'
+              ) {
+                assistCounts[curr.player] = (assistCounts[curr.player] || 0) + 1;
+              }
+            }
+          });
         }
         setAssistData(assistCounts);
         const settingOnly = filteredStats.filter(
           stat => stat.set_to_position || stat.set_to_player
         );
         setSettingStats(settingOnly);
-        // New logic: Count won/lost by player-action
         const resultCounts = {};
         filteredStats.forEach(({ player, action_type, result }) => {
           if (!player || !action_type || !result) return;

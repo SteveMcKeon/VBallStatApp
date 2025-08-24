@@ -22,8 +22,8 @@ export async function fetchTeamMembers(supabase, teamId) {
   members.sort((a, b) => {
     const byRole = String(a.role).localeCompare(String(b.role));
     if (byRole) return byRole;
-    const an = (a.full_name || a.display_name || a.email || a.user_id || '').toLowerCase();
-    const bn = (b.full_name || b.display_name || b.email || b.user_id || '').toLowerCase();
+    const an = (a.display_name || a.full_name || a.email || a.user_id || '').toLowerCase();
+    const bn = (b.display_name || b.full_name || b.email || b.user_id || '').toLowerCase();
     return an.localeCompare(bn);
   });
   return members;

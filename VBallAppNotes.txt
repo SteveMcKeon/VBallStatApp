@@ -1,6 +1,6 @@
 #New Features
 add "export highlights" (for player / action type) functionality, ffmpeg
-Add video player settings option to change settings such as "jump forward/backward" timings, delay after end of rally before skipping to next rally during autoplay
+Add video player settings option to change settings such as "jump forward/backward" timings
 Add tooltip intro for new users to introduce features.
 Add resize video option (drag) in side-by-side mode.
 	Shift + -> and <- for seek to set.
@@ -22,10 +22,12 @@ investigate uploads on mobile in background
 
 #Fixes
 REFACTOR
-Making someone else Captain still makes you Player instead of Editor.
 make invitation email nicer.
-add Google Auth to acecpt-invite
-on inputting emails, once "Add another..." pops up, enter again should submit.
-demo invite via email doesn't add to roster.
+add Google Auth to accept-invite
 emails going to invalid addresses -  supabase does NOT like bouncebacks.
-if userauth fails, go to login page.
+Video backups.
+HLS buffer in autoplay and filtered touches?
+avatar GIFs, history of last couple avatars
+signin with email or phone number if exists
+account and profiles like Discord? 
+disable browser autocomplete on invite player

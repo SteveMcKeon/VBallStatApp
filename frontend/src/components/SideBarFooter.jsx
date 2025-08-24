@@ -40,42 +40,48 @@ const SidebarFooter = ({ mini = false, teamId, isMobile = false }) => {
       setShowToast(true);
     }
   };
+
+  const fetchUserData = async () => {
+    const { data: { user: sessUser } } = await supabase.auth.getUser();
+    if (!sessUser) return;
+    let teamRole = null;
+    if (teamId) {
+      const { data: tm, error: tmErr } = await supabase
+        .from('team_members')
+        .select('role')
+        .eq('user_id', sessUser.id)
+        .eq('team_id', teamId)
+        .maybeSingle();
+      if (!tmErr) teamRole = tm?.role ?? null; // 'captain' | 'editor' | 'player' | 'viewer' | null
+    }
+    const avatarUrl = await getAvatarFromCacheOrFetch(
+      sessUser.id,
+      sessUser.user_metadata?.avatar_url
+    );
+    const meta = sessUser.user_metadata || {};
+    const providerName =
+      Array.isArray(sessUser.identities) && sessUser.identities[0]?.identity_data?.name;
+    setUser({
+      id: sessUser.id,
+      email: sessUser.email,
+      name:
+        meta.display_name ||
+        meta.full_name ||
+        meta.name ||
+        providerName ||
+        (sessUser.email ? sessUser.email.split('@')[0] : 'User'),
+      avatarUrl: meta.avatar_url || meta.picture || avatarUrl || null,
+      user_metadata: meta,
+      role: teamRole || 'viewer',
+    });
+  };
+  useEffect(() => { fetchUserData(); }, [teamId]);
   useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { user: sessUser } } = await supabase.auth.getUser();
-      if (!sessUser) return;
-      let teamRole = null;
-      if (teamId) {
-        const { data: tm, error: tmErr } = await supabase
-          .from('team_members')
-          .select('role')
-          .eq('user_id', sessUser.id)
-          .eq('team_id', teamId)
-          .maybeSingle();
-        if (!tmErr) teamRole = tm?.role ?? null; // 'captain' | 'editor' | 'player' | 'viewer' | null
-      }
-      const avatarUrl = await getAvatarFromCacheOrFetch(
-        sessUser.id,
-        sessUser.user_metadata?.avatar_url
-      );
-      const meta = sessUser.user_metadata || {};
-      const providerName =
-        Array.isArray(sessUser.identities) && sessUser.identities[0]?.identity_data?.name;
-      setUser({
-        id: sessUser.id,
-        email: sessUser.email,
-        name:
-          meta.full_name ||
-          meta.display_name ||
-          meta.name ||
-          providerName ||
-          (sessUser.email ? sessUser.email.split('@')[0] : 'User'),
-        avatarUrl: meta.avatar_url || meta.picture || avatarUrl || null,
-        role: teamRole || 'viewer',
-      });
-    };
-    fetchUserData();
-  }, [teamId]);
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'USER_UPDATED') fetchUserData();
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (popupRef.current && !popupRef.current.contains(e.target)) {
