@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import StyledSelect from './StyledSelect';
-import UploadGameModal from './UploadGameModal';
-import supabase from '../supabaseClient';
 const getStatusColor = (game) => {
   if (game.hastimestamps && game.isscored) return 'green';
   if (game.hastimestamps) return 'yellow';

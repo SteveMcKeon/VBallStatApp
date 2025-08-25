@@ -5,6 +5,8 @@ import VideoPlayer from './VideoPlayer';
 import ColumnSelector from './ColumnSelector';
 import { useSidebar } from './SidebarContext';
 import { useNavigate } from 'react-router-dom';
+import Modal from './Modal';
+import ManageTeamModal from './ManageTeamModal';
 import GameSelector from './GameSelector';
 import StyledSelect from './StyledSelect';
 import EditMode from './EditMode';
@@ -46,6 +48,23 @@ const MainPage = () => {
     supabase,
     onSignOut: () => navigate('/login'),
   });
+  const NEW_TEAM_VALUE = '__new-team__';
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const teamOptions = useMemo(
+    () => [
+      ...availableTeams.map(t => ({ label: t.name, value: t.id, color: 'blue' })),
+      { label: <em>Register new team…</em>, value: NEW_TEAM_VALUE, color: 'gray' },
+    ],
+    [availableTeams]
+  );
+  const [showCreateTeamCentered, setShowCreateTeamCentered] = useState(false);
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [quickTeamName, setQuickTeamName] = useState('');
+  const [creatingQuickTeam, setCreatingQuickTeam] = useState(false);
+  const [showManageTeamModal, setShowManageTeamModal] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [filterFrozen, setFilterFrozen] = useState(false);
   const [frozenRowIds, setFrozenRowIds] = useState([]);
   const sidebarRef = useRef(null);
@@ -72,6 +91,79 @@ const MainPage = () => {
       console.warn('cancelUploads() not available on UploadGameModal ref');
     }
     setShowResumeBanner(false);
+  };
+  const onCreateTeamSubmit = (e) => {
+    e.preventDefault();
+    if (!creatingTeam) handleCreateTeam();
+  };
+  const createTeamByName = async (name) => {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return;
+    setCreatingQuickTeam(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('Not signed in');
+      const { data: teamRow, error: teamErr } = await supabase
+        .from('teams')
+        .insert({ name: trimmed, captain_id: userId })
+        .select('id, name')
+        .single();
+      if (teamErr) throw teamErr;
+      await supabase.from('team_members').insert({
+        team_id: teamRow.id,
+        user_id: userId,
+        role: 'captain',
+      });
+      const next = [...availableTeams, teamRow];
+      setAvailableTeams(next);
+      setTeamId(teamRow.id);
+      setTeamName(teamRow.name);
+      setLocal('teamId', teamRow.id);
+      setLocal('teamName', teamRow.name);
+      await handleTeamChange({ target: { value: teamRow.id } }, { force: true });
+      setShowQuickCreate(false);
+      setQuickTeamName('');
+      setShowManageTeamModal(true);
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'Failed to create team');
+    } finally {
+      setCreatingQuickTeam(false);
+    }
+  };
+  const handleCreateTeam = async () => {
+    const name = newTeamName.trim();
+    if (!name) { setCreateError('Please enter a team name'); return; }
+    setCreatingTeam(true);
+    setCreateError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('Not signed in');
+      const { data: teamRow, error: teamErr } = await supabase
+        .from('teams')
+        .insert({ name, captain_id: userId })
+        .select('id, name')
+        .single();
+      if (teamErr) throw teamErr;
+      await supabase.from('team_members').insert({
+        team_id: teamRow.id,
+        user_id: userId,
+        role: 'captain',
+      });
+      const next = [...availableTeams, teamRow];
+      setAvailableTeams(next);
+      setTeamId(teamRow.id);
+      setTeamName(teamRow.name);
+      setLocal('teamId', teamRow.id);
+      setLocal('teamName', teamRow.name);
+      await handleTeamChange({ target: { value: teamRow.id } }, { force: true });
+    } catch (e) {
+      setCreateError(e?.message || 'Failed to create team');
+    } finally {
+      setCreatingTeam(false);
+    }
   };
   const [currentUserId, setCurrentUserId] = useState(false);
   const [teamName, setTeamName] = useState('');
@@ -124,7 +216,6 @@ const MainPage = () => {
   const [gamePlayers, setGamePlayers] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
-  const [availableTeams, setAvailableTeams] = useState([]);
   const [showCenteredGamePicker, setShowCenteredGamePicker] = useState(true);
   const handleTeamChange = async (e, { force = false } = {}) => {
     const selectedId = e.target.value;
@@ -146,12 +237,16 @@ const MainPage = () => {
       window.dispatchEvent(new Event('db_layout_change'))
     );
     const { data, error } = await refreshGames(selectedId);
-    if (!error && Array.isArray(data) && data.length > 0 && !force) {
-      const mostRecent = data[0];
-      setSelectedGameId(mostRecent.id);
-      setSelectedVideo(mostRecent.video_url || '');
-      setShowCenteredGamePicker(false);
-      localStorage.setItem('selectedGameId', mostRecent.id);
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const shouldAutoPick =
+        !force || data.length === 1 || String(selectedId) === String(DEMO_TEAM_ID);
+      if (shouldAutoPick) {
+        const pick = data.find(g => g.processed) || data[0];
+        setSelectedGameId(pick.id);
+        setSelectedVideo(pick.video_url || '');
+        setShowCenteredGamePicker(false);
+        localStorage.setItem('selectedGameId', pick.id);
+      }
     }
     return { data, error };
   };
@@ -407,11 +502,18 @@ const MainPage = () => {
         }
       } else if (teams.length === 1) {
         const only = teams[0];
-        setTeamId(only.id);
-        setTeamName(only.name);
-        setLocal('teamId', only.id);
-        setLocal('teamName', only.name);
-        await handleTeamChange({ target: { value: only.id }, force: true });
+        if (String(only.id) === DEMO_TEAM_ID) {
+          setTeamId('');
+          setTeamName('');
+          setLocal('teamId', '');
+          setLocal('teamName', '');
+        } else {
+          setTeamId(only.id);
+          setTeamName(only.name);
+          setLocal('teamId', only.id);
+          setLocal('teamName', only.name);
+          await handleTeamChange({ target: { value: only.id }, force: true });
+        }
       } else {
         setTeamId('');
         setTeamName('');
@@ -538,12 +640,10 @@ const MainPage = () => {
         return result ?? true;
       })
     ), [stats, visibleColumns, textColumnFilters]);
-
   const filteredStats = useMemo(() => {
     if (!filterFrozen) return baseFilteredStats;
     return frozenRowIds.map(id => idToRow.get(id)).filter(Boolean);
   }, [filterFrozen, frozenRowIds, idToRow, baseFilteredStats]);
-
   const sortedStats = [...filteredStats].sort((a, b) => {
     const { key, direction } = sortConfig;
     const aVal = a[key];
@@ -641,22 +741,110 @@ const MainPage = () => {
     );
   }
   if (!isAppLoading && !teamId) {
+    const isDemoOnly =
+      availableTeams.length === 1 &&
+      String(availableTeams[0]?.id) === DEMO_TEAM_ID;
+
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
-        <div className="text-lg font-semibold mb-4">Please select your team to begin</div>
-        <StyledSelect
-          options={availableTeams.map(t => ({
-            label: t.name,
-            value: t.id,
-            color: 'blue',
-          }))}
-          value={teamId}
-          onChange={(selected) =>
-            handleTeamChange({ target: { value: selected.value } })
-          }
-          placeholder="Click here to select a team"
-          showStatus={false}
-        />
+        {!isDemoOnly ? (
+          !showCreateTeamCentered ? (
+            <>
+              <div className="text-lg font-semibold mb-4">Please select your team to begin</div>
+              <StyledSelect
+                options={teamOptions}
+                value={teamId}
+                onChange={(selected) => {
+                  if (!selected) return;
+                  if (selected.value === NEW_TEAM_VALUE) {
+                    setShowCreateTeamCentered(true);
+                  } else {
+                    handleTeamChange({ target: { value: selected.value } });
+                  }
+                }}
+                placeholder="Click here to select a team"
+                showStatus={false}
+              />
+            </>
+          ) : (
+            <form onSubmit={onCreateTeamSubmit} className="w-full max-w-md text-center">
+              <div className="text-lg font-semibold mb-2">Register a new team</div>
+              <p className="text-sm text-gray-600 mb-6">
+                Enter a team name and you can invite players right away.
+              </p>
+              <div className="mb-3">
+                <input
+                  type="text"
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Enter a team name (e.g., Unprotected Sets)"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  disabled={creatingTeam}
+                  autoFocus
+                  required
+                />
+                {createError && (
+                  <div className="text-left text-sm text-red-600 mt-1">{createError}</div>
+                )}
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="submit"
+                  disabled={creatingTeam}
+                  className="px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-default cursor-pointer"
+                >
+                  {creatingTeam ? 'Creating…' : 'Create your team'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateTeamCentered(false)}
+                  className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 cursor-pointer"
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          )
+        ) : (
+          // Demo team is the only option: show welcome with "Create" OR "Explore Demo"
+          <form onSubmit={onCreateTeamSubmit} className="w-full max-w-md text-center">
+            <div className="text-lg font-semibold mb-2">Welcome!</div>
+            <p className="text-sm text-gray-600 mb-6">
+              You can explore the site's functionality via the Demo, or create your own team to get set up.
+            </p>
+            <div className="mb-3">
+              <input
+                type="text"
+                className="w-full border rounded px-3 py-2"
+                placeholder="Enter a team name (e.g., Unprotected Sets)"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                disabled={creatingTeam}
+                autoFocus
+                required
+              />
+              {createError && (
+                <div className="text-left text-sm text-red-600 mt-1">{createError}</div>
+              )}
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                type="submit"
+                disabled={creatingTeam}
+                className="px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-default cursor-pointer"
+              >
+                {creatingTeam ? 'Creating…' : 'Create your team'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTeamChange({ target: { value: DEMO_TEAM_ID } })}
+                className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 cursor-pointer"
+              >
+                Explore the Demo
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     );
   }
@@ -688,6 +876,17 @@ const MainPage = () => {
             resumeSilently={resumeSilently}
             hideUploadOption={teamId === DEMO_TEAM_ID || teamGames.length > 0}
           />
+          {teamId !== DEMO_TEAM_ID && (
+            <>
+              <div className="mt-4 text-sm text-gray-500 text-center">- or -</div>
+              <button
+                onClick={() => handleTeamChange({ target: { value: DEMO_TEAM_ID } })}
+                className="mt-3 px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-default cursor-pointer"
+              >
+                Explore the Demo instead
+              </button>
+            </>
+          )}
         </div>
         <UploadGameModal
           ref={uploadModalRef}
@@ -761,14 +960,17 @@ const MainPage = () => {
               <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col h-full">
                 <label className="font-semibold block mb-1 text-gray-800">Your Team:</label>
                 <StyledSelect
-                  options={availableTeams.map(t => ({
-                    label: t.name,
-                    value: t.id,
-                    color: 'blue',
-                  }))}
+                  options={teamOptions}
                   value={teamId}
-                  onChange={(opt) => handleTeamChange({ target: { value: opt.value } })}
-                  placeholder="Click here to select a team"
+                  onChange={(selected) => {
+                    if (!selected) return;
+                    if (selected.value === NEW_TEAM_VALUE) {
+                      setShowQuickCreate(true);
+                      return;
+                    }
+                    handleTeamChange({ target: { value: selected.value } });
+                  }}
+                  placeholder="Select a team"
                   showStatus={false}
                 />
                 <div>
@@ -778,7 +980,7 @@ const MainPage = () => {
                   <GameSelector
                     key={teamName}
                     games={teamGames}
-                    value={selectedGameId}
+                    value={teamGames.some(g => g.id === selectedGameId) ? selectedGameId : null}
                     onChange={(selectedOption) => {
                       if (selectedOption.value === 'upload-new') {
                         handleOpenUploadModal();
@@ -972,6 +1174,52 @@ const MainPage = () => {
           </div>
         </div>
       )}
+      <Modal isOpen={showQuickCreate} onClose={() => setShowQuickCreate(false)}>
+        <div className="p-4">
+          <h3 className="text-lg font-semibold mb-2">Register new team</h3>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!creatingQuickTeam) createTeamByName(quickTeamName);
+            }}
+          >
+            <input
+              type="text"
+              className="w-full border rounded px-3 py-2"
+              placeholder="Team name"
+              value={quickTeamName}
+              onChange={(e) => setQuickTeamName(e.target.value)}
+              disabled={creatingQuickTeam}
+              autoFocus
+              required
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowQuickCreate(false)}
+                className="px-3 py-2 rounded-md border border-gray-300 hover:bg-gray-100 cursor-pointer"
+                disabled={creatingQuickTeam}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-default cursor-pointer"
+                disabled={creatingQuickTeam || !quickTeamName.trim()}
+              >
+                {creatingQuickTeam ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+      <ManageTeamModal
+        isOpen={showManageTeamModal}
+        onClose={() => setShowManageTeamModal(false)}
+        teamId={teamId}
+        currentUserId={currentUserId}
+        canManage={true}
+      />
       <UploadGameModal
         ref={uploadModalRef}
         isOpen={isUploadModalOpen}

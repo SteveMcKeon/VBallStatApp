@@ -37,7 +37,30 @@ export default function ManageProfileModal({
         setToastType(type);
         setShowToast(true);
     };
-    // Current user
+    const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+    const handleDeleteAccount = async () => {
+        setBusy(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            };
+            const res = await fetch('/api/delete-account', { method: 'POST', headers });
+            if (!res.ok) {
+                const { error } = await res.json().catch(() => ({}));
+                throw new Error(error || 'Failed to delete account');
+            }
+            setToast('Account deleted', 'success');
+            setConfirmDeleteAccount(false);
+            await supabase.auth.signOut();
+            window.location.href = '/';
+        } catch (e) {
+            setToast(e?.message || 'Failed to delete account');
+        } finally {
+            setBusy(false);
+        }
+    };
     const [user, setUser] = useState(null);
     const [displayName, setDisplayName] = useState('');
     const [phone, setPhone] = useState('');
@@ -277,6 +300,22 @@ export default function ManageProfileModal({
                 )}
             </div>
             */}
+            {/* Danger zone: delete account */}
+            <div className="mt-8 pt-4 border-t flex items-center justify-between">
+                <div>
+                    <div className="font-medium text-gray-700">Delete account</div>
+                    <div className="text-xs text-gray-500">
+                        Permanently deletes your account and removes you from all teams.
+                    </div>
+                </div>
+                <button
+                    onClick={() => setConfirmDeleteAccount(true)}
+                    className="px-4 py-2 rounded-full border border-red-500 text-red-600 hover:bg-red-50 cursor-pointer"
+                    type="button"
+                >
+                    Delete
+                </button>
+            </div>
             {/* Footer */}
             {!embedded && (
                 <div className="mt-6 flex justify-end">
@@ -284,6 +323,32 @@ export default function ManageProfileModal({
                         Done
                     </button>
                 </div>
+            )}
+            {confirmDeleteAccount && (
+                <Modal isOpen onClose={() => setConfirmDeleteAccount(false)}>
+                    <div className="text-left">
+                        <h3 className="text-lg font-semibold mb-2">Delete account?</h3>
+                        <p className="text-sm text-gray-600">
+                            This permanently deletes your account and associated data. This cannot be undone.
+                        </p>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                onClick={() => setConfirmDeleteAccount(false)}
+                                className="px-4 py-2 rounded-md border hover:bg-gray-50 cursor-pointer"
+                                type="button"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteAccount}
+                                className="px-4 py-2 rounded-md border border-red-500 text-red-600 hover:bg-red-50 cursor-pointer"
+                                type="button"
+                            >
+                                Delete account
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
             )}
             <Toast
                 message={toastMessage}

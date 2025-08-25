@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from './Modal';
 import Toast from './Toast';
 import supabase from '../supabaseClient';
@@ -79,7 +79,7 @@ export default function ManageTeamModal({
   const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
   const splitEmails = (s) =>
     (s || '')
-      .split(/[\s,;\uFF0C]+/) // include full-width comma (iOS)
+      .split(/[\s,;\uFF0C]+/)
       .map(x => x.trim())
       .filter(Boolean);
   const addChip = (raw) => {
@@ -94,6 +94,40 @@ export default function ManageTeamModal({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [savingName, setSavingName] = useState(false);
+  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState(false);
+  const handleDeleteTeam = async () => {
+    if (!teamId) return;
+    if (isDemoTeam) {
+      setToast("You can't delete the Demo team.", 'error');
+      setConfirmDeleteTeam(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      };
+      const res = await fetch('/api/delete-team', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ teamId }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error || 'Failed to delete team');
+      }
+      setToast('Team deleted', 'success');
+      setConfirmDeleteTeam(false);
+      onClose?.();
+      window.location.reload();
+    } catch (e) {
+      setToast(e?.message || 'Failed to delete team');
+    } finally {
+      setBusy(false);
+    }
+  };
   const saveDisplayName = async (userId, value) => {
     if (!teamId || !userId) return;
     const trimmed = String(value || '').trim();
@@ -401,8 +435,23 @@ export default function ManageTeamModal({
         try {
           const match = await getUserByEmail(email);
           if (match) {
-            await addExistingUserToTeam(match.id); // no-op if already on team
-            added++;
+            let becameMember = false;
+            try {
+              await addExistingUserToTeam(match.id);
+              const { data: check } = await supabase
+                .from('team_members')
+                .select('user_id')
+                .eq('team_id', teamId)
+                .eq('user_id', match.id)
+                .maybeSingle();
+              becameMember = !!check;
+            } catch { /* ignore; we’ll fallback */ }
+            if (becameMember) {
+              added++;
+            } else {
+              await inviteByEmail(email);
+              invited++;
+            }
           } else {
             await inviteByEmail(email);
             invited++;
@@ -845,41 +894,84 @@ export default function ManageTeamModal({
           ))}
         </div>
       </div>
+      {/* Danger zone: delete team */}
+      {canManage && currentUserId === captainId && !isDemoTeam && (
+        <div className="mt-8 pt-4 border-t flex items-center justify-between">
+          <div>
+            <div className="font-medium text-gray-700">Delete team</div>
+            <div className="text-xs text-gray-500">
+              Permanently removes the team and all of its data.<br />This cannot be undone.
+            </div>
+          </div>
+          <button
+            onClick={() => setConfirmDeleteTeam(true)}
+            className="px-4 py-2 rounded-full border border-red-500 text-red-600 hover:bg-red-50 cursor-pointer"
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
+      )}
       <div className="mt-6 flex justify-end">
         <button onClick={onClose} className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 cursor-pointer">
           Done
         </button>
       </div>
-      {
-        confirmCaptain && (
-          <Modal isOpen onClose={() => setConfirmCaptain(null)}>
-            <div className="text-left">
-              <h3 className="text-lg font-semibold mb-2">Make {confirmCaptain.label} Captain?</h3>
-              <p className="text-sm text-gray-600">
-                This will transfer the Captain role to <b>{confirmCaptain.label}</b>.
-                You’ll be downgraded to <b>Editor</b> and won’t be able to make yourself Captain again.
-              </p>
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  onClick={() => setConfirmCaptain(null)}
-                  className="px-4 py-2 rounded-md border hover:bg-gray-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    await updateRole(confirmCaptain.userId, 'captain');
-                    setConfirmCaptain(null);
-                  }}
-                  className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 cursor-pointer"
-                >
-                  Yes, transfer Captain
-                </button>
-              </div>
+      {confirmCaptain && (
+        <Modal isOpen onClose={() => setConfirmCaptain(null)}>
+          <div className="text-left">
+            <h3 className="text-lg font-semibold mb-2">Make {confirmCaptain.label} Captain?</h3>
+            <p className="text-sm text-gray-600">
+              This will transfer the Captain role to <b>{confirmCaptain.label}</b>.
+              You’ll be downgraded to <b>Editor</b> and won’t be able to make yourself Captain again.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmCaptain(null)}
+                className="px-4 py-2 rounded-md border hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await updateRole(confirmCaptain.userId, 'captain');
+                  setConfirmCaptain(null);
+                }}
+                className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 cursor-pointer"
+              >
+                Yes, transfer Captain
+              </button>
             </div>
-          </Modal>
-        )
-      }
+          </div>
+        </Modal>
+      )}
+      {confirmDeleteTeam && (
+        <Modal isOpen onClose={() => setConfirmDeleteTeam(false)}>
+          <div className="text-left">
+            <h3 className="text-lg font-semibold mb-2">Delete team?</h3>
+            <p className="text-sm text-gray-600">
+              This will permanently delete <b>{teamName || 'this team'}</b> and all stats, games, and invites.
+              This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteTeam(false)}
+                className="px-4 py-2 rounded-md border hover:bg-gray-50 cursor-pointer"
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteTeam}
+                className="px-4 py-2 rounded-md border border-red-500 text-red-600 hover:bg-red-50 cursor-pointer"
+                type="button"
+              >
+                Delete team
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       <Toast
         message={toastMessage}
         show={showToast}

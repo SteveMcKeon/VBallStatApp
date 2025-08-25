@@ -489,7 +489,7 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
           <table className="text-center table-auto">
             <thead>
               <tr>
-                <th></th>
+                <th className="bg-white"></th>
                 {actions.filter(action => visibleColumns[action]?.visible).map(action => {
                   const subColSpan = allSubColumns.filter(
                     sub =>
@@ -498,15 +498,15 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
                   ).length;
                   if (subColSpan === 0) return null;
                   return (
-                    <th key={action} colSpan={subColSpan} className="p-1 font-semibold border border-black bg-gray-200">
+                    <th key={action} colSpan={subColSpan} className="p-1 font-semibold border border-black bg-gray-100">
                       {action}
                     </th>
                   );
                 })}
-                <th colSpan="4" className="bg-gray-200 border-l-2 border-t-2 border-r-2 p-1 font-semibold">Total</th>
+                <th colSpan="4" className="bg-gray-100 border-l-2 border-t-2 border-r-2 p-1 font-semibold ">Total</th>
               </tr>
               <tr>
-                <th></th>
+                <th className="bg-white"></th>
                 {actions
                   .filter(action => visibleColumns[action]?.visible)
                   .flatMap(action =>
@@ -676,9 +676,9 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
                   <table className="text-center table-auto border-collapse mb-4">
                     <thead>
                       <tr>
-                        <th className="p-1 font-semibold border border-black bg-gray-200">Position</th>
-                        <th className="p-1 font-semibold border border-black bg-gray-200">Qty</th>
-                        <th className="p-1 font-semibold border border-black bg-gray-200">%</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-100">Position</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-100">Qty</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-100">%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -701,9 +701,9 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
                   <table className="text-center table-auto border-collapse">
                     <thead>
                       <tr>
-                        <th className="p-1 font-semibold border border-black bg-gray-200">Player</th>
-                        <th className="p-1 font-semibold border border-black bg-gray-200">Qty</th>
-                        <th className="p-1 font-semibold border border-black bg-gray-200">%</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-100">Player</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-100">Qty</th>
+                        <th className="p-1 font-semibold border border-black bg-gray-100">%</th>
                       </tr>
                     </thead>
                     <tbody>

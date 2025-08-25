@@ -40,7 +40,6 @@ table {
 thead th {
   position: sticky;
   top: 0;
-  background: #f3f4f6;
   z-index: 200;
 }
 

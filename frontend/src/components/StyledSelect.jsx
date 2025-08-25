@@ -4,16 +4,22 @@ import { FaCircle } from 'react-icons/fa';
 import TooltipPortal from '../utils/tooltipPortal';
 export const selectStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  control: (base) => ({
+  control: (base, state) => ({
     ...base,
     border: '1px solid black',
-    backgroundColor: '#f3f4f6',
     width: 'auto',
     maxWidth: '100%',
     height: '32px',
     whiteSpace: 'nowrap',
     overflow: 'visible',
+    cursor: state?.isDisabled ? 'not-allowed' : 'pointer',
   }),
+  dropdownIndicator: (base) => ({ ...base, cursor: 'pointer' }),
+  clearIndicator: (base) => ({ ...base, cursor: 'pointer' }),
+  indicatorSeparator: (base) => ({ ...base, cursor: 'pointer' }),
+  option: (base) => ({ ...base, cursor: 'pointer' }),
+  menu: (base) => ({ ...base, cursor: 'pointer' }),
+  menuList: (base) => ({ ...base, cursor: 'pointer' }),
   placeholder: (base) => ({
     ...base,
     fontStyle: 'italic',
@@ -31,13 +37,14 @@ export const selectStyles = {
     gap: '0.5rem',
   }),
   valueContainer: (base) => ({
-    ...base,
-    display: 'flex',
-    overflow: 'visible',
-    flexWrap: 'nowrap',
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
-  }),
+  ...base,
+  display: 'flex',
+  overflow: 'visible',
+  flexWrap: 'nowrap',
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+  cursor: 'pointer',
+}),
 };
 // Tooltip-aware icon
 const TooltipIcon = ({ color, tooltip }) => {
@@ -83,7 +90,7 @@ const TooltipIcon = ({ color, tooltip }) => {
 // Value renderer
 const CustomSingleValue = ({ data, selectProps }) => (
   <div className="flex w-full items-center justify-between text-sm">
-    <span className="truncate">{data.label}</span>
+    <span className="truncate ">{data.label}</span>
     {selectProps.showStatus && data.color && (
       selectProps.showTooltip && data.tooltip ? (
         <TooltipIcon color={data.color} tooltip={data.tooltip} />
@@ -100,7 +107,7 @@ const CustomOption = ({ data, innerRef, innerProps, selectProps }) => (
   <div
     ref={innerRef}
     {...innerProps}
-    className="flex items-center justify-between gap-2 px-2 py-1 hover:bg-gray-100 relative"
+    className="flex items-center justify-between gap-2 px-2 py-1 hover:bg-gray-100 relative cursor-pointer"
   >
     <span className="truncate">{data.label}</span>
     {selectProps.showStatus && data.color && (

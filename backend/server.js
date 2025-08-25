@@ -30,6 +30,90 @@ app.use((req, res, next) => {
 });
 app.use(cors());
 app.use(express.json());
+const DEMO_TEAM_ID = process.env.DEMO_TEAM_ID || 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
+async function deleteTeamCascade(teamId) {
+  const { data: games } = await supabase
+    .from('games')
+    .select('id, video_url')
+    .eq('team_id', teamId);
+  if (games?.length) {
+    for (const g of games) {
+      const fname = path.basename(String(g.video_url || ''));
+      if (!fname) continue;
+      const full = path.join(VIDEO_DIR, fname);
+      try {
+        await fsp.unlink(full);
+      } catch (e) {
+        if (e.code !== 'ENOENT') throw e;
+      }
+    }
+  }
+  await supabase.from('stats').delete().eq('team_id', teamId);
+  await supabase.from('games').delete().eq('team_id', teamId);
+  await supabase.from('team_invites').delete().eq('team_id', teamId);
+  await supabase.from('team_members').delete().eq('team_id', teamId);
+  await supabase.from('teams').delete().eq('id', teamId);
+  return { deletedGames: games?.length || 0 };
+}
+/** DELETE TEAM (captain only) */
+app.post('/api/delete-team', async (req, res) => {
+  try {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const requesterId = decoded?.sub;
+    if (!requesterId) return res.status(403).json({ error: 'Unauthorized' });
+    const teamId = String(req.body?.teamId || '').trim();
+    if (!UUID_RE.test(teamId)) {
+      return res.status(400).json({ error: 'Invalid teamId' });
+    }
+    if (DEMO_TEAM_ID && teamId === DEMO_TEAM_ID) {
+      return res.status(400).json({ error: "You can't delete the Demo team" });
+    }
+    const allowed = await userCanManageTeam(requesterId, teamId);
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    const out = await deleteTeamCascade(teamId);
+    return res.json({ ok: true, ...out });
+  } catch (e) {
+    console.error('❌ /api/delete-team failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
+/** DELETE ACCOUNT (self) */
+app.post('/api/delete-account', async (req, res) => {
+  try {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const userId = decoded?.sub;
+    if (!userId) return res.status(403).json({ error: 'Unauthorized' });
+    const { data: ownedTeams } = await supabase
+      .from('teams')
+      .select('id, name')
+      .eq('captain_id', userId);
+    if (ownedTeams?.length) {
+      return res.status(409).json({
+        error: 'Captain of one or more teams. Delete or transfer captaincy first.',
+        teams: ownedTeams,
+      });
+    }
+    await supabase.from('team_members').delete().eq('user_id', userId);
+    let email = null;
+    try {
+      const r = await supabase.auth.admin.getUserById(userId);
+      const u = r.user || r.data?.user || null;
+      email = u?.email || null;
+    } catch { }
+    if (email) await supabase.from('team_invites').delete().eq('email', email);
+    await supabase.from('team_invites').delete().eq('invited_by', userId);
+    const { error: delErr } = await supabase.auth.admin.deleteUser(userId);
+    if (delErr) return res.status(400).json({ error: delErr.message });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('❌ /api/delete-account failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
 app.use('/videos', express.static(VIDEO_DIR, {
   setHeaders(res, p) {
     if (p.endsWith('.m3u8')) {
@@ -186,17 +270,6 @@ async function userCanManageTeam(userId, teamId) {
   } catch { }
   return false;
 }
-async function sendTransactionalEmail({ to, subject, html, text }) {
-  if (process.env.EMAIL_HOOK_URL) {
-    await fetch(process.env.EMAIL_HOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, html, text }),
-    });
-    return;
-  }
-  console.log('Invite email (dev):', { to, subject, html, text });
-}
 app.post('/api/set-display-name', async (req, res) => {
   try {
     const token = (req.headers.authorization || '').split(' ')[1];
@@ -262,71 +335,76 @@ app.post('/api/team-invites', async (req, res) => {
     if (!email || !teamId) return res.status(400).json({ error: 'Missing email or teamId' });
     email = String(email).trim();
     const emailRx = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
-    if (!emailRx.test(email)) {
-      return res.status(400).json({ error: `Email address "${email}" is invalid` });
-    }
-    if (!['player', 'editor'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
+    if (!emailRx.test(email)) return res.status(400).json({ error: `Email address "${email}" is invalid` });
+    if (!['player', 'editor'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
     const allowed = await userCanManageTeam(inviterId, teamId);
     if (!allowed) return res.status(403).json({ error: 'Forbidden' });
     const inviteToken = crypto.randomUUID();
     const redirectTo =
       `${process.env.SITE_URL}/accept-invite?team=${encodeURIComponent(teamId)}&token=${encodeURIComponent(inviteToken)}`;
-    const { error: inviteErr } =
-      await supabase.auth.admin.inviteUserByEmail(email, { redirectTo });
-    if (inviteErr?.message?.toLowerCase().includes('already registered')) {
-      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-        type: 'magiclink',
-        email,
-        options: { redirectTo },
-      });
-      if (linkErr) {
-        return res.status(400).json({ error: linkErr.message });
+    let existingUser = null;
+    try {
+      if (typeof supabase.auth.admin.getUserByEmail === 'function') {
+        const r = await supabase.auth.admin.getUserByEmail(email);
+        existingUser = r.user || r.data?.user || null;
+      } else {
+        const r = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+        const users = r.users || r.data?.users || [];
+        existingUser = users.find(u => (u.email || '').toLowerCase() === email.toLowerCase()) || null;
       }
-      await supabase.from('team_invites')
-        .delete()
-        .eq('team_id', teamId)
-        .eq('email', email);
-      const { error: insertErr } = await supabase.from('team_invites').insert({
-        team_id: teamId,
-        email,
-        invited_by: inviterId,
-        role,
-        token: inviteToken,
-      });
-      if (insertErr) {
-        return res.status(400).json({ error: insertErr.message || 'Failed to record invite' });
-      }
-      let inviterLabel = 'the team captain';
-      try {
-        const inviterRes = await supabase.auth.admin.getUserById(inviterId);
-        const inviter = inviterRes.user || inviterRes.data?.user || null;
-        inviterLabel =
-          inviter?.user_metadata?.display_name ||
-          inviter?.user_metadata?.full_name ||
-          inviter?.user_metadata?.name ||
-          inviter?.email ||
-          'the team captain';
-      } catch { }
-      let teamNameForEmail = '';
-      try {
-        const { data: teamRow } = await supabase
-          .from('teams')
-          .select('name')
-          .eq('id', teamId)
-          .maybeSingle();
-        teamNameForEmail = teamRow?.name || '';
-      } catch { }
-      const { subject, html, text } = buildInviteEmail({
-        inviterLabel,
-        teamName: teamNameForEmail,
-        actionLink: linkData.properties.action_link,
-        siteUrl: process.env.SITE_URL,
-      });
-      await sendTransactionalEmail({ to: email, subject, html, text });
-      return res.json({ ok: true });
+    } catch {
     }
+    if (existingUser) {
+      const isConfirmed =
+        !!(existingUser.email_confirmed_at || existingUser.confirmed_at);
+      if (isConfirmed) {
+        const { data: existing } = await supabase
+          .from('team_members')
+          .select('user_id')
+          .eq('team_id', teamId)
+          .eq('user_id', existingUser.id)
+          .maybeSingle();
+        if (!existing) {
+          const { error: insertMemberErr } = await supabase.from('team_members').insert({
+            team_id: teamId,
+            user_id: existingUser.id,
+            role: 'player',
+          });
+          if (insertMemberErr) {
+            return res.status(400).json({ error: insertMemberErr.message || 'Failed to add member' });
+          }
+        }
+        await supabase.from('team_invites')
+          .delete()
+          .eq('team_id', teamId)
+          .eq('email', email);
+        return res.json({ ok: true, addedUserId: existingUser.id });
+      } else {
+        try {
+          if (typeof supabase.auth.admin.resend === 'function') {
+            await supabase.auth.admin.resend({ type: 'signup', email, options: { redirectTo } });
+          } else {
+            await supabase.auth.admin.generateLink({ type: 'signup', email, options: { redirectTo } });
+          }
+        } catch { /* ignore non-fatal email errors */ }
+        await supabase.from('team_invites')
+          .delete()
+          .eq('team_id', teamId)
+          .eq('email', email);
+        const { error: insertUnverifiedInviteErr } = await supabase.from('team_invites').insert({
+          team_id: teamId,
+          email,
+          invited_by: inviterId,
+          role,
+          token: inviteToken,
+        });
+        if (insertUnverifiedInviteErr) {
+          return res.status(400).json({ error: insertUnverifiedInviteErr.message || 'Failed to record invite' });
+        }
+        return res.json({ ok: true, pending: true });
+      }
+    }
+    const { error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (inviteErr) {
       return res.status(400).json({ error: inviteErr.message || 'Invite failed' });
     }
@@ -429,7 +507,9 @@ app.get('/api/search-users', async (req, res) => {
       .from('team_members')
       .select('team_id')
       .eq('user_id', requesterId);
-    const myTeamIds = (myTeams || []).map(r => r.team_id);
+    const myTeamIds = (myTeams || [])
+      .map(r => r.team_id)
+      .filter(id => id && id !== DEMO_TEAM_ID);
     if (myTeamIds.length === 0) return res.json({ users: [] });
     const { data: coRows } = await supabase
       .from('team_members')

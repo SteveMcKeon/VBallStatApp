@@ -31,3 +31,5 @@ avatar GIFs, history of last couple avatars
 signin with email or phone number if exists
 account and profiles like Discord? 
 disable browser autocomplete on invite player
+need place to register new team.
+make videos exist in team_id/video.mp4

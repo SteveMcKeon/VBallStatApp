@@ -938,7 +938,7 @@ const UploadGameModal = forwardRef(({ isOpen, onBeforeOpen, onClose, teamId, onU
           }
         }
         setUploads(prev => prev.map(u => (u.id === uploadId ? { ...u, status: 'success' } : u)));
-        setToast('Game uploaded successfully!', 'success');
+        setToast("Game uploaded successfully! We'll email you when it's done being processed.", 'success');
         setTimeout(() => {
           setUploads(prev => prev.filter(u => u.id !== uploadId));
         }, 5000);

@@ -15,7 +15,7 @@ const ColumnSelector = ({ columns, visibleColumns, toggleColumn }) => {
     <div className="relative" ref={selectorRef}>
       <button
         type="button"
-        className="w-full border border-black p-2 text-left bg-gray-100 rounded hover:border-gray-400 text-sm focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors"
+        className="w-full cursor-pointer border border-black p-2 text-left bg-white rounded hover:border-gray-400 text-sm focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors"
         onClick={() => setOpen(!open)}
       >
         {columns
