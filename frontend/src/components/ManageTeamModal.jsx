@@ -643,6 +643,14 @@ export default function ManageTeamModal({
                 </span>
               ))}
               <input
+                type="search"
+                name="invite-player"
+                id="invite-player"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
                 className="flex-1 min-w-[8rem] outline-none px-1"
                 value={inviteQuery}
                 onChange={(e) => {

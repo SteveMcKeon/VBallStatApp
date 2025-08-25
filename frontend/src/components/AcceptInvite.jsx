@@ -22,10 +22,27 @@ export default function AcceptInvite() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [teamName, setTeamName] = useState('');
-  // Toast state (match Login/Register API)
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
   const [showToast, setShowToast] = useState(false);
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/accept-invite${window.location.search}` },
+    });
+  };
+  const handleGoogleLink = async () => {
+    try {
+      if (typeof supabase.auth.linkIdentity === 'function') {
+        const { error } = await supabase.auth.linkIdentity({
+          provider: 'google',
+          options: { redirectTo: `${window.location.origin}/accept-invite${window.location.search}` },
+        });
+        if (!error) return;
+      }
+    } catch { }
+    await handleGoogleLogin();
+  };
   const showToastMsg = (message, type = 'success') => {
     setToastMessage(message);
     setToastType(type);
@@ -184,6 +201,27 @@ export default function AcceptInvite() {
                 Go to Login
               </button>
             )}
+            <div className="flex items-center my-6">
+              <hr className="flex-grow border-gray-300" />
+              <span className="mx-2 text-sm text-gray-400">OR</span>
+              <hr className="flex-grow border-gray-300" />
+            </div>
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full flex items-center justify-center border border-gray-300 rounded-full py-2 hover:bg-gray-200 cursor-pointer"
+            >
+              <img
+                src="https://www.svgrepo.com/show/475656/google-color.svg"
+                alt="Google"
+                className="w-5 h-5 mr-2"
+              />
+              Continue with Google
+            </button>
+
+            <p className="text-xs text-center text-gray-400 mt-6">
+              <a href="#" className="hover:underline">Terms of Use</a> |{' '}
+              <a href="#" className="hover:underline">Privacy Policy</a>
+            </p>
           </div>
         </Center>
         <Toast
@@ -234,6 +272,22 @@ export default function AcceptInvite() {
                 Save & Continue
               </button>
             </form>
+            <div className="flex items-center my-6">
+              <hr className="flex-grow border-gray-300" />
+              <span className="mx-2 text-sm text-gray-400">OR</span>
+              <hr className="flex-grow border-gray-300" />
+            </div>
+            <button
+              onClick={handleGoogleLink}
+              className="w-full flex items-center justify-center border border-gray-300 rounded-full py-2 hover:bg-gray-200 cursor-pointer"
+            >
+              <img
+                src="https://www.svgrepo.com/show/475656/google-color.svg"
+                alt="Google"
+                className="w-5 h-5 mr-2"
+              />
+              Continue with Google
+            </button>
           </div>
         </Center>
         <Toast
