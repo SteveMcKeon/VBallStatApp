@@ -100,6 +100,23 @@ const DBStats = ({
     () => (visibleColumns?.notes?.visible ? DEFAULT_FLEX_MIN_PX : 170),
     [visibleColumns?.notes?.visible]
   );
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const enterFullscreenIfMobile = async () => {
+    if (!isMobile) return;
+    const v = videoRef?.current;
+    if (!v) return;
+    try {
+      if (document.fullscreenElement) return;
+      if (v.requestFullscreen) {
+        await v.requestFullscreen();
+      } else if (v.webkitEnterFullscreen) {
+        v.webkitEnterFullscreen();
+      } else if (v.webkitRequestFullscreen) {
+        await v.webkitRequestFullscreen();
+      }
+    } catch {
+    }
+  };
   const handleClearAllFilters = () => {
     window.dispatchEvent(new Event('closeAllFilters'));
     const keys = Object.keys(textColumnFilters ?? {});
@@ -121,7 +138,6 @@ const DBStats = ({
       );
     });
   }, [textColumnFilters]);
-
   const [gameSettings, setGameSettings] = useState({ hastimestamps: null, isscored: null });
   useEffect(() => {
     if (typeof hastimestamps === 'boolean' || typeof isscored === 'boolean') {
@@ -130,8 +146,8 @@ const DBStats = ({
   }, [hastimestamps, isscored]);
   const handlePlayFiltered = async () => {
     const timestamps = filteredStats
-      .filter(s => s.timestamp != null)
-      .map(s => s.timestamp)
+      .filter((s) => s.timestamp != null)
+      .map((s) => s.timestamp)
       .sort((a, b) => a - b);
     if (timestamps.length === 0 || !videoPlayerRef.current) return;
     const sequences = [];
@@ -166,6 +182,8 @@ const DBStats = ({
       const scrollTarget = videoBottom - scrollContainer.clientHeight;
       scrollContainer.scrollTo({ top: scrollTarget });
     }
+    await enterFullscreenIfMobile();
+    await sleep(1000);
     await videoPlayerRef.current.playCustomSequences(sequences);
   };
   const headerTableRef = useRef(null);
@@ -250,7 +268,6 @@ const DBStats = ({
     });
     setColumnWidths(next);
   }, [bodyColumns, flexKey]);
-
   // Track live measured header cell widths
   useLayoutEffect(() => {
     const table = headerTableRef.current;
@@ -274,7 +291,6 @@ const DBStats = ({
     ths.forEach((th) => ro.observe(th));
     return () => ro.disconnect();
   }, [visibleColumns, sortConfig, textColumnFilters, editMode]);
-
   const didInitialAutofit = useRef(false);
   useLayoutEffect(() => {
     if (didInitialAutofit.current) return;
@@ -302,7 +318,6 @@ const DBStats = ({
     keys.forEach(k => autofitColumn(k));
   }, [bodyColumns, flexKey]);
   const [viewportW, setViewportW] = useState(0);
-
   useLayoutEffect(() => {
     const headerEl = headerScrollRef.current;
     const bodyEl = listOuterRef.current;
@@ -362,9 +377,7 @@ const DBStats = ({
   useLayoutEffect(() => {
     listRef.current?.resetAfterIndex(0, true);
   }, [gridTemplate, columnWidths, viewportW]);
-
   const [isResizingCol, setIsResizingCol] = useState(false);
-
   useEffect(() => {
     const onStart = () => setIsResizingCol(true);
     const onEnd = () => {
@@ -380,19 +393,16 @@ const DBStats = ({
       window.removeEventListener('db_col_resize_end', onEnd);
     };
   }, []);
-
   useEffect(() => {
     rowHeightsRef.current.clear();
     requestAnimationFrame(() => {
       listRef.current?.resetAfterIndex(0, true);
     });
   }, [orderedKeys, gridTemplate]);
-
   const filteredKey = React.useMemo(
     () => filteredStats.map(r => r.id).join('|'),
     [filteredStats]
   );
-
   useEffect(() => {
     rowHeightsRef.current.clear();
     listRef.current?.resetAfterIndex(0, true);
@@ -540,7 +550,6 @@ const DBStats = ({
       window.addEventListener('db_row_maybe_grow', onMaybeGrow);
       return () => window.removeEventListener('db_row_maybe_grow', onMaybeGrow);
     }, [index, measureAndCommit]);
-
     useLayoutEffect(() => {
       if (!rowRef.current) return;
       const measure = () => {
@@ -570,7 +579,6 @@ const DBStats = ({
         if (raf) cancelAnimationFrame(raf);
       };
     }, [index, filteredStats, gridTemplate, isResizingCol]);
-
     const s = filteredStats[index];
     const prevRow = index > 0 ? filteredStats[index - 1] : null;
     const idx = index;
@@ -935,7 +943,7 @@ const DBStats = ({
                 className={
                   `px-4 rounded-xl text-white font-semibold shadow-md transform transition hover:scale-[1.03]
              bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 ` +
-                  ((isMobile  && layoutMode === 'side-by-side') ? 'col-span-2 w-full' : 'py-1')
+                  ((isMobile && layoutMode === 'side-by-side') ? 'col-span-2 w-full' : 'py-1')
                 }
                 aria-label="Play filtered touches"
               >
@@ -962,7 +970,6 @@ const DBStats = ({
                 {filterFrozen ? 'Resume Filters' : 'Pause Filters'}
               </button>
             ) : null}
-
             <button
               onClick={handleClearAllFilters}
               className={

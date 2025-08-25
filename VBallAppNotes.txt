@@ -13,7 +13,6 @@ Create welcome page, with short video and highlights of website features.
 Stats page - have entire row highlight on hover for readability or sticky row headers.
 Update index.html <head> info for SEO
 Ability to draw an overlay on the screen
-Play Filtered Touches should full screen on mobile. delay by a second as well.
 Encode videos like youtube
 let camera work when not fullscreen.
 add buttons to minisidebar

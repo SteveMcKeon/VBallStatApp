@@ -410,12 +410,12 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     setCurrentRallyNumber(null);
     setTouchBuffer([]);
     setVideoTime({ current: 0, duration: 0 });
-    const base = (selectedVideo || "").replace(/\.(mp4|m4v|mov)$/i, "");
+    const base = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
     const hlsRelCandidates = [
       `${base}/out_rally.m3u8`,
       `${base}/out_rally/index.m3u8`,
     ];
-    const hlsCandidates = hlsRelCandidates.map(p => `/videos/${p}`);
+    const hlsAbsCandidates = hlsRelCandidates.map((rel) => `/videos/${rel}`);
     const mp4Url = `/videos/${selectedVideo}`;
     const seekToSaved = () => {
       if (canceled) return;
@@ -448,9 +448,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       };
     };
     const HLS_START_TIMEOUT_MS = 2000;
-    const urlExists = async (relativePath) => {
+    const fileExists = async (relPath) => {
       try {
-        const r = await fetch(`/api/video-exists?p=${encodeURIComponent(relativePath)}`);
+        const r = await fetch(`/api/video-exists?p=${encodeURIComponent(relPath)}`);
         if (!r.ok) return false;
         const j = await r.json().catch(() => ({}));
         return !!j.exists;
@@ -459,27 +459,27 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       }
     };
     const loadHls = async () => {
-      const video = videoRef.current;
-      if (!video) return;
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        for (let i = 0; i < hlsCandidates.length; i++) {
+      const v = videoRef.current;
+      if (!v) return;
+      if (v.canPlayType("application/vnd.apple.mpegurl")) {
+        for (let i = 0; i < hlsAbsCandidates.length; i++) {
+          const abs = hlsAbsCandidates[i];
           const rel = hlsRelCandidates[i];
-          const url = hlsCandidates[i];
           if (await fileExists(rel)) {
-            video.pause();
-            video.removeAttribute("src");
-            video.load();
+            v.pause();
+            v.removeAttribute("src");
+            v.load();
             let startTimer = setTimeout(() => {
               loadMp4();
             }, HLS_START_TIMEOUT_MS);
-            video.src = url;
             const onError = () => {
               clearTimeout(startTimer);
-              video.removeEventListener('error', onError);
+              v.removeEventListener('error', onError);
               loadMp4();
             };
-            video.addEventListener('error', onError, { once: true });
-            video.onloadeddata = async () => {
+            v.addEventListener('error', onError, { once: true });
+            v.src = abs;
+            v.onloadeddata = async () => {
               if (canceled) return;
               clearTimeout(startTimer);
               seekToSaved();
@@ -494,15 +494,16 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         destroyHls();
         const hls = new window.Hls({ enableWorker: true, debug: false });
         video._hls = hls;
-        let src = null;
-        for (const u of hlsCandidates) {
-          if (await urlExists(u)) { src = u; break; }
+        let srcAbs = null;
+        for (let i = 0; i < hlsAbsCandidates.length; i++) {
+          const rel = hlsRelCandidates[i];
+          if (await fileExists(rel)) { srcAbs = hlsAbsCandidates[i]; break; }
         }
-        if (!src) {
+        if (!srcAbs) {
           return loadMp4();
         }
         let startTimer;
-        const bailToMp4 = (why) => {
+        const bailToMp4 = () => {
           try { hls.destroy(); } catch { }
           delete video._hls;
           clearTimeout(startTimer);
@@ -510,33 +511,27 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         };
         hls.attachMedia(video);
         hls.on(window.Hls.Events.MEDIA_ATTACHED, () => {
-          hls.loadSource(src);
+          hls.loadSource(srcAbs);
         });
         hls.on(window.Hls.Events.MANIFEST_PARSED, async () => {
           clearTimeout(startTimer);
           seekToSaved();
           await tryAutoplay();
         });
-        hls.on(window.Hls.Events.LEVEL_LOADED, () => {
-        });
-        startTimer = setTimeout(() => bailToMp4("HLS start timeout"), HLS_START_TIMEOUT_MS);
+        startTimer = setTimeout(bailToMp4, HLS_START_TIMEOUT_MS);
         let triedRecover = false;
         hls.on(window.Hls.Events.ERROR, (_evt, data) => {
           if (!data?.fatal) return;
-          if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
-            bailToMp4(data);
-            return;
-          }
           if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
             if (!triedRecover) {
               triedRecover = true;
               try { hls.recoverMediaError(); } catch { }
             } else {
-              bailToMp4("MEDIA_ERROR unrecoverable");
+              bailToMp4();
             }
             return;
           }
-          bailToMp4(data);
+          bailToMp4();
         });
         return;
       }
