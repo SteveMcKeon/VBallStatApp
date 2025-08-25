@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState, useMemo, useImperativeHandle, forwardRef } from "react";
+import { useEffect, useRef, useState, useMemo, useImperativeHandle, forwardRef } from "react";
 import { getRallyTimes } from "@/utils/getRallyTimes";
-import TooltipPortal from '../utils/tooltipPortal';
 import { getVideoTime as getSavedVideoTime, setVideoTime as saveVideoTime } from "../utils/videoTimes";
 const REWIND_AMOUNT = 3;
 const FORWARD_AMOUNT = 10;
@@ -30,7 +29,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   const customPlaybackCancelledRef = useRef(false);
   const [isPiP, setIsPiP] = useState(false);
   const playbackSessionRef = useRef(0);
-
   useImperativeHandle(ref, () => ({
     playCustomSequences: async (sequences) => {
       setIsCustomPlayback(true);
@@ -399,7 +397,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       }
     };
   }, [selectedVideo, gameId]);
-
   useEffect(() => {
     if (!videoRef.current || !selectedVideo) return;
     const video = videoRef.current;
@@ -414,10 +411,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     setTouchBuffer([]);
     setVideoTime({ current: 0, duration: 0 });
     const base = (selectedVideo || "").replace(/\.(mp4|m4v|mov)$/i, "");
-    const hlsCandidates = [
-      `/videos/${base}/out_rally.m3u8`,
-      //`/videos/${base}/master.m3u8`,
+    const hlsRelCandidates = [
+      `${base}/out_rally.m3u8`,
+      `${base}/out_rally/index.m3u8`,
     ];
+    const hlsCandidates = hlsRelCandidates.map(p => `/videos/${p}`);
     const mp4Url = `/videos/${selectedVideo}`;
     const seekToSaved = () => {
       if (canceled) return;
@@ -426,11 +424,10 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       else video.addEventListener("loadedmetadata", () => (video.currentTime = t), { once: true });
     };
     const tryAutoplay = () =>
-      video.play().catch(err => {
-        console.warn("Autoplay failed, retrying muted:", err);
+      video.play().catch(() => {
         video.muted = true;
         setIsMuted(true);
-        return video.play().catch(console.warn);
+        return video.play().catch(() => { });
       });
     const destroyHls = () => {
       if (video._hls) {
@@ -450,12 +447,13 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         await tryAutoplay();
       };
     };
-    const hls = window.Hls;
     const HLS_START_TIMEOUT_MS = 2000;
-    const urlExists = async (url) => {
+    const urlExists = async (relativePath) => {
       try {
-        const res = await fetch(url, { method: "HEAD" });
-        return res.ok;
+        const r = await fetch(`/api/video-exists?p=${encodeURIComponent(relativePath)}`);
+        if (!r.ok) return false;
+        const j = await r.json().catch(() => ({}));
+        return !!j.exists;
       } catch {
         return false;
       }
@@ -463,18 +461,24 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     const loadHls = async () => {
       const video = videoRef.current;
       if (!video) return;
-      const base = (selectedVideo || "").replace(/\.(mp4|m4v|mov)$/i, "");
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        for (const url of hlsCandidates) {
-          if (await urlExists(url)) {
+        for (let i = 0; i < hlsCandidates.length; i++) {
+          const rel = hlsRelCandidates[i];
+          const url = hlsCandidates[i];
+          if (await fileExists(rel)) {
             video.pause();
             video.removeAttribute("src");
             video.load();
             let startTimer = setTimeout(() => {
-              //console.warn("Native HLS start timeout → fallback to MP4");
               loadMp4();
             }, HLS_START_TIMEOUT_MS);
             video.src = url;
+            const onError = () => {
+              clearTimeout(startTimer);
+              video.removeEventListener('error', onError);
+              loadMp4();
+            };
+            video.addEventListener('error', onError, { once: true });
             video.onloadeddata = async () => {
               if (canceled) return;
               clearTimeout(startTimer);
@@ -488,19 +492,17 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       }
       if (window.Hls && window.Hls.isSupported()) {
         destroyHls();
-        const hls = new window.Hls({ enableWorker: true });
+        const hls = new window.Hls({ enableWorker: true, debug: false });
         video._hls = hls;
         let src = null;
         for (const u of hlsCandidates) {
           if (await urlExists(u)) { src = u; break; }
         }
         if (!src) {
-          //console.warn("No HLS playlist found → MP4");
           return loadMp4();
         }
         let startTimer;
         const bailToMp4 = (why) => {
-          //console.warn("Falling back to MP4:", why);
           try { hls.destroy(); } catch { }
           delete video._hls;
           clearTimeout(startTimer);
@@ -516,21 +518,18 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           await tryAutoplay();
         });
         hls.on(window.Hls.Events.LEVEL_LOADED, () => {
-          // level loaded means we at least fetched a playlist; still keep the global start timer
         });
         startTimer = setTimeout(() => bailToMp4("HLS start timeout"), HLS_START_TIMEOUT_MS);
         let triedRecover = false;
         hls.on(window.Hls.Events.ERROR, (_evt, data) => {
           if (!data?.fatal) return;
           if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
-            //console.warn("hls.js NETWORK_ERROR (fatal) → fallback");
             bailToMp4(data);
             return;
           }
           if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
             if (!triedRecover) {
               triedRecover = true;
-              //console.warn("hls.js MEDIA_ERROR → attempting recover...");
               try { hls.recoverMediaError(); } catch { }
             } else {
               bailToMp4("MEDIA_ERROR unrecoverable");
@@ -621,7 +620,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       video.addEventListener("loadeddata", handleAutoSeekToFirstRally, { once: true });
     }
   }, [rallyTimes, isAutoplayOn, videoRef]);
-
   useEffect(() => {
     if (!videoRef.current || !isMobile) return;
     const video = videoRef.current;
@@ -650,7 +648,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         hasShownControlsRef.current = true;
         return;
       }
-
       const now = Date.now();
       const tapInterval = now - lastTapTime;
       lastTapTime = now;
@@ -682,7 +679,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       clearTimeout(singleTapTimeout);
     };
   }, []);
-
   useEffect(() => {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -755,7 +751,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           video.currentTime = Math.min(video.duration, video.currentTime + FRAME_DURATION);
         }
       }
-
       switch (e.key) {
         case "a":
         case "A":
@@ -939,7 +934,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       </button>
     );
   };
-
   const NextRallyButton = ({ onClick, disabled }) => {
     if (!document.fullscreenElement && isMobile && !isLandscape) return null;
     return (
@@ -1251,7 +1245,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
                   {isCustomPlayback ? "Disabled during highlight reel playback" : isLastSet ? "Last Set" : "Next Set"}
                 </div>
               </div>
-
             </div>
             {/* Right Controls */}
             <div className="flex items-center gap-2">

@@ -114,6 +114,19 @@ app.post('/api/delete-account', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
+app.get('/api/video-exists', async (req, res) => {
+  try {
+    const rel = String(req.query.p || '').replace(/^\//, '');
+    if (!rel) return res.json({ exists: false });
+    const base = path.resolve(VIDEO_DIR);
+    const full = path.resolve(base, rel);
+    if (!full.startsWith(base)) return res.status(400).json({ error: 'bad path' });
+    await fsp.access(full);
+    return res.json({ exists: true });
+  } catch {
+    return res.json({ exists: false });
+  }
+});
 app.use('/videos', express.static(VIDEO_DIR, {
   setHeaders(res, p) {
     if (p.endsWith('.m3u8')) {

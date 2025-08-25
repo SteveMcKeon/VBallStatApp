@@ -23,13 +23,9 @@ investigate uploads on mobile in background
 #Fixes
 REFACTOR
 make invitation email nicer.
-add Google Auth to accept-invite
 emails going to invalid addresses -  supabase does NOT like bouncebacks.
 Video backups.
 HLS buffer in autoplay and filtered touches?
 avatar GIFs, history of last couple avatars
-signin with email or phone number if exists
 account and profiles like Discord? 
 make videos exist in team_id/video.mp4
-
-Replace OR for demo wiht the nice one from login page.

@@ -1,21 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import supabase from '..//supabaseClient';
 import '../App.css';
-import { useSidebar } from './SidebarContext';
 import StyledSelect from './StyledSelect';
 import ColumnSelector from './ColumnSelector';
-import SidebarFooter from './SidebarFooter';
 const StatsSummary = ({ onBack, setSidebarContent }) => {
   const [teamName, setTeamName] = useState('');
   const [teamId, setTeamId] = useState('');
   const [availableTeams, setAvailableTeams] = useState([]);
   const setLocal = (key, value) => localStorage.setItem(key, value);
   const getLocal = (key) => localStorage.getItem(key);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const { registerToggle } = useSidebar();
-  useEffect(() => {
-    registerToggle(() => setShowSidebar((prev) => !prev));
-  }, [registerToggle]);
   const [actions, setActions] = useState([]);
   const [stats, setStats] = useState([]);
   const [games, setGames] = useState([]);
@@ -23,7 +16,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
   const [selectedSet, setSelectedSet] = useState('all');
   const [assistData, setAssistData] = useState({});
   const [settingStats, setSettingStats] = useState([]);
-  const [resultAnalysis, setResultAnalysis] = useState([]);
   const [selectedSetter, setSelectedSetter] = useState('all');
   const filteredSettingStats = selectedSetter === 'all'
     ? settingStats
@@ -31,7 +23,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
   const NavToHome = () => {
     if (typeof onBack === 'function') onBack();
   };
-
   useEffect(() => {
     const savedTeamId = getLocal('teamId');
     const fetchTeams = async () => {
@@ -59,7 +50,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
     };
     fetchTeams();
   }, []);
-
   useEffect(() => {
     const fetchActions = async () => {
       if (!teamId) { setActions([]); return; }
@@ -79,7 +69,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
     };
     fetchActions();
   }, [teamId]);
-
   useEffect(() => {
     const fetchGames = async () => {
       if (!teamId) return;
@@ -95,7 +84,7 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
       }
     };
     fetchGames();
-  }, [teamName]);
+  }, [teamId]);
   useEffect(() => {
     const fetchStats = async () => {
       if (!selectedGame) return;
@@ -177,30 +166,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
           stat => stat.set_to_position || stat.set_to_player
         );
         setSettingStats(settingOnly);
-        const resultCounts = {};
-        filteredStats.forEach(({ player, action_type, result }) => {
-          if (!player || !action_type || !result) return;
-          const key = `${player}__${action_type}`;
-          if (!resultCounts[key]) {
-            resultCounts[key] = { won: 0, lost: 0, total: 0 };
-          }
-          if (result === 'Won Point') resultCounts[key].won += 1;
-          if (result === 'Lost Point') resultCounts[key].lost += 1;
-          resultCounts[key].total += 1;
-        });
-        const resultsArray = Object.entries(resultCounts).map(([key, val]) => {
-          const [player, action] = key.split('__');
-          return {
-            player,
-            action,
-            won: val.won,
-            lost: val.lost,
-            total: val.total,
-            pctWon: ((val.won / val.total) * 100).toFixed(1) + '%',
-            pctLost: ((val.lost / val.total) * 100).toFixed(1) + '%',
-          };
-        });
-        setResultAnalysis(resultsArray);
       }
     };
     fetchStats();
@@ -254,7 +219,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
   const [visibleSubColumns, setVisibleSubColumns] = useState(() => {
     const saved = getLocal('visibleSubColumnsStatsPage');
     let initial = {};
-
     allSubColumns.forEach(col => {
       const defaultHidden = ['Success', 'Fail'];
       initial[col.key] = { visible: !defaultHidden.includes(col.key) };
@@ -464,7 +428,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
     toggleSubColumn,
     NavToHome
   ]);
-
   useEffect(() => {
     setSidebarContent(renderSidebar());
     return () => setSidebarContent(null);
@@ -478,7 +441,6 @@ const StatsSummary = ({ onBack, setSidebarContent }) => {
     visibleColumns,
     visibleSubColumns,
   ]);
-
   return (
     <div className="flex flex-col overflow-hidden">
       {/* Main Content */}

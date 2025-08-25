@@ -295,18 +295,6 @@ const MainPage = () => {
       window.dispatchEvent(new Event('db_layout_change'))
     );
   };
-  const [containerHeight, setContainerHeight] = useState(0);
-  const insertButtonParentRef = useRef(null);
-  useEffect(() => {
-    const updateHeight = () => {
-      if (insertButtonParentRef.current) {
-        setContainerHeight(insertButtonParentRef.current.offsetHeight);
-      }
-    };
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
-    return () => window.removeEventListener('resize', updateHeight);
-  }, []);
   const savedVisibleColumns = getLocal('visibleColumnsMainPage');
   const savedLayout = getLocal('layoutMode');
   const videoRef = useRef(null);
@@ -526,15 +514,6 @@ const MainPage = () => {
   useEffect(() => {
     setLocal('visibleColumnsMainPage', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
-  const handleHeaderClick = (columnKey) => {
-    setSortConfig((prev) => {
-      if (prev.key === columnKey) {
-        if (prev.direction === 'asc') return { key: columnKey, direction: 'desc' };
-        if (prev.direction === 'desc') return { key: 'import_seq', direction: 'asc' };
-      }
-      return { key: columnKey, direction: 'asc' };
-    });
-  };
   useEffect(() => {
     setLocal('layoutMode', layoutMode);
   }, [layoutMode]);
@@ -680,28 +659,6 @@ const MainPage = () => {
       return `${mins}:${paddedSecs}${msPart}`;
     }
   };
-  const renderHeaderCell = (label, key) => {
-    const isTextColumn = visibleColumns[key]?.type === 'text';
-    return (
-      <th key={key} className="cursor-pointer hover:underline px-2 py-1 border-b border-black">
-        <div onClick={() => handleHeaderClick(key)} className="flex items-center justify-between">
-          <span>{label}</span>
-          {sortConfig.key === key && (
-            <span className="text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-          )}
-        </div>
-        {isTextColumn && (
-          <input
-            type="text"
-            value={textColumnFilters[key] || ''}
-            onChange={(e) => handleTextColumnFilterChange(key, e.target.value)}
-            placeholder="Filter..."
-            className="mt-1 w-full p-1 text-sm border border-gray-300 rounded"
-          />
-        )}
-      </th>
-    );
-  };
   const handleSidebarToggle = (value) => {
     setShowSidebar(value);
     const fire = (tag) => {
@@ -744,7 +701,6 @@ const MainPage = () => {
     const isDemoOnly =
       availableTeams.length === 1 &&
       String(availableTeams[0]?.id) === DEMO_TEAM_ID;
-
     return (
       <div className="flex flex-col h-[100svh] justify-center items-center">
         {!isDemoOnly ? (
@@ -806,7 +762,6 @@ const MainPage = () => {
             </form>
           )
         ) : (
-          // Demo team is the only option: show welcome with "Create" OR "Explore Demo"
           <form onSubmit={onCreateTeamSubmit} className="w-full max-w-md text-center">
             <div className="text-lg font-semibold mb-2">Welcome!</div>
             <p className="text-sm text-gray-600 mb-6">
@@ -852,7 +807,7 @@ const MainPage = () => {
     return (
       <>
         <div className="flex flex-col h-[100svh] justify-center items-center">
-          <div className="text-lg font-semibold mb-4">Please select a game to continue</div>
+          <div className="text-lg font-semibold mb-4">Please upload a game to continue</div>
           <GameSelector
             key={teamGames.map(g => g.id + g.hastimestamps + g.isscored).join('-')}
             games={teamGames}
@@ -878,10 +833,14 @@ const MainPage = () => {
           />
           {teamId !== DEMO_TEAM_ID && (
             <>
-              <div className="mt-4 text-sm text-gray-500 text-center">- or -</div>
+              <div className="flex items-center my-6 w-full max-w-xs">
+                <hr className="flex-grow border-gray-300" />
+                <span className="mx-2 text-sm text-gray-400">OR</span>
+                <hr className="flex-grow border-gray-300" />
+              </div>
               <button
                 onClick={() => handleTeamChange({ target: { value: DEMO_TEAM_ID } })}
-                className="mt-3 px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-default cursor-pointer"
+                className="mt-0 px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-default cursor-pointer"
               >
                 Explore the Demo instead
               </button>
