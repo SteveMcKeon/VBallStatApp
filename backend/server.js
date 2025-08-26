@@ -493,6 +493,40 @@ app.get('/api/team-members', async (req, res) => {
     return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
+app.post('/api/display-names', async (req, res) => {
+  try {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const decoded = verifySupabaseToken(token);
+    const requesterId = decoded?.sub;
+    if (!requesterId) return res.status(403).json({ error: 'Unauthorized' });
+    const raw = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const ids = [...new Set(raw.map(String).filter(id => UUID_RE.test(id)))].slice(0, 200);
+    if (ids.length === 0) return res.json({ names: {} });
+    const pairs = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const r = await supabase.auth.admin.getUserById(id);
+          const u = r.user || r.data?.user || null;
+          if (!u) return null;
+          const dn =
+            u.user_metadata?.display_name ||
+            u.user_metadata?.full_name ||
+            u.user_metadata?.name ||
+            (u.email ? u.email.split('@')[0] : '');
+          return dn ? [id, dn] : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+    const names = Object.fromEntries(pairs.filter(Boolean));
+    return res.json({ names });
+  } catch (e) {
+    console.error('/api/display-names failed:', e);
+    return res.status(500).json({ error: 'Unexpected server error' });
+  }
+});
 app.get('/api/search-users', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];

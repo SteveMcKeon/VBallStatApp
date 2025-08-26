@@ -58,7 +58,7 @@ export default function ManageTeamModal({
     inviteMany(payload);
     return true;
   };
-
+  const [nameOverrides, setNameOverrides] = useState({});
   const isDemoTeam = teamId === DEMO_TEAM_ID;
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('error');
@@ -135,9 +135,17 @@ export default function ManageTeamModal({
     if (!trimmed) return;
     if (isDemoTeam) {
       setDemoMembers(prev => prev.map(m => (m.user_id === userId ? { ...m, name: trimmed } : m)));
+      window.dispatchEvent(new CustomEvent('display_names_updated', {
+        detail: { id: userId, name: trimmed }
+      }));
       setToast('Display name updated (demo)', 'success');
       return;
     }
+    const prevName =
+      (rosterMembers || []).find(m => m.user_id === userId)?.display_name ||
+      (rosterMembers || []).find(m => m.user_id === userId)?.full_name ||
+      null;
+    setNameOverrides(prev => ({ ...prev, [userId]: trimmed }));    
     setBusy(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -154,9 +162,21 @@ export default function ManageTeamModal({
         const { error } = await res.json().catch(() => ({}));
         throw new Error(error || 'Failed to update display name');
       }
+      window.dispatchEvent(new CustomEvent('display_names_updated', {
+        detail: { id: userId, name: trimmed }
+      }));      
       setToast('Display name updated', 'success');
       await refresh();
+      setNameOverrides(prev => {
+        const { [userId]: _, ...rest } = prev;
+        return rest;
+      });      
     } catch (e) {
+      setNameOverrides(prev => {
+        const next = { ...prev };
+        if (prevName) next[userId] = prevName; else delete next[userId];
+        return next;
+      });      
       setToast(e?.message || 'Failed to update display name');
     } finally {
       setBusy(false);
@@ -556,10 +576,10 @@ export default function ManageTeamModal({
         null;
       return {
         ...m,
-        name: preferredName,
+        name: nameOverrides[m.user_id] ?? preferredName,
       };
     });
-  }, [isDemoTeam, demoMembers, rosterMembers]);
+  }, [isDemoTeam, demoMembers, rosterMembers, nameOverrides]);
   const visibleMembers = useMemo(() => {
     const pendingEmails = new Set([
       ...(rosterInvites ?? []).map(i => (i.email || '').toLowerCase()),

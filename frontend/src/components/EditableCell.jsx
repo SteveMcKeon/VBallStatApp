@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
-const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, setEditingCell, onStartEditing, setToast, supabase, practiceMode = false, parentHasHighlight = false }, ref) => {
+import { useState, useMemo, useRef, useEffect, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
+const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setStats, gamePlayers, displayNamesById = {}, setEditingCell, onStartEditing, setToast, supabase, practiceMode = false, parentHasHighlight = false }, ref) => {
   const RALLY_FIELD = 'rally_id';
   const SET_FIELD = 'set';
   const RALLY_START = 1;
@@ -14,6 +14,61 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value ?? '');
+  const equalsCI = (a, b) =>
+    (a ?? '').toString().trim().toLowerCase() === (b ?? '').toString().trim().toLowerCase();
+  const idByAlias = useMemo(() => {
+    const m = new Map();
+    (stats || []).forEach(r => {
+      if (r?.player && r?.player_user_id) {
+        m.set(r.player.trim().toLowerCase(), String(r.player_user_id));
+      }
+      if (r?.set_to_player && r?.set_to_user_id) {
+        m.set(r.set_to_player.trim().toLowerCase(), String(r.set_to_user_id));
+      }
+    });
+    return m;
+  }, [stats]);
+  const nameOptions = useMemo(() => {
+    const entries = Object.entries(displayNamesById || {});
+    const idsWithDisplay = new Set(entries.map(([id]) => String(id)));
+    const displayNames = new Map(
+      entries
+        .filter(([, dn]) => !!dn)
+        .map(([id, dn]) => [String(id), dn])
+    );
+    const add = (map, label) => {
+      const key = label.trim().toLowerCase();
+      if (!map.has(key)) map.set(key, label);
+    };
+    const out = new Map();
+    displayNames.forEach(dn => add(out, dn));
+    if (Array.isArray(gamePlayers)) {
+      for (const p of gamePlayers) {
+        if (!p) continue;
+        if (typeof p === 'string') {
+          const aliasLc = p.trim().toLowerCase();
+          const aliasId = idByAlias.get(aliasLc);
+          if (aliasId && idsWithDisplay.has(aliasId)) continue;
+          const equalsAnyDisplay = Array.from(displayNames.values()).some(dn => equalsCI(dn, p));
+          if (!equalsAnyDisplay) add(out, p);
+        } else {
+          const id = String(p.user_id ?? p.id ?? '');
+          const nm = p.display_name || p.name || p.full_name || (p.email ? p.email.split('@')[0] : '');
+          if (id && idsWithDisplay.has(id)) continue;
+          if (nm) add(out, nm);
+        }
+      }
+    }
+    return Array.from(out.values());
+  }, [displayNamesById, gamePlayers, idByAlias]);
+  const idForDisplayName = (input) => {
+    if (!input) return null;
+    for (const [id, dn] of Object.entries(displayNamesById || {})) {
+      if (equalsCI(dn, input)) return String(id);
+    }
+    const aliasId = idByAlias.get(input.trim().toLowerCase());
+    return aliasId || null;
+  };
   const inputRef = useRef(null);
   const wrapperRef = useRef(null);
   const [cellHeight, setCellHeight] = useState(null);
@@ -30,10 +85,10 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       if (value == null || value === '') {
         return !curIsSet;
       }
-      return gamePlayers.includes(value);
+      return nameOptions.some(n => equalsCI(n, value));
     }
     if (field === 'player') {
-      return gamePlayers.includes(value);
+      return nameOptions.some(n => equalsCI(n, value));
     }
     if (field === 'action_type') {
       return ACTION_TYPE_OPTIONS.includes(value);
@@ -90,12 +145,18 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
           : (parsed ?? '');
     if (prevComparable === nextComparable) return;
     patchRowsRef.current = null;
+    let extraPayload = {};
+    if (field === 'player' || field === 'set_to_player') {
+      const idField = field === 'player' ? 'player_user_id' : 'set_to_user_id';
+      const uid = parsed ? idForDisplayName(parsed) : null;
+      extraPayload[idField] = uid ?? null;
+    }
     setStats(prev => {
       const next = [...prev];
       const idxInAll = next.findIndex(r => r.id === statId);
       if (idxInAll === -1) return prev;
       const currentSet = next[idxInAll]?.set ?? null;
-      next[idxInAll] = { ...next[idxInAll], [field]: parsed };
+      next[idxInAll] = { ...next[idxInAll], [field]: parsed, ...extraPayload };
       if (field === 'result') {
         let our = (idxInAll > 0 && next[idxInAll - 1].set === currentSet)
           ? (Number(next[idxInAll - 1].our_score) || 0)
@@ -191,7 +252,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     }
     const { error: updErr } = await supabase
       .from('stats')
-      .update({ [field]: parsed })
+      .update({ [field]: parsed, ...extraPayload })
       .eq('id', statId)
       .select('id')
       .maybeSingle();
@@ -220,7 +281,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       await batch(patchRows);
     }
   };
-
   const handleBlur = async (e) => {
     if (!editing) return;
     if (e?.relatedTarget && wrapperRef.current?.contains(e.relatedTarget)) return;
@@ -347,7 +407,6 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
       return;
     }
   };
-
   useImperativeHandle(ref, () => ({
     focusInput: () => {
       inputRef.current?.focus();
@@ -358,17 +417,15 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     },
     element: inputRef.current || wrapperRef.current
   }));
-
   useLayoutEffect(() => {
     if (!editing) return;
     measureGhost();
   }, [editing, tempValue]);
-
   useEffect(() => {
     if (!editing) return;
     let options = [];
     if (field === 'player' || field === 'set_to_player') {
-      options = gamePlayers;
+      options = nameOptions;
     } else if (field === 'result') {
       options = RESULT_OPTIONS;
     } else if (field === 'action_type') {
@@ -384,7 +441,7 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
     setInteractionMode('keyboard');
     setSelectedSuggestionIndex(0);
     setShowSuggestions(filtered.length > 0);
-  }, [editing, field, gamePlayers, tempValue]);
+  }, [editing, field, gamePlayers, nameOptions, tempValue]);
   useEffect(() => {
     setTempValue(value ?? '');
   }, [value]);
@@ -451,10 +508,10 @@ const EditableCell = forwardRef(({ value, type, statId, field, idx, stats, setSt
               <li
                 key={i}
                 className={`px-2 py-1 cursor-pointer ${i === selectedSuggestionIndex
-                    ? 'bg-blue-100 text-black'
-                    : interactionMode === 'mouse'
-                      ? 'hover:bg-blue-100'
-                      : ''
+                  ? 'bg-blue-100 text-black'
+                  : interactionMode === 'mouse'
+                    ? 'hover:bg-blue-100'
+                    : ''
                   }`}
                 onMouseEnter={() => {
                   if (interactionMode === 'mouse') {

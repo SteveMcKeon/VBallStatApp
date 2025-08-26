@@ -7,8 +7,7 @@ const StatsSummary = ({ onBack, setSidebarContent: setSidebarContentProp, scope 
   const isPlayerScope = scope === 'player';
   const [playerName, setPlayerName] = useState('');
   const navigate = useNavigate();
-  const { supabase, setSidebarContent: setSidebarFromCtx, teamId: ctxTeamId, gameId: ctxGameId, userId: ctxCurrentUserId, availableTeams, DEMO_TEAM_ID } = useOutletContext() || {};
-  const setSidebarContent = setSidebarContentProp ?? setSidebarFromCtx ?? (() => { });
+  const { supabase, setSidebarContent: setSidebarFromCtx, teamId: ctxTeamId, gameId: ctxGameId, userId: ctxCurrentUserId, availableTeams, DEMO_TEAM_ID, displayNamesById } = useOutletContext() || {}; const setSidebarContent = setSidebarContentProp ?? setSidebarFromCtx ?? (() => { });
   const [teamName, setTeamName] = useState('');
   const [userId, setUserId] = useState(ctxCurrentUserId || '');
   const [teamId, setTeamId] = useState(isPlayerScope ? 'all' : (ctxTeamId || ''));
@@ -43,6 +42,10 @@ const StatsSummary = ({ onBack, setSidebarContent: setSidebarContentProp, scope 
   const [assistData, setAssistData] = useState({});
   const [settingStats, setSettingStats] = useState([]);
   const [selectedSetter, setSelectedSetter] = useState('all');
+  const nameFor = useCallback(
+    (id, fallback) => (displayNamesById?.[String(id)] || fallback || ''),
+    [displayNamesById]
+  );
   const filteredSettingStats = selectedSetter === 'all'
     ? settingStats
     : settingStats.filter(stat => stat.player === selectedSetter);
@@ -161,7 +164,12 @@ const StatsSummary = ({ onBack, setSidebarContent: setSidebarContentProp, scope 
             Number(a.import_seq ?? 0) - Number(b.import_seq ?? 0) ||
             String(a.id).localeCompare(String(b.id))
           );
-        setTableStats(filteredStats);
+        const namedStats = filteredStats.map(s => ({
+          ...s,
+          player: nameFor(s.player_user_id, s.player),
+          set_to_player: nameFor(s.set_to_user_id, s.set_to_player),
+        }));
+        setTableStats(namedStats);
         const assistCounts = {};
         if (selectedGame !== 'all' && selectedGame !== 'scored') {
           const gameStats = filteredStats
@@ -178,14 +186,14 @@ const StatsSummary = ({ onBack, setSidebarContent: setSidebarContentProp, scope 
             ) {
               const key = isPlayerScope
                 ? (teamNameById[String(curr.team_id)] || `Team ${curr.team_id}`)
-                : curr.player;
+                : nameFor(curr.player_user_id, curr.player);
               assistCounts[key] = (assistCounts[key] || 0) + 1;
             }
           }
         } else {
           const relevantGames = gameIds;
           relevantGames.forEach(gameId => {
-            const gameStats = filteredStats
+            const gameStats = namedStats
               .filter(stat => stat.game_id === gameId)
               .sort((a, b) => Number(a.import_seq ?? 0) - Number(b.import_seq ?? 0));
             for (let i = 0; i < gameStats.length - 1; i++) {
@@ -199,14 +207,14 @@ const StatsSummary = ({ onBack, setSidebarContent: setSidebarContentProp, scope 
               ) {
                 const key = isPlayerScope
                   ? (teamNameById[String(curr.team_id)] || `Team ${curr.team_id}`)
-                  : curr.player;
+                  : nameFor(curr.player_user_id, curr.player);
                 assistCounts[key] = (assistCounts[key] || 0) + 1;
               }
             }
           });
         }
         setAssistData(assistCounts);
-        const settingOnly = filteredStats.filter(
+        const settingOnly = namedStats.filter(
           stat => stat.set_to_position || stat.set_to_player
         );
         setSettingStats(settingOnly);
@@ -698,7 +706,7 @@ const StatsSummary = ({ onBack, setSidebarContent: setSidebarContentProp, scope 
                 )}
                 <div className="flex  flex-wrap gap-8">
                   <div>
-                    <h4 className="font-semibold mb-1">{isPlayerScope ? '' : 'By'}</h4>
+                    <h4 className="font-semibold mb-1">{isPlayerScope ? '' : 'By Position'}</h4>
                     <table className="text-center table-auto border-collapse mb-4">
                       <thead>
                         <tr>

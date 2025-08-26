@@ -81,6 +81,7 @@ const DBStats = ({
   mainContentRef,
   containerRef,
   formatTimestamp,
+  displayNamesById,
   gameId,
   refreshGames,
   supabase,
@@ -88,6 +89,17 @@ const DBStats = ({
   isMobile,
 }) => {
   const practiceMode = teamId === DEMO_TEAM_ID;
+  const nameFor = (userId, fallback) =>
+    displayNamesById?.[String(userId)] || fallback || '';
+  const renderPretty = (row, field) => {
+    if (field === 'player') {
+      return nameFor(row.player_user_id, row.player);
+    }
+    if (field === 'set_to_player') {
+      return nameFor(row.set_to_user_id, row.set_to_player);
+    }
+    return row[field] ?? '';
+  };
   const [filterPortalEl, setFilterPortalEl] = useState(null);
   const HIGHLIGHT_PRE_BUFFER = 2;
   const HIGHLIGHT_PLAY_DURATION = 5 - HIGHLIGHT_PRE_BUFFER;
@@ -730,12 +742,27 @@ const DBStats = ({
             'set_to_position',
           ];
           const shouldRenderEditableCell = editMode === 'admin' || (editMode === 'editor' && editableFieldsInEditorMode.includes(field));
+          const isNameField = field === 'player' || field === 'set_to_player';
           return (
-            <div key={field} role="cell" data-field={field} className={`db-cell ${highlightClass} ${shouldRenderEditableCell ? '' : 'cursor-default'}`}>
+            <div
+              key={field}
+              role="cell"
+              data-field={field}
+              className={`db-cell ${highlightClass} ${shouldRenderEditableCell ? '' : 'cursor-default'}`}
+              style={(!shouldRenderEditableCell && isNameField)
+                ? { justifyContent: 'center', textAlign: 'center' }
+                : undefined}
+            >
               {shouldRenderEditableCell ? (
                 <EditableCell
                   ref={(el) => { cellRefs.current[`${idx}-${field}`] = el; }}
-                  value={s[field]}
+                  value={
+                    field === 'player'
+                      ? nameFor(s.player_user_id, s.player)
+                      : field === 'set_to_player'
+                        ? nameFor(s.set_to_user_id, s.set_to_player)
+                        : s[field]
+                  }
                   type={visibleColumns[field].type}
                   statId={s.id}
                   field={field}
@@ -743,6 +770,7 @@ const DBStats = ({
                   stats={stats}
                   setStats={setStats}
                   gamePlayers={gamePlayers}
+                  displayNamesById={displayNamesById}
                   setEditingCell={navigateToEditableCell}
                   onStartEditing={() => {
                     if (isFiltered) setFilterFrozen(true);
@@ -753,7 +781,9 @@ const DBStats = ({
                   parentHasHighlight={!!highlightClass}
                 />
               ) : (
-                s[field] ?? ''
+                <span className="w-full text-center whitespace-normal break-words leading-normal">
+                  {renderPretty(s, field)}
+                </span>
               )}
             </div>
           );

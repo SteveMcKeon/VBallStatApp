@@ -11,7 +11,7 @@ export default function TeamGameView() {
     teamId, gameId, supabase,
     jumpToTime, formatTimestamp, refreshGames, refreshStats,
     selectedVideo,
-    selectedGame,
+    selectedGame, displayNamesById,
   } = useOutletContext();
   if (!selectedVideo) return null;
   return (
@@ -20,6 +20,7 @@ export default function TeamGameView() {
         <div className="bg-white w-full h-full flex flex-col">
           <DBStats
             canEdit={editMode && (allowedRole === 'admin' || allowedRole === 'editor')}
+            displayNamesById={displayNamesById}
             editMode={editMode}
             hastimestamps={selectedGame?.hastimestamps}
             isscored={selectedGame?.isscored}

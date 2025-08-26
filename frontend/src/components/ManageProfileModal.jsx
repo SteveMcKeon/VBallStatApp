@@ -149,6 +149,12 @@ export default function ManageProfileModal({
                 },
             });
             if (error) throw error;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.id) {
+                window.dispatchEvent(new CustomEvent('display_names_updated', {
+                    detail: { id: user.id, name: trimmed }
+                }));
+            }
             setToast('Display name saved', 'success');
         } catch (e) {
             setToast(e?.message || 'Failed to save display name');
