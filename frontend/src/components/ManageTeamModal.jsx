@@ -5,7 +5,6 @@ import supabase from '../supabaseClient';
 import { TeamRoster } from './TeamRoster';
 const ROLES = ['captain', 'editor', 'player'];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-const DEMO_TEAM_ID = 'e2e310d6-68b1-47cb-97e4-affd7e56e1a3';
 const DEMO_CAPTAIN_ID = 'demo-uid-1';
 const DEMO_MEMBERS = [
   { user_id: 'demo-uid-1', role: 'captain', name: 'Alex Captain', email: 'alex.captain@example.com' },
@@ -42,6 +41,7 @@ export default function ManageTeamModal({
   currentUserId,
   canManage = false,
   embedded = false,
+  DEMO_TEAM_ID,
 }) {
   const {
     members: rosterMembers,

@@ -39,6 +39,7 @@ const SettingsModal = ({
     currentUserId,
     canManage,
     isMobile,
+    DEMO_TEAM_ID,
 }) => {
     const [tab, setTab] = useState('team');
     if (isMobile) {
@@ -72,6 +73,7 @@ const SettingsModal = ({
                     currentUserId={currentUserId}
                     canManage={canManage}
                     embedded={false}
+                    DEMO_TEAM_ID={DEMO_TEAM_ID}
                 />
                 <ManageProfileModal
                     isOpen={profileOpen}
@@ -117,6 +119,7 @@ const SettingsModal = ({
                             currentUserId={currentUserId}
                             canManage={canManage}
                             onClose={onClose}
+                            DEMO_TEAM_ID={DEMO_TEAM_ID}
                         />
                     )}
                     {tab === 'profile' && (

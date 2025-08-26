@@ -1,6 +1,6 @@
 # VBallStatApp
 
-VBallStatApp is a volleyball match statistics tracking and analysis application. It provides tools for managing match data, analyzing video footage, and storing synchronized stats in a Supabase backend.
+VBallStatApp is a volleyball match statistics tracking and analysis application. It's BalltimeAI for those who don't want to spend an arm and a leg. It provides tools for managing match data, analyzing video footage, and storing synchronized stats across teams and games.
 
 ## Features
 

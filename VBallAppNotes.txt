@@ -26,5 +26,6 @@ emails going to invalid addresses -  supabase does NOT like bouncebacks.
 Video backups.
 HLS buffer in autoplay and filtered touches?
 avatar GIFs, history of last couple avatars
-account and profiles like Discord? 
+account and profiles like Discord? Profile stats page.
 make videos exist in team_id/video.mp4
+show stats over time in time chart

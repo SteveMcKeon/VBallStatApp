@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import supabase from '../supabaseClient';
+import { useState } from 'react';
+import supabase from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import Toast from './Toast';
-import FloatingLabelInput from './FloatingLabelInput';
+import Toast from '../Toast';
+import FloatingLabelInput from '../FloatingLabelInput';
 const LoginPage = () => {
   const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);

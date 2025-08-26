@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import supabase from '../supabaseClient';
-import FloatingLabelInput from './FloatingLabelInput';
-import Toast from './Toast';
+import supabase from '../../supabaseClient';
+import FloatingLabelInput from '../FloatingLabelInput';
+import Toast from '../Toast';
 function useQuery() {
   return new URLSearchParams(useLocation().search);
 }

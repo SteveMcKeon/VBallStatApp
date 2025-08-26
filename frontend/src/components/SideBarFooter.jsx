@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import supabase from '../supabaseClient';
 import Toast from './Toast';
 import SettingsModal from './SettingsModal';
-const SidebarFooter = ({ mini = false, teamId, isMobile = false }) => {
+const SidebarFooter = ({ mini = false, teamId, isMobile = false, DEMO_TEAM_ID }) => {
   const [user, setUser] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -225,6 +225,7 @@ const SidebarFooter = ({ mini = false, teamId, isMobile = false }) => {
         currentUserId={user?.id}
         canManage={user?.role === 'captain'}
         isMobile={isMobile}
+        DEMO_TEAM_ID={DEMO_TEAM_ID}
       />
     </div>
   );
