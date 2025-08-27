@@ -40,6 +40,13 @@ const MiniSidebar = ({ onExpand, teamId, isMobile }) => {
   );
 };
 const MainPage = () => {
+  const [showBetaBanner, setShowBetaBanner] = useState(() => {
+    try { return localStorage.getItem('hideBetaBanner') !== '1'; } catch { return true; }
+  });
+  const dismissBetaBanner = () => {
+    setShowBetaBanner(false);
+    try { localStorage.setItem('hideBetaBanner', '1'); } catch { }
+  };
   const navigate = useNavigate();
   useSupabaseAuthWatcher({
     supabase,
@@ -945,14 +952,14 @@ const MainPage = () => {
                   <div className="inline-flex rounded-full bg-gray-200 p-1">
                     <button
                       onClick={() => navigate('stats/team')}
-                      className={`px-3 py-1 text-sm rounded-full transition ${!isPlayerScope ? 'bg-white shadow' : 'text-gray-600 hover:bg-white/60'}`}
+                      className={`px-3 text-sm rounded-full transition ${!isPlayerScope ? 'bg-white shadow' : 'text-gray-600 hover:bg-white/60'}`}
                       aria-pressed={!isPlayerScope}
                     >
                       Team
                     </button>
                     <button
                       onClick={() => navigate('stats/player')}
-                      className={`px-3 py-1 text-sm rounded-full transition ${isPlayerScope ? 'bg-white shadow' : 'text-gray-600 hover:bg-white/60'}`}
+                      className={`px-3 text-sm rounded-full transition ${isPlayerScope ? 'bg-white shadow' : 'text-gray-600 hover:bg-white/60'}`}
                       aria-pressed={isPlayerScope}
                     >
                       Player
@@ -1146,6 +1153,38 @@ const MainPage = () => {
           </div>
         </div>
       </div>
+      {showBetaBanner && (
+        <div
+          className={`fixed ${showResumeBanner ? 'top-12' : 'top-0'} left-0 right-0 z-50`}
+          role="region"
+          aria-label="Early preview notice"
+        >
+          <div className={`${isMobile ? 'flex flex-col gap-2' : 'flex items-center justify-between'} bg-indigo-600 text-white p-3 shadow`}>
+            <p className="text-sm md:text-base">
+              <strong>Heads up — early preview!</strong> This app is still in early development, so things may change or break.
+              If you have a feature request or hit a bug, please email
+              {' '}
+              <a className="underline font-medium" href="mailto:stephen@mckeon.ca">stephen@mckeon.ca</a>.
+            </p>
+            <div className={`${isMobile ? 'flex w-full justify-end gap-2' : 'flex gap-2'}`}>
+              <a
+                className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded"
+                href={`mailto:stephen@mckeon.ca?subject=${encodeURIComponent('[Feedback] Feature request or bug report')}&body=${encodeURIComponent(
+                  'What were you doing?\nWhat did you expect to happen?\nWhat happened instead?\n(Feel free to add screenshots or a link)'
+                )}`}
+              >
+                Send feedback
+              </a>
+              <button
+                onClick={dismissBetaBanner}
+                className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {
         showResumeBanner && (
           <div

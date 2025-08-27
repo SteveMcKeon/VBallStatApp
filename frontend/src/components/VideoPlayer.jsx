@@ -469,9 +469,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
             v.pause();
             v.removeAttribute("src");
             v.load();
-            let startTimer = setTimeout(() => {
+            //let startTimer = setTimeout(() => {
               loadMp4();
-            }, HLS_START_TIMEOUT_MS);
+            //}, HLS_START_TIMEOUT_MS);
             const onError = () => {
               clearTimeout(startTimer);
               v.removeEventListener('error', onError);
