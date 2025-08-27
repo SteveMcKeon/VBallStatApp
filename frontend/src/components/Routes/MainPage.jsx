@@ -52,6 +52,18 @@ const MainPage = () => {
     supabase,
     onSignOut: () => navigate('/login'),
   });
+  const [accessToken, setAccessToken] = useState(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) setAccessToken(session?.access_token ?? null);
+    })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setAccessToken(session?.access_token ?? null);
+    });
+    return () => { mounted = false; subscription?.unsubscribe(); };
+  }, []);
   const location = useLocation();
   const isStats = location.pathname.includes('/stats/');
   const isPlayerScope = location.pathname.includes('/stats/player');
@@ -357,7 +369,7 @@ const MainPage = () => {
   });
   const [sortConfig, setSortConfig] = useState({ key: 'import_seq', direction: 'asc' });
   const defaultColumnConfig = {
-    timestamp: { visible: false, type: 'float8' },
+    timestamp: { visible: true, type: 'float8' },
     set: { visible: false, type: 'int2' },
     rally_id: { visible: false, type: 'int2' },
     player: { visible: true, type: 'text' },
@@ -564,19 +576,6 @@ const MainPage = () => {
   useEffect(() => {
     setLocal('layoutMode', layoutMode);
   }, [layoutMode]);
-  useEffect(() => {
-    fetch('/api/videos')
-      .then(async res => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Fetch failed: ${res.status} ${res.statusText} — ${text}`);
-        }
-        return res.json();
-      })
-      .catch(err => {
-        console.error('Failed to load videos:', err.message);
-      });
-  }, []);
   const refreshStats = () => loadStatsForSelectedVideo(selectedVideo);
   const baseFilteredStats = useMemo(() => stats
     .filter((s) =>
@@ -1148,6 +1147,7 @@ const MainPage = () => {
                 teamId,
                 currentUserId,
                 selectedGame: teamGames.find(g => String(g.id) === String(selectedGameId)),
+                accessToken,
               }}
             />
           </div>

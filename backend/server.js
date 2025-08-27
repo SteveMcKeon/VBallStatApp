@@ -8,14 +8,31 @@ const { createClient } = require('@supabase/supabase-js');
 const verifySupabaseToken = require('./src/utils/verifySupabaseToken');
 dotenv.config();
 const app = express();
+app.set('trust proxy', true);
 const EXPRESSPORT = 3001;
 const VIDEO_DIR = '/app/videos';
 const TUS_DIR = path.join(VIDEO_DIR, 'user-uploads');
 const crypto = require('crypto');
+const VIDEO_TOKEN_SECRET = process.env.VIDEO_TOKEN_SECRET;
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+function signVideoToken(payload, ttlSec = 600) {
+  const exp = Math.floor(Date.now() / 1000) + ttlSec;
+  const body = Buffer.from(JSON.stringify({ ...payload, exp }), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', VIDEO_TOKEN_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+function verifyVideoToken(token) {
+  const [body, sig] = String(token || '').split('.');
+  if (!body || !sig) return null;
+  const want = crypto.createHmac('sha256', VIDEO_TOKEN_SECRET).update(body).digest('base64url');
+  if (want !== sig) return null;
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+  return payload;
+}
 function requireInternal(req, res, next) {
   const headerKey = req.headers['x-internal-key'] || '';
   const envLen = (process.env.INTERNAL_API_KEY || '').length;
@@ -24,8 +41,73 @@ function requireInternal(req, res, next) {
   return res.status(403).json({ success: false, message: 'Forbidden (internal key required)' });
 }
 const fsp = require('fs/promises');
+function getClientIp(req) {
+  return (
+    req.headers['cf-connecting-ip'] ||
+    req.headers['x-real-ip'] ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.ip ||
+    req.connection?.remoteAddress ||
+    null
+  );
+}
+function getUserIdFromAuth(req) {
+  try {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (!token) return null;
+    const decoded = verifySupabaseToken(token);
+    return decoded?.sub || null;
+  } catch {
+    return null;
+  }
+}
+function safePreview(body, max = 2000) {
+  try {
+    const str = typeof body === 'string' ? body : JSON.stringify(body);
+    return str.length > max ? str.slice(0, max) + '…' : str;
+  } catch {
+    return '[unserializable]';
+  }
+}
 app.use((req, res, next) => {
-  console.log(`🛰️  ${req.method} ${req.url}`);
+  const start = Date.now();
+  const reqId = req.headers['cf-ray'] || crypto.randomUUID();
+  const ip = getClientIp(req);
+  const wantBody = () => {
+    const ct = (res.getHeader('Content-Type') || '').toString().toLowerCase();
+    return ct.includes('application/json') || ct.startsWith('text/');
+  };
+  const _json = res.json.bind(res);
+  res.json = (body) => {
+    if (wantBody()) res.locals.__resBody = safePreview(body);
+    return _json(body);
+  };
+  const _send = res.send.bind(res);
+  res.send = (body) => {
+    if (wantBody()) res.locals.__resBody = safePreview(body);
+    return _send(body);
+  };
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const uid = getUserIdFromAuth(req);
+    const line = {
+      t: new Date(start).toISOString(),
+      id: reqId,
+      ip,
+      method: req.method,
+      url: req.originalUrl || req.url,
+      status: res.statusCode,
+      dur_ms: duration,
+      bytes: Number(res.getHeader('Content-Length')) || undefined,
+      uid,
+      cf_ray: req.headers['cf-ray'] || undefined,
+      ua: req.headers['user-agent'] || undefined,
+      res: res.locals.__resBody,
+    };
+    if (!line.res) delete line.res;
+    console.log(JSON.stringify(line));
+  });
   next();
 });
 app.use(cors());
@@ -127,14 +209,41 @@ app.get('/api/video-exists', async (req, res) => {
     return res.json({ exists: false });
   }
 });
-app.use('/videos', express.static(VIDEO_DIR, {
+app.get('/api/video-token', async (req, res) => {
+  const token = (req.headers.authorization || '').split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Missing token' });
+  const decoded = verifySupabaseToken(token);
+  const uid = decoded?.sub;
+  if (!uid) return res.status(403).json({ error: 'Unauthorized' });
+  const gameId = String(req.query.gameId || '').trim();
+  if (!UUID_RE.test(gameId)) return res.status(400).json({ error: 'Invalid gameId' });
+  const { data: game } = await supabase.from('games')
+    .select('id, team_id, video_url').eq('id', gameId).maybeSingle();
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const allowed = await userCanDeleteGame(uid, game.team_id); // or a userCanViewGame(...) variant
+  if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  const base = path.basename(String(game.video_url || '')).replace(/\.(mp4|m4v|mov)$/i, '');
+  return res.json({ token: signVideoToken({ gid: game.id, base }) });
+});
+function guardVideo(req, res, next) {
+  const t = req.query.t || req.query.token;
+  const payload = verifyVideoToken(t);
+  if (!payload) return res.status(401).end('Unauthorized');
+  const rel = req.path.replace(/^\//, '');
+  if (!(rel === payload.base || rel.startsWith(payload.base + '.') || rel.startsWith(payload.base + '/'))) {
+    return res.status(403).end('Forbidden');
+  }
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  next();
+}
+app.use('/videos', guardVideo, express.static(VIDEO_DIR, {
   setHeaders(res, p) {
     if (p.endsWith('.m3u8')) {
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-      res.setHeader('Cache-Control', 'public, max-age=30');
+      res.setHeader('Cache-Control', 'private, max-age=30');
     } else if (p.endsWith('.m4s') || p.endsWith('.mp4')) {
       res.setHeader('Content-Type', 'video/mp4');
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
     }
     res.setHeader('Accept-Ranges', 'bytes');
   }
@@ -747,17 +856,6 @@ app.post('/api/finalize-upload', async (req, res) => {
     console.error('❌ finalize-upload failed:', e);
     return res.status(500).json({ error: 'Finalize failed' });
   }
-});
-app.get('/api/videos', (req, res) => {
-  console.log('Reading video directory:', VIDEO_DIR);
-  fs.readdir(VIDEO_DIR, (err, files) => {
-    if (err) {
-      console.error('Failed to read video directory:', VIDEO_DIR);
-      return res.status(500).json({ error: 'Unable to list files' });
-    }
-    const mp4s = files.filter(file => file.endsWith('.mp4'));
-    res.json(mp4s);
-  });
 });
 app.delete('/api/delete-upload/:id', (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];

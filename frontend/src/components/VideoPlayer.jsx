@@ -24,7 +24,7 @@ const Key = ({ combo }) => {
       .replace(/\b[a-z]\b/g, (m) => m.toUpperCase());
   return <span className="text-neutral-400">{prettify(combo)}</span>;
 };
-const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, gameId }, ref) => {
+const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, gameId, accessToken }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
   const [isPiP, setIsPiP] = useState(false);
@@ -397,8 +397,32 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       }
     };
   }, [selectedVideo, gameId]);
+  const [videoToken, setVideoToken] = useState(null);
+  useEffect(() => {
+    let canceled = false;
+    console.log("Fetching video token for gameId:", gameId);
+    (async () => {
+      if (!gameId) { setVideoToken(null); return; }
+      try {
+        if (!accessToken) { setVideoToken(null); return; }
+        console.log("GameID Worked", gameId);;
+        console.log("Access token present?", !!accessToken);
+        const r = await fetch(`/api/video-token?gameId=${encodeURIComponent(gameId)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        console.log("r", r);;
+        const j = await r.json().catch(() => ({}));
+        console.log("j:", j);
+        if (!canceled) setVideoToken(j.token || null);
+      } catch {
+        if (!canceled) setVideoToken(null);
+      }
+    })();
+    return () => { canceled = true; };
+  }, [gameId]);
   useEffect(() => {
     if (!videoRef.current || !selectedVideo) return;
+    if (gameId && !videoToken) return;
     const video = videoRef.current;
     let canceled = false;
     const savedVolume = parseFloat(getLocal("videoVolume") ?? "1");
@@ -415,8 +439,9 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       `${base}/out_rally.m3u8`,
       `${base}/out_rally/index.m3u8`,
     ];
-    const hlsAbsCandidates = hlsRelCandidates.map((rel) => `/videos/${rel}`);
-    const mp4Url = `/videos/${selectedVideo}`;
+    const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : '';
+    const hlsAbsCandidates = hlsRelCandidates.map((rel) => `/videos/${rel}${q}`);
+    const mp4Url = `/videos/${selectedVideo}${q}`;
     const seekToSaved = () => {
       if (canceled) return;
       const t = !isNaN(savedTime) ? savedTime : 0.001;
@@ -461,38 +486,21 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     const loadHls = async () => {
       const v = videoRef.current;
       if (!v) return;
-      if (v.canPlayType("application/vnd.apple.mpegurl")) {
-        for (let i = 0; i < hlsAbsCandidates.length; i++) {
-          const abs = hlsAbsCandidates[i];
-          const rel = hlsRelCandidates[i];
-          if (await fileExists(rel)) {
-            v.pause();
-            v.removeAttribute("src");
-            v.load();
-            //let startTimer = setTimeout(() => {
-              loadMp4();
-            //}, HLS_START_TIMEOUT_MS);
-            const onError = () => {
-              clearTimeout(startTimer);
-              v.removeEventListener('error', onError);
-              loadMp4();
-            };
-            v.addEventListener('error', onError, { once: true });
-            v.src = abs;
-            v.onloadeddata = async () => {
-              if (canceled) return;
-              clearTimeout(startTimer);
-              seekToSaved();
-              await tryAutoplay();
-            };
-            return;
-          }
-        }
+      if (v.canPlayType("application/vnd.apple.mpegurl") && !gameId) {
+        // (optional) keep native HLS for *public* videos; otherwise fall through to hls.js / MP4.
+      } else if (v.canPlayType("application/vnd.apple.mpegurl") && gameId) {
         return loadMp4();
       }
       if (window.Hls && window.Hls.isSupported()) {
         destroyHls();
-        const hls = new window.Hls({ enableWorker: true, debug: false });
+        const token = videoToken;
+        const addToken = (url) => token ? url + (url.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(token) : url;
+        const hls = new window.Hls({
+          enableWorker: true,
+          debug: false,
+          // append ?t=... to ALL playlist/segment requests
+          fetchSetup: (ctx, init) => [addToken(ctx.url), init],
+        });
         video._hls = hls;
         let srcAbs = null;
         for (let i = 0; i < hlsAbsCandidates.length; i++) {
@@ -551,7 +559,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       video.load();
       video.onloadeddata = null;
     };
-  }, [selectedVideo, gameId]);
+  }, [selectedVideo, gameId, videoToken]);
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
