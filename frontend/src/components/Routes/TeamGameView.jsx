@@ -11,7 +11,7 @@ export default function TeamGameView() {
     teamId, gameId, supabase,
     jumpToTime, formatTimestamp, refreshGames, refreshStats,
     selectedVideo,
-    selectedGame, displayNamesById, accessToken
+    selectedGame, displayNamesById, accessToken, DEMO_TEAM_ID
   } = useOutletContext();
   if (!selectedVideo) return null;
   return (
@@ -61,6 +61,7 @@ export default function TeamGameView() {
           stats={stats}
           gameId={selectedGame?.id ?? gameId}
           accessToken={accessToken}
+          DEMO_TEAM_ID={DEMO_TEAM_ID}
         />
       </div>
     </div>

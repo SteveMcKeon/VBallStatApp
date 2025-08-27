@@ -12,6 +12,8 @@ const CONTROLS_TIMEOUT_MS = 3000;
 const INTRO_SKIP_THRESHOLD = 0.5;
 const TOUCH_BUFFER_INTERVAL_MS = 500;
 const FRAME_DURATION = 1 / 60;
+const DEMO_GAME_ID = "8c35de74-90d9-4ab3-a198-45c0eb38047c";
+const CDN_BASE = "https://cdn.mckeon.ca";
 const Key = ({ combo }) => {
   const prettify = (s) =>
     s
@@ -417,7 +419,8 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   }, [gameId]);
   useEffect(() => {
     if (!videoRef.current || !selectedVideo) return;
-    if (gameId && !videoToken) return;
+    const isDemo = gameId === DEMO_GAME_ID;
+    if (!isDemo && gameId && !videoToken) return;
     const video = videoRef.current;
     let canceled = false;
     const savedVolume = parseFloat(getLocal("videoVolume") ?? "1");
@@ -430,13 +433,11 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     setTouchBuffer([]);
     setVideoTime({ current: 0, duration: 0 });
     const base = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
-    // --- HLS disabled for now ---
-    // const hlsRelCandidates = [
-    //   `${base}/out_rally.m3u8`,
-    //   `${base}/out_rally/index.m3u8`,
-    // ];
+    const hlsAbsCandidates = [
+      `${CDN_BASE}/${base}/out_rally.m3u8`,
+      `${CDN_BASE}/${base}/out_rally/index.m3u8`,
+    ];
     const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : '';
-    // const hlsAbsCandidates = hlsRelCandidates.map((rel) => `/videos/${rel}${q}`);
     const mp4Url = `/videos/${selectedVideo}${q}`;
     const seekToSaved = () => {
       if (canceled) return;
@@ -450,14 +451,14 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         setIsMuted(true);
         return video.play().catch(() => { });
       });
-    // const destroyHls = () => {
-    //   if (video._hls) {
-    //     try { video._hls.destroy(); } catch {}
-    //     delete video._hls;
-    //   }
-    // };
+    const destroyHls = () => {
+      if (video._hls) {
+        try { video._hls.destroy(); } catch { }
+        delete video._hls;
+      }
+    };
     const loadMp4 = () => {
-      // destroyHls();
+      destroyHls();
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -468,20 +469,70 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         await tryAutoplay();
       };
     };
-    // --- HLS loader disabled ---
-    // const HLS_START_TIMEOUT_MS = 2000;
-    // const fileExists = async (relPath) => { ... };
-    // const loadHls = async () => { ... };
-    // destroyHls();
+    // --- HLS loader (demo game only) ---
+    const HLS_START_TIMEOUT_MS = 5000;
+    const headOk = async (url) => {
+      try { const r = await fetch(url, { method: "HEAD" }); return r.ok; }
+      catch { return false; }
+    };
+    const loadHls = async () => {
+      let manifest = null;
+      for (const u of hlsAbsCandidates) {
+        if (await headOk(u)) { manifest = u; break; }
+      }
+      if (!manifest) { loadMp4(); return; }
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        let startTimer = setTimeout(() => {
+          video.removeEventListener("canplay", onCanPlay);
+          loadMp4();
+        }, HLS_START_TIMEOUT_MS);
+        const onCanPlay = async () => {
+          clearTimeout(startTimer);
+          if (canceled) return;
+          seekToSaved();
+          await tryAutoplay();
+        };
+        video.addEventListener("canplay", onCanPlay, { once: true });
+        video.pause(); video.removeAttribute("src"); video.load();
+        video.src = manifest;
+        return;
+      }
+      if (window.Hls && window.Hls.isSupported && window.Hls.isSupported()) {
+        destroyHls();
+        const hls = new window.Hls();
+        video._hls = hls;
+        let bailed = false;
+        const bailToMp4 = () => {
+          if (bailed) return; bailed = true;
+          try { hls.destroy(); } catch { }
+          delete video._hls;
+          loadMp4();
+        };
+        const startTimer = setTimeout(bailToMp4, HLS_START_TIMEOUT_MS);
+        hls.on(window.Hls.Events.MANIFEST_PARSED, async () => {
+          clearTimeout(startTimer);
+          if (canceled) return;
+          seekToSaved();
+          await tryAutoplay();
+        });
+        hls.on(window.Hls.Events.ERROR, (_evt, data) => {
+          if (data?.fatal) bailToMp4();
+        });
+        hls.loadSource(manifest);
+        hls.attachMedia(video);
+        return;
+      }
+      loadMp4();
+    };
     video.pause();
     video.removeAttribute("src");
     video.load();
-    // MP4 only
-    loadMp4();
+    if (isDemo) loadHls();
+    else loadMp4();
     return () => {
       canceled = true;
       // clearTimeout(timeoutId);
-      // destroyHls();
+      destroyHls();
       video.pause();
       video.removeAttribute("src");
       video.load();
