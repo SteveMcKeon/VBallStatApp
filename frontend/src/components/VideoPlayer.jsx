@@ -419,6 +419,8 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   }, [gameId]);
   useEffect(() => {
     if (!videoRef.current || !selectedVideo) return;
+    const pendingTimers = [];
+    const setTimer = (fn, ms) => { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; };
     const isDemo = gameId === DEMO_GAME_ID;
     if (!isDemo && gameId && !videoToken) return;
     const video = videoRef.current;
@@ -434,8 +436,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     setVideoTime({ current: 0, duration: 0 });
     const base = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
     const hlsAbsCandidates = [
-      `${CDN_BASE}/${base}/out_rally.m3u8`,
-      `${CDN_BASE}/${base}/out_rally/index.m3u8`,
+      `${CDN_BASE}/${base}/out_rally.m3u8`
     ];
     const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : '';
     const mp4Url = `/videos/${selectedVideo}${q}`;
@@ -470,29 +471,23 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       };
     };
     // --- HLS loader (demo game only) ---
-    const HLS_START_TIMEOUT_MS = 5000;
-    const headOk = async (url) => {
-      try { const r = await fetch(url, { method: "HEAD" }); return r.ok; }
-      catch { return false; }
-    };
+    const HLS_START_TIMEOUT_MS = 15000;
+    const urlExists = async (_url) => true;
     const loadHls = async () => {
       let manifest = null;
-      for (const u of hlsAbsCandidates) {
-        if (await headOk(u)) { manifest = u; break; }
-      }
+      for (const u of hlsAbsCandidates) { if (await urlExists(u)) { manifest = u; break; } }
       if (!manifest) { loadMp4(); return; }
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        let startTimer = setTimeout(() => {
-          video.removeEventListener("canplay", onCanPlay);
+        const bail = () => {
+          if (canceled) return; // guard against stale timers
+          video.removeEventListener("loadedmetadata", ok);
+          video.removeEventListener("canplay", ok);
           loadMp4();
-        }, HLS_START_TIMEOUT_MS);
-        const onCanPlay = async () => {
-          clearTimeout(startTimer);
-          if (canceled) return;
-          seekToSaved();
-          await tryAutoplay();
         };
-        video.addEventListener("canplay", onCanPlay, { once: true });
+        const startTimer = setTimer(bail, HLS_START_TIMEOUT_MS);
+        const ok = async () => { clearTimeout(startTimer); if (canceled) return; video.removeEventListener("loadedmetadata", ok); video.removeEventListener("canplay", ok); seekToSaved(); await tryAutoplay(); };
+        video.addEventListener("loadedmetadata", ok, { once: true });
+        video.addEventListener("canplay", ok, { once: true });
         video.pause(); video.removeAttribute("src"); video.load();
         video.src = manifest;
         return;
@@ -503,18 +498,27 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         video._hls = hls;
         let bailed = false;
         const bailToMp4 = () => {
-          if (bailed) return; bailed = true;
+          if (canceled || bailed) return; // guard against stale timers
+          bailed = true;
           try { hls.destroy(); } catch { }
           delete video._hls;
           loadMp4();
         };
         const startTimer = setTimeout(bailToMp4, HLS_START_TIMEOUT_MS);
-        hls.on(window.Hls.Events.MANIFEST_PARSED, async () => {
+        let started = false;
+        const startOnce = async () => {
+          if (started) return;
+          started = true;
           clearTimeout(startTimer);
+          hls.off(window.Hls.Events.LEVEL_LOADED, startOnce);
+          hls.off(window.Hls.Events.MANIFEST_PARSED, startOnce);
+          hls.off(window.Hls.Events.FRAG_LOADED, startOnce);
           if (canceled) return;
           seekToSaved();
           await tryAutoplay();
-        });
+        };
+        hls.on(window.Hls.Events.LEVEL_LOADED, startOnce);
+        hls.on(window.Hls.Events.MANIFEST_PARSED, startOnce);
         hls.on(window.Hls.Events.ERROR, (_evt, data) => {
           if (data?.fatal) bailToMp4();
         });
@@ -531,7 +535,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     else loadMp4();
     return () => {
       canceled = true;
-      // clearTimeout(timeoutId);
+      for (const id of pendingTimers) clearTimeout(id);
       destroyHls();
       video.pause();
       video.removeAttribute("src");
