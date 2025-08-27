@@ -400,19 +400,14 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
   const [videoToken, setVideoToken] = useState(null);
   useEffect(() => {
     let canceled = false;
-    console.log("Fetching video token for gameId:", gameId);
     (async () => {
       if (!gameId) { setVideoToken(null); return; }
       try {
         if (!accessToken) { setVideoToken(null); return; }
-        console.log("GameID Worked", gameId);;
-        console.log("Access token present?", !!accessToken);
         const r = await fetch(`/api/video-token?gameId=${encodeURIComponent(gameId)}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
-        console.log("r", r);;
         const j = await r.json().catch(() => ({}));
-        console.log("j:", j);
         if (!canceled) setVideoToken(j.token || null);
       } catch {
         if (!canceled) setVideoToken(null);
