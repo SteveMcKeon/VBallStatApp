@@ -434,11 +434,15 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     setCurrentRallyNumber(null);
     setTouchBuffer([]);
     setVideoTime({ current: 0, duration: 0 });
-    const base = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
-    const hlsAbsCandidates = [
-      `${CDN_BASE}/${base}/out_rally.m3u8`
-    ];
+    const baseNoExt = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
     const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : '';
+    const demoBasePath = `${DEMO_GAME_ID}/${baseNoExt}`;
+    const hlsAbsCandidates = [
+      `${CDN_BASE}/${demoBasePath}/master.m3u8`,
+      `${CDN_BASE}/${demoBasePath}/v0/stream.m3u8`,
+      `${CDN_BASE}/${demoBasePath}/v1/stream.m3u8`,
+      `${CDN_BASE}/${demoBasePath}/v2/stream.m3u8`,
+    ];
     const mp4Url = `/videos/${selectedVideo}${q}`;
     const seekToSaved = () => {
       if (canceled) return;

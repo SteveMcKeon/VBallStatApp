@@ -220,9 +220,10 @@ app.get('/api/video-token', async (req, res) => {
   const { data: game } = await supabase.from('games')
     .select('id, team_id, video_url').eq('id', gameId).maybeSingle();
   if (!game) return res.status(404).json({ error: 'Game not found' });
-  const allowed = await userCanDeleteGame(uid, game.team_id); // or a userCanViewGame(...) variant
+  const allowed = await userCanDeleteGame(uid, game.team_id);
   if (!allowed) return res.status(403).json({ error: 'Forbidden' });
-  const base = path.basename(String(game.video_url || '')).replace(/\.(mp4|m4v|mov)$/i, '');
+  const rel = String(game.video_url || '').replace(/^\//, '');
+  const base = rel.replace(/\.(mp4|m4v|mov)$/i, '');
   return res.json({ token: signVideoToken({ gid: game.id, base }) });
 });
 function guardVideo(req, res, next) {
@@ -241,7 +242,10 @@ app.use('/videos', guardVideo, express.static(VIDEO_DIR, {
     if (p.endsWith('.m3u8')) {
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
       res.setHeader('Cache-Control', 'private, max-age=30');
-    } else if (p.endsWith('.m4s') || p.endsWith('.mp4')) {
+    } else if (p.endsWith('.m4s')) {
+      res.setHeader('Content-Type', 'video/iso.segment');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+    } else if (p.endsWith('.mp4')) {
       res.setHeader('Content-Type', 'video/mp4');
       res.setHeader('Cache-Control', 'private, max-age=3600');
     }
