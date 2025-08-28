@@ -14,6 +14,7 @@ const TOUCH_BUFFER_INTERVAL_MS = 500;
 const FRAME_DURATION = 1 / 60;
 const DEMO_GAME_ID = "8c35de74-90d9-4ab3-a198-45c0eb38047c";
 const CDN_BASE = "https://cdn.mckeon.ca";
+const DASH_HLS_START_TIMEOUT_MS = 15000;
 const Key = ({ combo }) => {
   const prettify = (s) =>
     s
@@ -437,6 +438,10 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     const baseNoExt = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
     const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : '';
     const demoBasePath = `${DEMO_GAME_ID}/${baseNoExt}`;
+    const mpdUrl = `${CDN_BASE}/${demoBasePath}/manifest.mpd`;
+    const ua = navigator.userAgent || '';
+    const isApple = /\b(iPad|iPhone|iPod)\b/i.test(ua) ||
+      (/\bSafari\b/.test(ua) && !/\b(Chrome|CriOS|Edg|OPR|Firefox)\b/.test(ua));
     const hlsAbsCandidates = [
       `${CDN_BASE}/${demoBasePath}/master.m3u8`,
       `${CDN_BASE}/${demoBasePath}/v0/stream.m3u8`,
@@ -456,6 +461,49 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         setIsMuted(true);
         return video.play().catch(() => { });
       });
+    const destroyDash = () => {
+      if (video._dash) {
+        try { video._dash.reset(); } catch { }
+        delete video._dash;
+      }
+    };
+    const loadDash = () => {
+      if (!window.dashjs || isApple) { loadHls(); return; }
+      destroyHls();
+      destroyDash();
+      let bailed = false;
+      const bailToHls = () => {
+        if (canceled || bailed) return;
+        bailed = true;
+        destroyDash();
+        loadHls();
+      };
+      const startTimer = setTimer(bailToHls, DASH_HLS_START_TIMEOUT_MS);
+      const dash = window.dashjs.MediaPlayer().create();
+      video._dash = dash;
+      dash.updateSettings({
+        'streaming': {
+          abr: { autoSwitchBitrate: { video: true } },
+          fastSwitchEnabled: true,
+          buffer: { fastSwitchEnabled: true },
+          stableBufferTime: 20
+        }
+      });
+      const E = window.dashjs.MediaPlayer.events;
+      const onStarted = async () => {
+        clearTimeout(startTimer);
+        if (canceled) return;
+        seekToSaved();
+        await tryAutoplay();
+      };
+      const onError = (e) => {
+        if (e && e.fatal) bailToHls();
+      };
+      dash.on(E.STREAM_INITIALIZED, onStarted);
+      dash.on(E.ERROR, onError);
+      video.pause(); video.removeAttribute('src'); video.load();
+      dash.initialize(video, mpdUrl, true);
+    };
     const destroyHls = () => {
       if (video._hls) {
         try { video._hls.destroy(); } catch { }
@@ -474,8 +522,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
         await tryAutoplay();
       };
     };
-    // --- HLS loader (demo game only) ---
-    const HLS_START_TIMEOUT_MS = 15000;
     const urlExists = async (_url) => true;
     const loadHls = async () => {
       let manifest = null;
@@ -488,7 +534,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           video.removeEventListener("canplay", ok);
           loadMp4();
         };
-        const startTimer = setTimer(bail, HLS_START_TIMEOUT_MS);
+        const startTimer = setTimer(bail, DASH_HLS_START_TIMEOUT_MS);
         const ok = async () => { clearTimeout(startTimer); if (canceled) return; video.removeEventListener("loadedmetadata", ok); video.removeEventListener("canplay", ok); seekToSaved(); await tryAutoplay(); };
         video.addEventListener("loadedmetadata", ok, { once: true });
         video.addEventListener("canplay", ok, { once: true });
@@ -498,7 +544,15 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
       }
       if (window.Hls && window.Hls.isSupported && window.Hls.isSupported()) {
         destroyHls();
-        const hls = new window.Hls();
+        const hls = new window.Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          capLevelToPlayerSize: true,
+          abrMaxWithRealBitrate: true,
+          maxBufferLength: 60,
+          backBufferLength: 90,
+          startLevel: -1,
+        });
         video._hls = hls;
         let bailed = false;
         const bailToMp4 = () => {
@@ -508,7 +562,7 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           delete video._hls;
           loadMp4();
         };
-        const startTimer = setTimeout(bailToMp4, HLS_START_TIMEOUT_MS);
+        const startTimer = setTimeout(bailToMp4, DASH_HLS_START_TIMEOUT_MS);
         let started = false;
         const startOnce = async () => {
           if (started) return;
@@ -535,12 +589,17 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     video.pause();
     video.removeAttribute("src");
     video.load();
-    if (isDemo) loadHls();
-    else loadMp4();
+    if (isDemo) {
+      if (isApple) loadHls();
+      else loadDash();
+    } else {
+      loadMp4();
+    }
     return () => {
       canceled = true;
       for (const id of pendingTimers) clearTimeout(id);
       destroyHls();
+      destroyDash();
       video.pause();
       video.removeAttribute("src");
       video.load();
