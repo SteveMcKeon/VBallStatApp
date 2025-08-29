@@ -23,11 +23,11 @@ investigate uploads on mobile in background
 REFACTOR
 make invitation email nicer.
 emails going to invalid addresses -  supabase does NOT like bouncebacks.
-Video backups.
 HLS buffer in autoplay and filtered touches?
 avatar GIFs, history of last couple avatars
 account and profiles like Discord? Profile stats page.
-make videos exist in team_id/video.mp4
 show stats over time in time chart
 when user uploads video, allow them to link player list to users on team. -linux daemon, backend on team deletion, loading/reading video
 pre-buffer on autoplay?
+
+make videos exist in team_id/video.mp4

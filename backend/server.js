@@ -217,17 +217,25 @@ app.get('/api/video-token', async (req, res) => {
   if (!uid) return res.status(403).json({ error: 'Unauthorized' });
   const gameId = String(req.query.gameId || '').trim();
   if (!UUID_RE.test(gameId)) return res.status(400).json({ error: 'Invalid gameId' });
-  const { data: game } = await supabase.from('games')
-    .select('id, team_id, video_url').eq('id', gameId).maybeSingle();
+  const { data: game } = await supabase
+    .from('games')
+    .select('id, team_id, video_url')
+    .eq('id', gameId)
+    .maybeSingle();
   if (!game) return res.status(404).json({ error: 'Game not found' });
   const allowed = await userCanDeleteGame(uid, game.team_id);
   if (!allowed) return res.status(403).json({ error: 'Forbidden' });
-  const rel = String(game.video_url || '').replace(/^\//, '');
-  const base = rel.replace(/\.(mp4|m4v|mov)$/i, '');
+  const filename = String(game.video_url || '').replace(/^\//, '');
+  const baseNoExt = filename.replace(/\.(mp4|m4v|mov)$/i, '');
+  const base = game.team_id ? `${game.team_id}/${baseNoExt}` : baseNoExt;
   return res.json({ token: signVideoToken({ gid: game.id, base }) });
 });
 function guardVideo(req, res, next) {
-  const t = req.query.t || req.query.token;
+  const bearer = (req.get('authorization') || '').trim();
+  const fromHeader = bearer.toLowerCase().startsWith('bearer ')
+    ? bearer.slice(7).trim()
+    : null;
+  const t = typeof req.query.t === 'string' ? req.query.t : fromHeader;
   const payload = verifyVideoToken(t);
   if (!payload) return res.status(401).end('Unauthorized');
   const rel = req.path.replace(/^\//, '');
@@ -241,6 +249,9 @@ app.use('/videos', guardVideo, express.static(VIDEO_DIR, {
   setHeaders(res, p) {
     if (p.endsWith('.m3u8')) {
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+      res.setHeader('Cache-Control', 'private, max-age=30');
+    } else if (p.endsWith('.mpd')) {
+      res.setHeader('Content-Type', 'application/dash+xml');
       res.setHeader('Cache-Control', 'private, max-age=30');
     } else if (p.endsWith('.m4s')) {
       res.setHeader('Content-Type', 'video/iso.segment');

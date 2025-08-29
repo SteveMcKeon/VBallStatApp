@@ -62,6 +62,7 @@ export default function TeamGameView() {
           gameId={selectedGame?.id ?? gameId}
           accessToken={accessToken}
           DEMO_TEAM_ID={DEMO_TEAM_ID}
+          team_id={teamId}
         />
       </div>
     </div>

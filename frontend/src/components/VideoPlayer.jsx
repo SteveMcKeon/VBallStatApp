@@ -12,9 +12,13 @@ const CONTROLS_TIMEOUT_MS = 3000;
 const INTRO_SKIP_THRESHOLD = 0.5;
 const TOUCH_BUFFER_INTERVAL_MS = 500;
 const FRAME_DURATION = 1 / 60;
+const DASH_HLS_START_TIMEOUT_MS = 15000;
 const DEMO_GAME_ID = "8c35de74-90d9-4ab3-a198-45c0eb38047c";
 const CDN_BASE = "https://cdn.mckeon.ca";
-const DASH_HLS_START_TIMEOUT_MS = 15000;
+const isAppleUA =
+  /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent) &&
+  /Apple/.test(navigator.vendor || '') &&
+  !/CriOS|EdgiOS|FxiOS/.test(navigator.userAgent);
 const Key = ({ combo }) => {
   const prettify = (s) =>
     s
@@ -27,7 +31,7 @@ const Key = ({ combo }) => {
       .replace(/\b[a-z]\b/g, (m) => m.toUpperCase());
   return <span className="text-neutral-400">{prettify(combo)}</span>;
 };
-const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, gameId, accessToken }, ref) => {
+const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, gameId, accessToken, team_id }, ref) => {
   const [isCustomPlayback, setIsCustomPlayback] = useState(false);
   const customPlaybackCancelledRef = useRef(false);
   const [isPiP, setIsPiP] = useState(false);
@@ -401,6 +405,15 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     };
   }, [selectedVideo, gameId]);
   const [videoToken, setVideoToken] = useState(null);
+  const VIDEO_TOKEN_COOKIE = 'vt';
+  function setVideoTokenCookie(token) {
+    const base = `Path=/videos; SameSite=Lax`;
+    if (!token) {
+      document.cookie = `${VIDEO_TOKEN_COOKIE}=; Max-Age=0; ${base}`;
+    } else {
+      document.cookie = `${VIDEO_TOKEN_COOKIE}=${encodeURIComponent(token)}; Max-Age=3600; ${base}`;
+    }
+  }
   useEffect(() => {
     let canceled = false;
     (async () => {
@@ -411,189 +424,245 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         const j = await r.json().catch(() => ({}));
-        if (!canceled) setVideoToken(j.token || null);
+        if (!canceled) {
+          setVideoToken(j.token || null);
+          setVideoTokenCookie(j.token || null);
+        }
       } catch {
-        if (!canceled) setVideoToken(null);
+        if (!canceled) {
+          setVideoToken(null);
+          setVideoTokenCookie(null);
+        }
       }
     })();
     return () => { canceled = true; };
   }, [gameId]);
   useEffect(() => {
-    if (!videoRef.current || !selectedVideo) return;
-    const pendingTimers = [];
-    const setTimer = (fn, ms) => { const id = setTimeout(fn, ms); pendingTimers.push(id); return id; };
-    const isDemo = gameId === DEMO_GAME_ID;
-    if (!isDemo && gameId && !videoToken) return;
     const video = videoRef.current;
-    let canceled = false;
-    const savedVolume = parseFloat(getLocal("videoVolume") ?? "1");
-    const savedTime = gameId ? getSavedVideoTime(gameId) : 0;
-    video.volume = savedVolume;
-    video.muted = savedVolume === 0;
-    setIsMuted(video.muted);
-    setCurrentSet(null);
-    setCurrentRallyNumber(null);
-    setTouchBuffer([]);
-    setVideoTime({ current: 0, duration: 0 });
+    if (!videoRef.current || !selectedVideo) return;
+    const isDemo = String(gameId) === DEMO_GAME_ID;
     const baseNoExt = String(selectedVideo).replace(/\.(mp4|m4v|mov)$/i, "");
-    const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : '';
-    const demoBasePath = `${DEMO_GAME_ID}/${baseNoExt}`;
-    const mpdUrl = `${CDN_BASE}/${demoBasePath}/manifest.mpd`;
-    const ua = navigator.userAgent || '';
-    const isApple = /\b(iPad|iPhone|iPod)\b/i.test(ua) ||
-      (/\bSafari\b/.test(ua) && !/\b(Chrome|CriOS|Edg|OPR|Firefox)\b/.test(ua));
-    const hlsAbsCandidates = [
-      `${CDN_BASE}/${demoBasePath}/master.m3u8`,
-      `${CDN_BASE}/${demoBasePath}/v0/stream.m3u8`,
-      `${CDN_BASE}/${demoBasePath}/v1/stream.m3u8`,
-      `${CDN_BASE}/${demoBasePath}/v2/stream.m3u8`,
-    ];
-    const mp4Url = `/videos/${selectedVideo}${q}`;
-    const seekToSaved = () => {
-      if (canceled) return;
-      const t = !isNaN(savedTime) ? savedTime : 0.001;
-      if (video.readyState >= 1) video.currentTime = t;
-      else video.addEventListener("loadedmetadata", () => (video.currentTime = t), { once: true });
-    };
+    const q = videoToken ? `?t=${encodeURIComponent(videoToken)}` : "";
+    const basePath = isDemo
+      ? `${CDN_BASE}/${DEMO_GAME_ID}/${baseNoExt}`
+      : `/videos/${team_id}/${baseNoExt}`;
+    const hlsCandidates = isDemo
+      ? [
+        `${basePath}/master.m3u8`,
+        `${basePath}/v0/stream.m3u8`,
+      ]
+      : [
+        `${basePath}/master.m3u8${q}`,
+        `${basePath}/v0/stream.m3u8${q}`,
+      ];
+    const dashCandidates = isDemo
+      ? [
+        `${basePath}/manifest.mpd`
+      ]
+      : [
+        `${basePath}/manifest.mpd${q}`,
+      ];
+    const mp4Candidates =
+      [
+        `${basePath}/_enc/v1080.mp4${q}`,
+        `/videos/${selectedVideo}${q}`,
+      ]
+    const pendingTimers = [];
+    let canceled = false;
     const tryAutoplay = () =>
       video.play().catch(() => {
         video.muted = true;
         setIsMuted(true);
         return video.play().catch(() => { });
       });
-    const destroyDash = () => {
-      if (video._dash) {
-        try { video._dash.reset(); } catch { }
-        delete video._dash;
-      }
-    };
-    const loadDash = () => {
-      if (!window.dashjs || isApple) { loadHls(); return; }
-      destroyHls();
-      destroyDash();
-      let bailed = false;
-      const bailToHls = () => {
-        if (canceled || bailed) return;
-        bailed = true;
-        destroyDash();
-        loadHls();
-      };
-      const startTimer = setTimer(bailToHls, DASH_HLS_START_TIMEOUT_MS);
-      const dash = window.dashjs.MediaPlayer().create();
-      video._dash = dash;
-      dash.updateSettings({
-        'streaming': {
-          abr: { autoSwitchBitrate: { video: true } },
-          fastSwitchEnabled: true,
-          buffer: { fastSwitchEnabled: true },
-          stableBufferTime: 20
-        }
-      });
-      const E = window.dashjs.MediaPlayer.events;
-      const onStarted = async () => {
-        clearTimeout(startTimer);
-        if (canceled) return;
-        seekToSaved();
-        await tryAutoplay();
-      };
-      const onError = (e) => {
-        if (e && e.fatal) bailToHls();
-      };
-      dash.on(E.STREAM_INITIALIZED, onStarted);
-      dash.on(E.ERROR, onError);
-      video.pause(); video.removeAttribute('src'); video.load();
-      dash.initialize(video, mpdUrl, true);
-    };
     const destroyHls = () => {
       if (video._hls) {
         try { video._hls.destroy(); } catch { }
         delete video._hls;
       }
     };
-    const loadMp4 = () => {
-      destroyHls();
+    const destroyDash = () => {
+      if (video._dash) {
+        try { video._dash.reset?.(); } catch { }
+        delete video._dash;
+      }
+    };
+    const seekToSaved = () => {
+      const savedTime = gameId ? getSavedVideoTime(gameId) : 0;
+      if (savedTime > 0 && !Number.isNaN(savedTime)) {
+        try { video.currentTime = savedTime; } catch { }
+      }
+    };
+    const loadMp4From = (urls) => {
+      destroyHls(); destroyDash();
       video.pause();
       video.removeAttribute("src");
       video.load();
-      video.src = mp4Url;
-      video.onloadeddata = async () => {
-        if (canceled) return;
-        seekToSaved();
-        await tryAutoplay();
-      };
-    };
-    const urlExists = async (_url) => true;
-    const loadHls = async () => {
-      let manifest = null;
-      for (const u of hlsAbsCandidates) { if (await urlExists(u)) { manifest = u; break; } }
-      if (!manifest) { loadMp4(); return; }
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        const bail = () => {
-          if (canceled) return; // guard against stale timers
-          video.removeEventListener("loadedmetadata", ok);
-          video.removeEventListener("canplay", ok);
-          loadMp4();
+      const tryIndex = (i) => {
+        if (i >= urls.length) return;
+        const url = urls[i];
+        const onError = () => {
+          video.removeEventListener("error", onError);
+          tryIndex(i + 1);
         };
-        const startTimer = setTimer(bail, DASH_HLS_START_TIMEOUT_MS);
-        const ok = async () => { clearTimeout(startTimer); if (canceled) return; video.removeEventListener("loadedmetadata", ok); video.removeEventListener("canplay", ok); seekToSaved(); await tryAutoplay(); };
-        video.addEventListener("loadedmetadata", ok, { once: true });
-        video.addEventListener("canplay", ok, { once: true });
-        video.pause(); video.removeAttribute("src"); video.load();
-        video.src = manifest;
-        return;
-      }
-      if (window.Hls && window.Hls.isSupported && window.Hls.isSupported()) {
-        destroyHls();
-        const hls = new window.Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          capLevelToPlayerSize: true,
-          abrMaxWithRealBitrate: true,
-          maxBufferLength: 60,
-          backBufferLength: 90,
-          startLevel: -1,
-        });
-        video._hls = hls;
-        let bailed = false;
-        const bailToMp4 = () => {
-          if (canceled || bailed) return; // guard against stale timers
-          bailed = true;
-          try { hls.destroy(); } catch { }
-          delete video._hls;
-          loadMp4();
-        };
-        const startTimer = setTimeout(bailToMp4, DASH_HLS_START_TIMEOUT_MS);
-        let started = false;
-        const startOnce = async () => {
-          if (started) return;
-          started = true;
-          clearTimeout(startTimer);
-          hls.off(window.Hls.Events.LEVEL_LOADED, startOnce);
-          hls.off(window.Hls.Events.MANIFEST_PARSED, startOnce);
-          hls.off(window.Hls.Events.FRAG_LOADED, startOnce);
+        video.addEventListener("error", onError, { once: true });
+        video.onloadeddata = async () => {
+          video.removeEventListener("error", onError);
           if (canceled) return;
           seekToSaved();
           await tryAutoplay();
         };
-        hls.on(window.Hls.Events.LEVEL_LOADED, startOnce);
-        hls.on(window.Hls.Events.MANIFEST_PARSED, startOnce);
-        hls.on(window.Hls.Events.ERROR, (_evt, data) => {
-          if (data?.fatal) bailToMp4();
-        });
-        hls.loadSource(manifest);
-        hls.attachMedia(video);
+        video.src = url;
+      };
+      tryIndex(0);
+    };
+    const loadHlsFrom = async (urls) => {
+      if (isAppleUA && video.canPlayType("application/vnd.apple.mpegurl")) {
+        destroyHls(); destroyDash();
+        video.pause(); video.removeAttribute("src"); video.load();
+        const onErr = () => loadMp4From(mp4Candidates);
+        video.addEventListener("error", onErr, { once: true });
+        video.onloadeddata = async () => {
+          video.removeEventListener("error", onErr);
+          if (canceled) return;
+          seekToSaved();
+          await tryAutoplay();
+        };
+        video.src = urls[0];
         return;
       }
-      loadMp4();
+      const HlsGlobal = window.Hls;
+      if (!HlsGlobal || !HlsGlobal.isSupported()) {
+        loadMp4From(mp4Candidates);
+        return;
+      }
+      destroyHls(); destroyDash();
+      const TokenLoader = class extends HlsGlobal.DefaultConfig.loader {
+        constructor(config) { super(config); this.token = config?.token; }
+        load(context, config, callbacks) {
+          try {
+            if (this.token && context?.url) {
+              const u = new URL(context.url, window.location.href);
+              if (!u.searchParams.has('t')) u.searchParams.set('t', this.token);
+              context.url = u.toString();
+            }
+          } catch { /* noop */ }
+          return super.load(context, config, callbacks);
+        }
+      };
+      const hls = new HlsGlobal({
+        loader: TokenLoader,
+        token: videoToken || null,
+        enableWorker: true,
+        lowLatencyMode: false,
+        capLevelToPlayerSize: true,
+        abrMaxWithRealBitrate: true,
+        maxBufferLength: 60,
+        backBufferLength: 90,
+        startLevel: -1,
+      });
+      video._hls = hls;
+      let started = false;
+      let urlIndex = 0;
+      const bailToNext = () => {
+        if (canceled) return;
+        try { hls.stopLoad(); hls.detachMedia(); } catch { }
+        if (++urlIndex < urls.length) {
+          hls.attachMedia(video);
+          hls.loadSource(urls[urlIndex]);
+          armStartTimer();
+        } else {
+          try { hls.destroy(); } catch { }
+          delete video._hls;
+          loadMp4From(mp4Candidates);
+        }
+      };
+      const armStartTimer = () => {
+        const id = setTimeout(bailToNext, DASH_HLS_START_TIMEOUT_MS);
+        pendingTimers.push(id);
+      };
+      const startOnce = async () => {
+        if (started) return;
+        started = true;
+        pendingTimers.forEach(clearTimeout);
+        if (canceled) return;
+        seekToSaved();
+        await tryAutoplay();
+      };
+      hls.on(HlsGlobal.Events.LEVEL_LOADED, startOnce);
+      hls.on(HlsGlobal.Events.MANIFEST_PARSED, startOnce);
+      hls.on(HlsGlobal.Events.FRAG_LOADED, startOnce);
+      hls.on(HlsGlobal.Events.ERROR, (_evt, data) => {
+        if (data?.fatal) bailToNext();
+      });
+      hls.attachMedia(video);
+      hls.loadSource(urls[urlIndex]);
+      armStartTimer();
+    };
+    const loadDashFrom = (urls) => {
+      const dashjs = window.dashjs;
+      if (!dashjs || !dashjs.MediaPlayer) {
+        if (isAppleUA) return loadHlsFrom(hlsCandidates);
+        return loadMp4From(mp4Candidates);
+      }
+      destroyHls(); destroyDash();
+      video.pause(); video.removeAttribute("src"); video.load();
+      const player = dashjs.MediaPlayer().create();
+      video._dash = player;
+      player.updateSettings({
+        streaming: {
+          abr: { autoSwitchBitrate: { video: true } },
+          buffer: { stableBufferTime: 30, bufferTimeAtTopQualityLongForm: 30 },
+        },
+      });
+      if (videoToken) {
+        player.extend('RequestModifier', function () {
+          return {
+            modifyRequestHeader: function (xhr) {
+              return xhr;
+            },
+            modifyRequestURL: function (url) {
+              try {
+                const u = new URL(url, window.location.href);
+                if (!u.searchParams.has('t')) u.searchParams.set('t', videoToken);
+                return u.toString();
+              } catch {
+                const sep = url.includes('?') ? '&' : '?';
+                return `${url}${sep}t=${encodeURIComponent(videoToken)}`;
+              }
+            }
+          };
+        }, true);
+      }
+      let urlIndex = 0;
+      const tryNext = () => {
+        if (urlIndex >= urls.length) {
+          destroyDash();
+          if (isAppleUA) loadHlsFrom(hlsCandidates);
+          else loadMp4From(mp4Candidates);
+          return;
+        }
+        const url = urls[urlIndex++];
+        player.initialize(video, url, true);
+      };
+      player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, async () => {
+        if (canceled) return;
+        seekToSaved();
+        await tryAutoplay();
+      });
+      player.on(dashjs.MediaPlayer.events.ERROR, () => {
+        tryNext();
+      });
+      tryNext();
     };
     video.pause();
     video.removeAttribute("src");
     video.load();
     if (isDemo) {
-      if (isApple) loadHls();
-      else loadDash();
+      loadHlsFrom(hlsCandidates);
     } else {
-      loadMp4();
+      if (isAppleUA) loadHlsFrom(hlsCandidates);
+      else loadDashFrom(dashCandidates);
     }
     return () => {
       canceled = true;
@@ -736,7 +805,6 @@ const VideoPlayer = forwardRef(({ selectedVideo, videoRef, containerRef, stats, 
     let singleTapTimeout;
     // ---- KEYBOARD LISTENER ----
     const handleKeyDown = async (e) => {
-      const activeElement = document.activeElement;
       if (
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "TEXTAREA" ||
